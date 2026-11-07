@@ -723,6 +723,18 @@ class DiffEngineMixin:
         elif set(children_b) - set(children_a):
             saw_missing = True
 
+        if hash_pairs and best_rank < 1:
+            # Same content held a different number of times on each side
+            # (extra duplicates): the folders are not the same.
+            counts_a, counts_b = {}, {}
+            for counts, kids in ((counts_a, children_a), (counts_b, children_b)):
+                for kid in kids.values():
+                    digest = None if kid["is_dir"] else self._node_hash(kid)
+                    if digest is not None:
+                        counts[digest] = counts.get(digest, 0) + 1
+            if any(n != counts_b[h] for h, n in counts_a.items() if h in counts_b):
+                best_rank, best_directions = 1, {"larger": 1}
+
         if saw_missing and best_rank < 3:
             best_rank = 3
             best_directions = {}

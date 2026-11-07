@@ -542,6 +542,9 @@ class DiffEngineMixin:
         new snapshot, so it has to be thrown away wholesale rather than
         picked through entry by entry."""
         self._dir_rank_cache = {}
+        for _pane in (getattr(self, "left", None), getattr(self, "right", None)):
+            if _pane is not None:
+                _pane._hash_groups = None
         self._pair_cache = {}
 
     def _dir_content_rank(self, dir_a, dir_b, date_field="mtime"):

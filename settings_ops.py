@@ -57,6 +57,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
+    "multi_select_matching", "multi_select_same_folder",
 })
 
 
@@ -115,6 +116,8 @@ class SettingsMixin:
             "fingerprint_end_kb": getattr(self, "fingerprint_end_spin", None),
             "ignore_file_extensions": getattr(self, "ignore_file_extensions_cb", None),
             "first_name_only": getattr(self, "first_name_only_cb", None),
+            "multi_select_matching": getattr(self, "multi_select_matching_cb", None),
+            "multi_select_same_folder": getattr(self, "multi_select_same_folder_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)
@@ -547,10 +550,19 @@ class SettingsMixin:
         self.first_name_only_cb.setEnabled(ctype == CMP_NAME_SIZE_DATE)
         self.hash_algorithm_combo.setEnabled(hashing)
         self.hash_algorithm_label.setEnabled(hashing)
+        self.multi_select_matching_cb.setEnabled(hashing)
+        self.multi_select_same_folder_cb.setEnabled(hashing and self.multi_select_matching_cb.isChecked())
         for spin, label in ((self.fingerprint_start_spin, self.fingerprint_start_label),
                             (self.fingerprint_end_spin, self.fingerprint_end_label)):
             spin.setEnabled(ctype == CMP_FINGERPRINT)
             label.setEnabled(ctype == CMP_FINGERPRINT)
+
+    def _on_multi_select_setting_changed(self, *_args):
+        """Multi Select options (no effect on how files compare, so no
+        re-tagging): copy into state and fix which one is enabled."""
+        self._multi_select_matching = self.multi_select_matching_cb.isChecked()
+        self._multi_select_same_folder = self.multi_select_same_folder_cb.isChecked()
+        self._update_comparison_controls_enabled()
 
     def _on_name_match_option_toggled(self, other_cb, checked):
         """"Ignore file extensions" and "Only first part of file name" are

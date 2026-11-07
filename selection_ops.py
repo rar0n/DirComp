@@ -346,43 +346,98 @@ class SelectionMixin:
         correctly itself once it's actually done."""
         if (getattr(self, "_select_group_guard", False) or getattr(self, "_sync_guard", False)
                 or getattr(pane, "_tree_rebuild_pending", False)):
+            pane._multi_prev = None
             return
         for btn in pane.select_toggle_buttons.values():
             if btn.isChecked():
                 btn.blockSignals(True)
                 btn.setChecked(False)
                 btn.blockSignals(False)
-        self._select_duplicates_of_current(pane)
+        self._select_duplicates_of_new(pane)
 
-    def _select_duplicates_of_current(self, pane: DirectoryPane):
-        """Hash / Fingerprint comparison: selecting a file by hand also
-        selects the other files of the same folder with identical content
-        (its duplicates). Only the item just clicked / moved to is
-        expanded, and only when it ended up selected -- deselecting one
-        leaves its duplicates alone, and Select-group operations (which
-        never reach here) are unaffected."""
-        if getattr(self, "_dup_select_guard", False) or not self._hash_mode_active():
+    def _selected_path_set(self, pane: DirectoryPane) -> set:
+        return {os.path.normpath(p) for p in
+                (i.data(0, PATH_ROLE) for i in pane.tree.selectedItems()) if p}
+
+    def _hash_groups_index(self, pane: DirectoryPane):
+        """{digest: [file nodes]} over the pane's whole snapshot, built
+        once and kept until the next snapshot rebuild / settings change
+        (see DiffEngineMixin._invalidate_dir_rank_cache)."""
+        cached = getattr(pane, "_hash_groups", None)
+        if cached is not None:
+            return cached
+        groups = {}
+        for node in (pane.snapshot_index or {}).values():
+            if not node["is_dir"]:
+                digest = self._node_hash(node)
+                if digest is not None:
+                    groups.setdefault(digest, []).append(node)
+        pane._hash_groups = groups
+        return groups
+
+    def _select_duplicates_of_new(self, pane: DirectoryPane):
+        """Hash / Fingerprint comparison with "Multi Select matching files
+        in same pane" on: files newly selected by hand (click, Ctrl-click,
+        Shift-click range, drag) pull in the files with identical content --
+        in the same folder only, or (that option off) anywhere in the pane.
+        Without a previous selection to diff against (pane._multi_prev is
+        None after a Select-group operation) only the item just clicked
+        counts. Deselecting never pulls anything in or out."""
+        previous = getattr(pane, "_multi_prev", None)
+        if (getattr(self, "_dup_select_guard", False)
+                or not getattr(self, "_multi_select_matching", True)
+                or not self._hash_mode_active()):
+            pane._multi_prev = None
             return
-        item = pane.tree.currentItem()
-        if item is None or not item.isSelected() or item.data(0, IS_DIR_ROLE):
-            return
-        node = self._snapshot_lookup(item.data(0, PATH_ROLE))
-        digest = self._node_hash(node) if node is not None else None
-        parent = self._snapshot_lookup(os.path.dirname(item.data(0, PATH_ROLE)))
-        if digest is None or parent is None:
-            return
-        selected = {os.path.normpath(i.data(0, PATH_ROLE)) for i in pane.tree.selectedItems()}
-        extra = [c["full_path"] for c in (parent["children"] or {}).values()
-                 if not c["is_dir"] and os.path.normpath(c["full_path"]) not in selected
-                 and self._node_hash(c) == digest]
-        if not extra:
-            return
-        self._dup_select_guard = True
-        try:
-            self._select_paths_in_tree(pane.tree, extra, additive=True, select_subtree=False,
-                                       auto_expand=False, expand_matched_dirs=False)
-        finally:
-            self._dup_select_guard = False
+        current = self._selected_path_set(pane)
+        if previous is None:
+            item = pane.tree.currentItem()
+            new = {os.path.normpath(item.data(0, PATH_ROLE))} if (
+                item is not None and item.isSelected() and item.data(0, PATH_ROLE)) else set()
+        else:
+            new = current - previous
+        same_folder = getattr(self, "_multi_select_same_folder", True)
+        recursive = self._recursive_folder_contents_enabled()
+        extra = []
+        for path in new:
+            node = self._snapshot_lookup(path)
+            if node is None or node["is_dir"]:
+                continue
+            digest = self._node_hash(node)
+            if digest is None:
+                continue
+            if same_folder:
+                parent = self._snapshot_lookup(os.path.dirname(path))
+                pool = [c for c in (parent["children"] or {}).values()] if parent else []
+            else:
+                pool = self._hash_groups_index(pane).get(digest, [])
+            for c in pool:
+                cp = os.path.normpath(c["full_path"])
+                if (not c["is_dir"] and cp not in current and self._node_hash(c) == digest):
+                    extra.append(c["full_path"])
+                    current.add(cp)
+        if not same_folder and not recursive and extra:
+            # Pane-wide, but only what is actually listed (populated).
+            shown = set()
+            stack = [pane.tree.topLevelItem(i) for i in range(pane.tree.topLevelItemCount())]
+            while stack:
+                it = stack.pop()
+                shown.add(os.path.normpath(it.data(0, PATH_ROLE) or ""))
+                if it.data(0, POPULATED_ROLE):
+                    stack.extend(it.child(i) for i in range(it.childCount()))
+            keep = [p for p in extra if os.path.normpath(p) in shown]
+            current -= {os.path.normpath(p) for p in extra if p not in keep}
+            extra = keep
+        if extra:
+            self._dup_select_guard = True
+            try:
+                self._select_paths_in_tree(
+                    pane.tree, extra, additive=True, select_subtree=False,
+                    auto_expand=self._expand_folders_matching_selection_enabled(),
+                    expand_matched_dirs=False)
+            finally:
+                self._dup_select_guard = False
+        pane._multi_prev = self._selected_path_set(pane)
 
     def update_selection_count(self, tree, pane: DirectoryPane):
         if getattr(self, "_bulk_select_guard", False) or getattr(pane, "_tree_rebuild_pending", False):

@@ -254,6 +254,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._cmp_chunk_end_kb = DEFAULT_FINGERPRINT_CHUNK_KB
             self._cmp_ignore_ext = False
             self._cmp_first_name = False
+            self._multi_select_matching = True
+            self._multi_select_same_folder = True
             self._cmp_applied_key = None
         if not hasattr(self, "_select_colors"):
             self._select_colors = dict(_DEFAULT_SELECT_COLORS)

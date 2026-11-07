@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 # Project-module imports below that this file itself no longer uses are kept
 # on purpose: other modules may still import them via ui_builder.
 from constants import IS_DIR_ROLE, CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, TAG_COLORS
+from constants import CMP_NAME_SIZE_DATE, DEFAULT_HASH_ALGORITHM, DEFAULT_FINGERPRINT_CHUNK_KB
 from panes import DirectoryPane
 from dnd_widgets import DirDropLineEdit, DirDropTreeWidget
 from statistics_widget import TimelineWidget, DEFAULT_BIN_COUNT, DEFAULT_LABEL_FONT_PT, TICK_LABEL_ANGLE_DEG
@@ -241,6 +242,17 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # File List View" (see panes.DirectoryPane.folder_history /
             # SettingsMixin._record_folder_history).
             self._file_list_history_limit = 10
+        if not hasattr(self, "_cmp_type"):
+            # Settings tab -> Global Options -> comparison type controls.
+            # Plain attributes (not read back from the widgets) so they
+            # survive a UI rebuild; see DiffEngineMixin._comparison_key
+            # and SettingsMixin._on_comparison_setting_changed.
+            self._cmp_type = CMP_NAME_SIZE_DATE
+            self._cmp_algorithm = DEFAULT_HASH_ALGORITHM
+            self._cmp_chunk_start_kb = DEFAULT_FINGERPRINT_CHUNK_KB
+            self._cmp_chunk_end_kb = DEFAULT_FINGERPRINT_CHUNK_KB
+            self._cmp_ignore_ext = False
+            self._cmp_applied_key = None
         if not hasattr(self, "_select_colors"):
             self._select_colors = dict(_DEFAULT_SELECT_COLORS)
         if not hasattr(self, "_summary_colors"):

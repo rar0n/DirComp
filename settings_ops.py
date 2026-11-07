@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QLineEdit, QMessageBox, QSpinBox,
 )
 
+from constants import CMP_FINGERPRINT, CMP_HASH, CMP_NAME_SIZE_DATE
 from theme_ops import _THEMES
 
 _SETTINGS_FILENAME = "dircomp_settings.json"
@@ -54,6 +55,8 @@ _SHARED_WIDGET_KEYS = frozenset({
     "sort_directories_first", "symmetrical_buttons", "synchronize_views",
     "dual_pane", "dual_pane_threshold", "single_pane_threshold", "unnatural_scrolling",
     "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
+    "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
+    "ignore_file_extensions",
 })
 
 
@@ -106,6 +109,11 @@ class SettingsMixin:
             "file_list_history_limit": getattr(self, "file_list_history_limit_spin", None),
             # A QButtonGroup, not a widget: see _widget_value below.
             "scrollbar_handle_style": getattr(self, "scrollbar_handle_style_group", None),
+            "comparison_type": getattr(self, "comparison_type_combo", None),
+            "hash_algorithm": getattr(self, "hash_algorithm_combo", None),
+            "fingerprint_start_kb": getattr(self, "fingerprint_start_spin", None),
+            "fingerprint_end_kb": getattr(self, "fingerprint_end_spin", None),
+            "ignore_file_extensions": getattr(self, "ignore_file_extensions_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)
@@ -526,6 +534,40 @@ class SettingsMixin:
             if len(pane.folder_history) > value:
                 del pane.folder_history[value:]
                 self._refresh_history_combo(pane)
+
+    def _update_comparison_controls_enabled(self):
+        """Which comparison controls apply to the chosen type: Ignore
+        file extensions only to Name, size and date; the algorithm to
+        both hash types; the chunk sizes to Fingerprint alone."""
+        ctype = self.comparison_type_combo.currentIndex()
+        hashing = ctype in (CMP_HASH, CMP_FINGERPRINT)
+        self.ignore_file_extensions_cb.setEnabled(ctype == CMP_NAME_SIZE_DATE)
+        self.hash_algorithm_combo.setEnabled(hashing)
+        self.hash_algorithm_label.setEnabled(hashing)
+        for spin, label in ((self.fingerprint_start_spin, self.fingerprint_start_label),
+                            (self.fingerprint_end_spin, self.fingerprint_end_label)):
+            spin.setEnabled(ctype == CMP_FINGERPRINT)
+            label.setEnabled(ctype == CMP_FINGERPRINT)
+
+    def _on_comparison_setting_changed(self, *_args):
+        """Any comparison control (Settings tab -> Global Options) changed:
+        copy all of them into the self._cmp_* state, fix which controls are
+        enabled, and -- only if the result can actually differ (see
+        DiffEngineMixin._comparison_key) -- re-tag both panes in place from
+        the snapshots already in memory (no disk rescan: nothing on disk
+        changed, and update_listings' retag_only path just recolors)."""
+        self._cmp_type = self.comparison_type_combo.currentIndex()
+        self._cmp_algorithm = self.hash_algorithm_combo.currentIndex()
+        self._cmp_chunk_start_kb = self.fingerprint_start_spin.value()
+        self._cmp_chunk_end_kb = self.fingerprint_end_spin.value()
+        self._cmp_ignore_ext = self.ignore_file_extensions_cb.isChecked()
+        self._update_comparison_controls_enabled()
+        key = self._comparison_key()
+        if key == self._cmp_applied_key:
+            return
+        self._cmp_applied_key = key
+        self._invalidate_dir_rank_cache()
+        self.update_listings(rescan_disk=False)
 
     def _set_settings_status(self, message: str):
         """Settings tab's own status line (see ui_builder._build_status_

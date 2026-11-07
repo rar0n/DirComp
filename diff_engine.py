@@ -22,6 +22,8 @@ A future change to how dates are compared/typed, or to what counts as
 import os
 import datetime
 
+from constants import CMP_NAME_SIZE_DATE
+
 
 class DiffEngineMixin:
     # ------------------------------------------------------------ Snapshot
@@ -110,6 +112,58 @@ class DiffEngineMixin:
                 return index[norm]
         return None
 
+    # ------------------------------------------------- Comparison settings
+
+    def _ignore_extensions_active(self) -> bool:
+        """True when files are matched by name without extension (Settings
+        tab -> Global Options -> "Ignore file extensions"). Only the
+        name-based comparison type has this option; the hash types ignore
+        the checkbox even if it was left checked."""
+        return (getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) == CMP_NAME_SIZE_DATE
+                and bool(getattr(self, "_cmp_ignore_ext", False)))
+
+    def _comparison_key(self) -> tuple:
+        """Everything about the comparison settings that can change a
+        diff result, as one hashable value: part of _dir_content_rank's
+        cache key, and what the settings handler compares to decide
+        whether a changed control needs the panes re-tagged at all.
+
+        Hash value and Fingerprint have no hashes to compare yet, so for
+        now they reduce to the same key (and the same behavior) as the
+        plain name/size/date type; once hashing exists they get their
+        own entries here, with the algorithm and chunk sizes."""
+        return (CMP_NAME_SIZE_DATE, self._ignore_extensions_active())
+
+    @staticmethod
+    def _stem_index(dir_node):
+        """{name without extension: file node} for a directory node's
+        files (folders never take part -- a folder called "v1.2" has no
+        extension to ignore). Built once per node and kept on it; a
+        rebuilt snapshot brings new nodes, so it never goes stale."""
+        index = dir_node.get("_stems")
+        if index is None:
+            index = {}
+            for name, child in (dir_node["children"] or {}).items():
+                if not child["is_dir"]:
+                    index.setdefault(os.path.splitext(name)[0], child)
+            dir_node["_stems"] = index
+        return index
+
+    def _counterpart_node(self, other_full, is_dir):
+        """The snapshot node `other_full` refers to, if it is the same
+        kind of thing (file vs folder); None otherwise. With "Ignore file
+        extensions" on, a file with no exact-name counterpart falls back
+        to any file in that folder with the same name minus extension."""
+        node = self._snapshot_lookup(other_full)
+        if node is not None and node["is_dir"] == is_dir:
+            return node
+        if is_dir or not self._ignore_extensions_active():
+            return None
+        parent = self._snapshot_lookup(os.path.dirname(other_full))
+        if parent is None or not parent["is_dir"]:
+            return None
+        return self._stem_index(parent).get(os.path.splitext(os.path.basename(other_full))[0])
+
     # ------------------------------------------------------------- Compare
 
     def _diff_tag(self, name, is_dir, size_str, date_str, other_dir, full_path=None, date_field="mtime"):
@@ -145,11 +199,8 @@ class DiffEngineMixin:
             return "directory" if is_dir else "file"
 
         other_full = os.path.join(other_dir, name)
-        other_node = self._snapshot_lookup(other_full)
+        other_node = self._counterpart_node(other_full, is_dir)
         if other_node is None:
-            return "missing_dir" if is_dir else "missing_file"
-
-        if other_node["is_dir"] != is_dir:
             return "missing_dir" if is_dir else "missing_file"
 
         if is_dir and full_path and self._recursive_folder_contents_enabled():
@@ -193,8 +244,8 @@ class DiffEngineMixin:
         For a directory this is its *immediate* item count and date --
         the non-recursive comparison -- regardless of Recursive Folder
         Contents; aggregate folder differences are Diff Folders' job."""
-        other_node = self._snapshot_lookup(other_full) if other_full else None
-        if other_node is None or other_node["is_dir"] != is_dir:
+        other_node = self._counterpart_node(other_full, is_dir) if other_full else None
+        if other_node is None:
             return None
         return self._diff_axes_vs_node(other_node, is_dir, size_str, date_str, date_field)
 
@@ -204,7 +255,12 @@ class DiffEngineMixin:
         the same formatted strings the listing shows -- dates to the
         whole second, sizes as format_size's text for a file or "N items"
         for a folder -- so what counts as "different" matches what's on
-        screen."""
+        screen.
+
+        With "Ignore file extensions" on, a file that has a counterpart
+        at all matches: size and dates are not compared."""
+        if not is_dir and self._ignore_extensions_active():
+            return None, None
         other_date_str = datetime.datetime.fromtimestamp(other_node[date_field]).strftime("%Y-%m-%d %H:%M:%S")
         if is_dir:
             other_size_str = f"{len(other_node['children'] or {})} items"
@@ -247,6 +303,8 @@ class DiffEngineMixin:
         _diff_tag) -- only falls back to the size comparison (rank 1)
         once the (truncated) dates actually agree. See _DIFF_RANK for
         the same priority applied to _diff_tag's own top-level compare."""
+        if self._ignore_extensions_active():
+            return 0, None
         same_size = node_a["size"] == node_b["size"]
         same_date = int(node_a[date_field]) == int(node_b[date_field])
         if same_size and same_date:
@@ -341,7 +399,7 @@ class DiffEngineMixin:
             cache = self._dir_rank_cache = {}
         key = (os.path.normpath(dir_a) if dir_a else None,
                os.path.normpath(dir_b) if dir_b else None,
-               date_field)
+               date_field, self._comparison_key())
         if key in cache:
             return cache[key]
         result = self._dir_content_rank_uncached(dir_a, dir_b, date_field)
@@ -405,8 +463,15 @@ class DiffEngineMixin:
         best_rank = 0
         best_directions = {}
         saw_missing = False
+        # "Ignore file extensions": a file also pairs with any file of
+        # the same name minus extension (see _counterpart_node).
+        ignore_ext = self._ignore_extensions_active()
+        stems_a = self._stem_index(node_a) if ignore_ext else None
+        stems_b = self._stem_index(node_b) if ignore_ext and node_b is not None else {}
         for name, child_a in children_a.items():
             child_b = children_b.get(name)
+            if ignore_ext and not child_a["is_dir"] and (child_b is None or child_b["is_dir"]):
+                child_b = stems_b.get(os.path.splitext(name)[0])
             if child_b is None or child_b["is_dir"] != child_a["is_dir"]:
                 saw_missing = True
                 continue
@@ -421,7 +486,16 @@ class DiffEngineMixin:
                 best_directions[direction] = best_directions.get(direction, 0) + 1
 
         # Symmetric check: dir_b may hold items dir_a simply doesn't have.
-        if set(children_b) - set(children_a):
+        if ignore_ext:
+            for name, child_b in children_b.items():
+                child_a = children_a.get(name)
+                if child_a is not None and child_a["is_dir"] == child_b["is_dir"]:
+                    continue
+                if not child_b["is_dir"] and os.path.splitext(name)[0] in stems_a:
+                    continue
+                saw_missing = True
+                break
+        elif set(children_b) - set(children_a):
             saw_missing = True
 
         if saw_missing and best_rank < 3:

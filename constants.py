@@ -198,3 +198,18 @@ _DEFAULT_TREE_INDENTATION = 20
 # -- see DirDropTreeWidget.drawBranches) at least barely usable, and
 # never 0, which DirDropTreeWidget._line_at would divide by.
 _MIN_TREE_INDENTATION, _MAX_TREE_INDENTATION = 4, 100
+
+
+# Comparison type (Settings tab -> Global Options). The combo box's item
+# order IS the saved value (settings_ops saves a combo by index), so only
+# ever append. Hash value and Fingerprint have no hashes to compare yet
+# (hashing is a later step), so they currently behave exactly like
+# CMP_NAME_SIZE_DATE -- see DiffEngineMixin._comparison_key.
+CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT = 0, 1, 2
+COMPARISON_TYPES = ("Name, size and date", "Hash value", "Fingerprint")
+# Same rule for the algorithm combo (index saved). SHA-256 is the default.
+HASH_ALGORITHMS = ("MD5", "SHA-1", "SHA-256", "BLAKE2b")
+DEFAULT_HASH_ALGORITHM = 2
+# Fingerprint = file size + this many kB from the start + this many from the end.
+DEFAULT_FINGERPRINT_CHUNK_KB = 64
+MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB = 1, 1024

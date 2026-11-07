@@ -13,12 +13,14 @@ Split out of ui_builder.py unchanged -- same methods, still reached as
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics
 from PySide6.QtWidgets import (
-    QAbstractItemView, QAbstractScrollArea, QButtonGroup, QCheckBox, QColorDialog,
+    QAbstractItemView, QAbstractScrollArea, QButtonGroup, QCheckBox, QColorDialog, QComboBox,
     QFrame, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QPushButton, QRadioButton,
     QScrollArea, QSizePolicy, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from constants import (
+    COMPARISON_TYPES, HASH_ALGORITHMS, CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT,
+    MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB,
     TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
     _MAX_TREE_INDENTATION, _MIN_TREE_INDENTATION, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE,
     _SUBSECTION_GAP, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE, _SUBTITLE_PT, _SUBTITLE_STYLE,
@@ -499,6 +501,96 @@ class SettingsTabMixin:
         scrollbar_style_row.addStretch(1)
         self.scrollbar_handle_style_group.idToggled.connect(self._on_scrollbar_handle_style_toggled)
         global_grid.addLayout(scrollbar_style_row, 10, 0, 1, 7)
+
+        # Rows 11-14: how two files are judged "the same" (see
+        # DiffEngineMixin._comparison_key). Shared by both panes, no
+        # Main-tab primary. The state lives in self._cmp_* (so it
+        # survives a UI rebuild); these widgets are built from it and
+        # write back through _on_comparison_setting_changed.
+        comparison_gap = QWidget()
+        comparison_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        global_grid.addWidget(comparison_gap, 11, 0, 1, 7)
+
+        comparison_type_row = QHBoxLayout()
+        comparison_type_row.setContentsMargins(0, 0, 0, 0)
+        comparison_type_row.addWidget(QLabel("Comparison type:"))
+        self.comparison_type_combo = QComboBox()
+        self.comparison_type_combo.addItems(COMPARISON_TYPES)
+        self.comparison_type_combo.setCurrentIndex(self._cmp_type)
+        self.comparison_type_combo.setToolTip(
+            "How a file is judged to match its counterpart in the other pane.\n"
+            "Name, size and date: same name, size and modification date (the "
+            "classic comparison).\n"
+            "Hash value / Fingerprint: compare file contents instead. Hashing "
+            "is not available yet, so for now these two behave like "
+            "Name, size and date."
+        )
+        comparison_type_row.addWidget(self.comparison_type_combo)
+        comparison_type_row.addStretch(1)
+        global_grid.addLayout(comparison_type_row, 12, 0, 1, 7)
+
+        hash_row = QHBoxLayout()
+        hash_row.setContentsMargins(0, 0, 0, 0)
+        hash_row.addSpacing(20)
+        self.hash_algorithm_label = QLabel("Hash algorithm:")
+        hash_row.addWidget(self.hash_algorithm_label)
+        self.hash_algorithm_combo = QComboBox()
+        self.hash_algorithm_combo.addItems(HASH_ALGORITHMS)
+        self.hash_algorithm_combo.setCurrentIndex(self._cmp_algorithm)
+        self.hash_algorithm_combo.setToolTip("The hash function used by the Hash value and Fingerprint types.")
+        hash_row.addWidget(self.hash_algorithm_combo)
+        hash_row.addStretch(1)
+        global_grid.addLayout(hash_row, 13, 0, 1, 7)
+
+        def _chunk_row(attr, label_text, value, tip):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.addSpacing(20)
+            spin = SliderSpinBox()
+            spin.setRange(MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB)
+            spin.setSuffix(" kB")
+            spin.setValue(value)
+            spin.setToolTip(tip)
+            setattr(self, attr, spin)
+            label = QLabel(label_text)
+            row.addWidget(spin_slider_inline(label, spin, SpinSlider(spin, live=False)), 0, Qt.AlignVCenter)
+            row.addStretch(1)
+            return row, label
+
+        fp_start_row, self.fingerprint_start_label = _chunk_row(
+            "fingerprint_start_spin", "Fingerprint start chunk:", self._cmp_chunk_start_kb,
+            "How much of the beginning of each file the Fingerprint type reads. "
+            "A file smaller than both chunks together is read whole.")
+        fp_end_row, self.fingerprint_end_label = _chunk_row(
+            "fingerprint_end_spin", "Fingerprint end chunk:", self._cmp_chunk_end_kb,
+            "How much of the end of each file the Fingerprint type reads. "
+            "A file smaller than both chunks together is read whole.")
+        global_grid.addLayout(fp_start_row, 14, 0, 1, 7)
+        global_grid.addLayout(fp_end_row, 15, 0, 1, 7)
+
+        ignore_ext_row = QHBoxLayout()
+        ignore_ext_row.setContentsMargins(0, 0, 0, 0)
+        ignore_ext_row.addSpacing(20)
+        self.ignore_file_extensions_cb = QCheckBox("Ignore file extensions")
+        self.ignore_file_extensions_cb.setChecked(self._cmp_ignore_ext)
+        self.ignore_file_extensions_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+        self.ignore_file_extensions_cb.setToolTip(
+            "Name, size and date only: files match by name without the "
+            "extension (a.txt matches a.doc), and size and dates are not "
+            "compared. A file matches if any file in the other folder has "
+            "the same name minus extension. Folders still match by full name."
+        )
+        ignore_ext_row.addWidget(self.ignore_file_extensions_cb)
+        ignore_ext_row.addStretch(1)
+        global_grid.addLayout(ignore_ext_row, 16, 0, 1, 7)
+
+        self._update_comparison_controls_enabled()
+        self._cmp_applied_key = self._comparison_key()
+        self.comparison_type_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
+        self.hash_algorithm_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
+        self.fingerprint_start_spin.valueChanged.connect(self._on_comparison_setting_changed)
+        self.fingerprint_end_spin.valueChanged.connect(self._on_comparison_setting_changed)
+        self.ignore_file_extensions_cb.toggled.connect(self._on_comparison_setting_changed)
 
         global_outer.addLayout(global_grid)
 

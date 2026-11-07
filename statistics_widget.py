@@ -547,10 +547,14 @@ class TimelineWidget(QWidget):
         values = [self._value_of(r) for r in records]
         self.global_start = min(values)
         self.global_end = max(values)
-        if self.global_start == self.global_end:
+        if self.global_end - self.global_start < self.axis.min_span:
+            # All values identical, or closer together than the axis can
+            # even resolve (e.g. access times a few milliseconds apart):
+            # treat as one point, centered.
+            mid = (self.global_start + self.global_end) / 2
             pad = self.axis.equal_span_pad
-            self.global_start -= pad
-            self.global_end += pad
+            self.global_start = mid - pad
+            self.global_end = mid + pad
         self.reset_view()
 
     def set_bin_count(self, n: int):

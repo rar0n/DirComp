@@ -56,7 +56,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "dual_pane", "dual_pane_threshold", "single_pane_threshold", "unnatural_scrolling",
     "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
-    "ignore_file_extensions",
+    "ignore_file_extensions", "first_name_only",
 })
 
 
@@ -114,6 +114,7 @@ class SettingsMixin:
             "fingerprint_start_kb": getattr(self, "fingerprint_start_spin", None),
             "fingerprint_end_kb": getattr(self, "fingerprint_end_spin", None),
             "ignore_file_extensions": getattr(self, "ignore_file_extensions_cb", None),
+            "first_name_only": getattr(self, "first_name_only_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)
@@ -543,12 +544,23 @@ class SettingsMixin:
         ctype = self.comparison_type_combo.currentIndex()
         hashing = ctype in (CMP_HASH, CMP_FINGERPRINT)
         self.ignore_file_extensions_cb.setEnabled(ctype == CMP_NAME_SIZE_DATE)
+        self.first_name_only_cb.setEnabled(ctype == CMP_NAME_SIZE_DATE)
         self.hash_algorithm_combo.setEnabled(hashing)
         self.hash_algorithm_label.setEnabled(hashing)
         for spin, label in ((self.fingerprint_start_spin, self.fingerprint_start_label),
                             (self.fingerprint_end_spin, self.fingerprint_end_label)):
             spin.setEnabled(ctype == CMP_FINGERPRINT)
             label.setEnabled(ctype == CMP_FINGERPRINT)
+
+    def _on_name_match_option_toggled(self, other_cb, checked):
+        """"Ignore file extensions" and "Only first part of file name" are
+        mutually exclusive: checking one unchecks the other (silently --
+        the regular change handler runs once, right after)."""
+        if checked and other_cb.isChecked():
+            other_cb.blockSignals(True)
+            other_cb.setChecked(False)
+            other_cb.blockSignals(False)
+        self._on_comparison_setting_changed()
 
     def _on_comparison_setting_changed(self, *_args):
         """Any comparison control (Settings tab -> Global Options) changed:
@@ -562,6 +574,7 @@ class SettingsMixin:
         self._cmp_chunk_start_kb = self.fingerprint_start_spin.value()
         self._cmp_chunk_end_kb = self.fingerprint_end_spin.value()
         self._cmp_ignore_ext = self.ignore_file_extensions_cb.isChecked()
+        self._cmp_first_name = self.first_name_only_cb.isChecked()
         self._update_comparison_controls_enabled()
         self._update_hash_buttons_enabled()
         key = self._comparison_key()

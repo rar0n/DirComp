@@ -581,6 +581,17 @@ class SettingsTabMixin:
             "the same name minus extension. Folders still match by full name."
         )
         ignore_ext_row.addWidget(self.ignore_file_extensions_cb)
+        ignore_ext_row.addSpacing(20)
+        self.first_name_only_cb = QCheckBox("Only first part of file name")
+        self.first_name_only_cb.setChecked(self._cmp_first_name)
+        self.first_name_only_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+        self.first_name_only_cb.setToolTip(
+            "Name, size and date only: files match by the part of the name "
+            "before the first dot (a.tar.gz matches a.txt and a.bak.zip), "
+            "so names with several extensions match too. Size and dates are "
+            "not compared. Cannot be combined with Ignore file extensions."
+        )
+        ignore_ext_row.addWidget(self.first_name_only_cb)
         ignore_ext_row.addStretch(1)
         global_grid.addLayout(ignore_ext_row, 16, 0, 1, 7)
 
@@ -590,7 +601,10 @@ class SettingsTabMixin:
         self.hash_algorithm_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
         self.fingerprint_start_spin.valueChanged.connect(self._on_comparison_setting_changed)
         self.fingerprint_end_spin.valueChanged.connect(self._on_comparison_setting_changed)
-        self.ignore_file_extensions_cb.toggled.connect(self._on_comparison_setting_changed)
+        self.ignore_file_extensions_cb.toggled.connect(
+            lambda checked: self._on_name_match_option_toggled(self.first_name_only_cb, checked))
+        self.first_name_only_cb.toggled.connect(
+            lambda checked: self._on_name_match_option_toggled(self.ignore_file_extensions_cb, checked))
 
         global_outer.addLayout(global_grid)
 

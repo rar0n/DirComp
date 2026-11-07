@@ -128,8 +128,28 @@ class DiffEngineMixin:
         tab -> Global Options -> "Ignore file extensions"). Only the
         name-based comparison type has this option; the hash types ignore
         the checkbox even if it was left checked."""
-        return (getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) == CMP_NAME_SIZE_DATE
-                and bool(getattr(self, "_cmp_ignore_ext", False)))
+        return self._stem_mode() != 0
+
+    def _stem_mode(self) -> int:
+        """How file names are matched in the name-based comparison type:
+        0 = full name (plus size and date), 1 = name without extension
+        ("Ignore file extensions"), 2 = only the part before the first dot
+        ("Only first part of file name"; handy for names with several
+        extensions). Modes 1 and 2 ignore size and dates, and exist only
+        for the name-based type."""
+        if getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) != CMP_NAME_SIZE_DATE:
+            return 0
+        if getattr(self, "_cmp_first_name", False):
+            return 2
+        return 1 if getattr(self, "_cmp_ignore_ext", False) else 0
+
+    def _name_stem(self, name: str) -> str:
+        """`name` as compared in the current stem mode (see _stem_mode).
+        A leading dot is part of the name, not a separator (".bashrc")."""
+        if self._stem_mode() == 2:
+            dot = name.find(".", 1)
+            return name if dot < 0 else name[:dot]
+        return os.path.splitext(name)[0]
 
     def _comparison_key(self) -> tuple:
         """Everything about the comparison settings that can change a
@@ -147,7 +167,7 @@ class DiffEngineMixin:
         if ctype == CMP_FINGERPRINT:
             return (CMP_FINGERPRINT, getattr(self, "_cmp_algorithm", 2),
                     getattr(self, "_cmp_chunk_start_kb", 64), getattr(self, "_cmp_chunk_end_kb", 64))
-        return (CMP_NAME_SIZE_DATE, self._ignore_extensions_active())
+        return (CMP_NAME_SIZE_DATE, self._stem_mode())
 
     def _hash_mode_active(self) -> bool:
         return getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) in (CMP_HASH, CMP_FINGERPRINT)
@@ -263,19 +283,19 @@ class DiffEngineMixin:
         states_a, _states_b = self._pair_dir_files(own_parent, other_parent)
         return states_a.get(own["name"], ("missing", None))
 
-    @staticmethod
-    def _stem_index(dir_node):
+    def _stem_index(self, dir_node):
         """{name without extension: file node} for a directory node's
         files (folders never take part -- a folder called "v1.2" has no
         extension to ignore). Built once per node and kept on it; a
         rebuilt snapshot brings new nodes, so it never goes stale."""
-        index = dir_node.get("_stems")
+        mode = self._stem_mode()
+        by_mode = dir_node.setdefault("_stems", {})
+        index = by_mode.get(mode)
         if index is None:
-            index = {}
+            index = by_mode[mode] = {}
             for name, child in (dir_node["children"] or {}).items():
                 if not child["is_dir"]:
-                    index.setdefault(os.path.splitext(name)[0], child)
-            dir_node["_stems"] = index
+                    index.setdefault(self._name_stem(name), child)
         return index
 
     def _counterpart_node(self, other_full, is_dir):
@@ -291,7 +311,7 @@ class DiffEngineMixin:
         parent = self._snapshot_lookup(os.path.dirname(other_full))
         if parent is None or not parent["is_dir"]:
             return None
-        return self._stem_index(parent).get(os.path.splitext(os.path.basename(other_full))[0])
+        return self._stem_index(parent).get(self._name_stem(os.path.basename(other_full)))
 
     # ------------------------------------------------------------- Compare
 
@@ -654,7 +674,7 @@ class DiffEngineMixin:
                 continue
             child_b = children_b.get(name)
             if ignore_ext and not child_a["is_dir"] and (child_b is None or child_b["is_dir"]):
-                child_b = stems_b.get(os.path.splitext(name)[0])
+                child_b = stems_b.get(self._name_stem(name))
             if child_b is None or child_b["is_dir"] != child_a["is_dir"]:
                 saw_missing = True
                 continue
@@ -689,7 +709,7 @@ class DiffEngineMixin:
                 child_a = children_a.get(name)
                 if child_a is not None and child_a["is_dir"] == child_b["is_dir"]:
                     continue
-                if not child_b["is_dir"] and os.path.splitext(name)[0] in stems_a:
+                if not child_b["is_dir"] and self._name_stem(name) in stems_a:
                     continue
                 saw_missing = True
                 break

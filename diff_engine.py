@@ -212,7 +212,7 @@ class DiffEngineMixin:
         """Hash comparison: pair the FILES of two counterpart folders by
         content, ignoring names. Returns (states_a, states_b), each
         {file name: (state, other_node)} with state one of:
-        "matched" (same hash, one-to-one; identical names preferred on
+        "matched" (same hash, however many duplicates; identical names preferred on
         ties), "differs" (no content partner, but a still-unpaired file
         with the same name exists: other_node), "unhashed" (this file
         has no hash yet, or it has no partner while the other folder
@@ -239,21 +239,21 @@ class DiffEngineMixin:
                     by_hash.setdefault(digest, []).append(name)
         unhashed_a = bool(states_a)
         unhashed_b = bool(states_b)
-        # Pass 1: equal hashes, one-to-one, identical names first.
+        # Pass 1: equal hashes. Not one-to-one: every file whose content
+        # exists on the other side is matched, however many duplicates
+        # either side holds (a same-named partner is preferred as the
+        # representative one).
         for digest, names_a in by_hash_a.items():
             names_b = by_hash_b.get(digest)
             if not names_b:
                 continue
-            set_b = set(names_b)
-            same = [n for n in names_a if n in set_b]
-            for n in same:
-                states_a[n] = ("matched", files_b[n])
-                states_b[n] = ("matched", files_a[n])
-            rest_a = sorted(set(names_a) - set(same))
-            rest_b = sorted(set_b - set(same))
-            for na, nb in zip(rest_a, rest_b):
-                states_a[na] = ("matched", files_b[nb])
-                states_b[nb] = ("matched", files_a[na])
+            set_a, set_b = set(names_a), set(names_b)
+            for n in names_a:
+                partner = n if n in set_b else sorted(names_b)[0]
+                states_a[n] = ("matched", files_b[partner])
+            for n in names_b:
+                partner = n if n in set_a else sorted(names_a)[0]
+                states_b[n] = ("matched", files_a[partner])
         # Pass 2: leftovers.
         for files, states, other_files, other_states, other_unhashed in (
                 (files_a, states_a, files_b, states_b, unhashed_b),

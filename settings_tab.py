@@ -1,0 +1,2145 @@
+"""
+SettingsTabMixin: the Settings tab -- _build_settings_tab and everything that
+exists only to build or feed it: the title-level helpers
+(_settings_section/_subsection/_subsubsection), the Main<->Settings copy
+linkers (_link_checkboxes/_link_spinboxes), the color swatch and
+color-table helpers, and the handlers of the Statistics View (common)
+controls.
+
+Split out of ui_builder.py unchanged -- same methods, still reached as
+`self._...` because UiBuilderMixin inherits this class.
+"""
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont, QFontMetrics
+from PySide6.QtWidgets import (
+    QAbstractItemView, QAbstractScrollArea, QButtonGroup, QCheckBox, QColorDialog,
+    QFrame, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QPushButton, QRadioButton,
+    QScrollArea, QSizePolicy, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+)
+
+from constants import (
+    TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
+    _MAX_TREE_INDENTATION, _MIN_TREE_INDENTATION, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE,
+    _SUBSECTION_GAP, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE, _SUBTITLE_PT, _SUBTITLE_STYLE,
+    _TABLE_HEADER_STYLE,
+)
+from custom_widgets import (
+    _DEFAULT_SELECT_COLORS, _INVERT_BUTTON_COLORS, _SCROLLBAR_COLORS, _SCROLLBAR_HANDLE_STYLES,
+    _SCROLLBAR_STYLE, CascadeFlowLayout, FlowLayout,
+    _SELECT_KEY_TO_TAG_COLOR_KEYS, _bevel_button_stylesheet, _press_blend,
+    SliderDoubleSpinBox, SliderSpinBox, SpinSlider,
+    spin_slider_inline,
+)
+from statistics_widget import DEFAULT_BIN_COUNT, DEFAULT_LABEL_FONT_PT, TICK_LABEL_ANGLE_DEG
+from theme_ops import _THEMES
+
+
+class SettingsTabMixin:
+
+    # -------------------------------------------------------------- Settings tab
+
+    def _link_checkboxes(self, primary: QCheckBox, secondary: QCheckBox):
+        """Bidirectionally sync two checkboxes representing the same
+        underlying setting -- a Main-tab control and its Settings-tab
+        copy. Toggling either one sets the other to match; since that's
+        done through the PRIMARY's own setChecked (not just a value
+        copy), the primary's own existing handler chain (e.g.
+        _on_synchronize_views_changed, or the auto-vrange/readjust-
+        button enable relationship) still runs exactly as if you'd
+        clicked the primary directly, no matter which of the two you
+        actually clicked. blockSignals guards against the obvious
+        infinite ping-pong; the `!=` checks mean a toggle that didn't
+        actually change anything (e.g. the primary's own handler setting
+        it right back) doesn't recurse further than one hop."""
+        def sync_to_secondary(checked, secondary=secondary):
+            if secondary.isChecked() != checked:
+                secondary.blockSignals(True)
+                secondary.setChecked(checked)
+                secondary.blockSignals(False)
+
+        def sync_to_primary(checked, primary=primary):
+            if primary.isChecked() != checked:
+                primary.setChecked(checked)
+
+        primary.toggled.connect(sync_to_secondary)
+        secondary.toggled.connect(sync_to_primary)
+        secondary.blockSignals(True)
+        secondary.setChecked(primary.isChecked())
+        secondary.blockSignals(False)
+
+    def _link_spinboxes(self, primary: QSpinBox, secondary: QSpinBox):
+        """Same idea as _link_checkboxes, for a spinbox pair -- e.g. the
+        two width-threshold spinboxes' Main/Settings-tab copies."""
+        def sync_to_secondary(value, secondary=secondary):
+            if secondary.value() != value:
+                secondary.blockSignals(True)
+                secondary.setValue(value)
+                secondary.blockSignals(False)
+
+        def sync_to_primary(value, primary=primary):
+            if primary.value() != value:
+                primary.setValue(value)
+
+        primary.valueChanged.connect(sync_to_secondary)
+        secondary.valueChanged.connect(sync_to_primary)
+        secondary.blockSignals(True)
+        secondary.setValue(primary.value())
+        secondary.blockSignals(False)
+
+    def _settings_titled_block(
+        self, title: str, group: QWidget, pt: int, style: str, space_above: bool,
+    ) -> QWidget:
+        """A title label (`style`, `pt` points, bold) directly above
+        `group`, with an empty band above the title exactly as tall as
+        the title itself when `space_above` -- the same rule at every
+        title level, so blocks start clearly apart from whatever comes
+        before them (or, in a FlowLayout, from the line above when they
+        wrap), in proportion to how big their own title is. Only the
+        very first title on the page (Global Settings) goes without."""
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        title_font = QFont(self.font())
+        title_font.setPointSize(pt)
+        title_font.setBold(True)
+        layout.setContentsMargins(0, QFontMetrics(title_font).height() if space_above else 0, 0, 0)
+        layout.setSpacing(4)
+        header = QLabel(title)
+        header.setStyleSheet(style)
+        layout.addWidget(header)
+        layout.addWidget(group)
+        return container
+
+    def _settings_section(self, title: str, group: QGroupBox, space_above: bool = True) -> QWidget:
+        """Level 1: wraps a Settings-tab section's (title-less) QGroupBox
+        with a real QLabel above it acting as that section's header --
+        see _SECTION_HEADER_STYLE. Callers build `group` and its
+        contents, constructed with QGroupBox(""); the returned container
+        is a drop-in substitute for `group` at whichever addWidget call
+        adds it."""
+        return self._settings_titled_block(
+            title, group, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE, space_above
+        )
+
+    def _settings_subsection(self, title: str, group: QGroupBox, space_above: bool = True) -> QWidget:
+        """Level 2 (_SUBTITLE_STYLE): an individual table or group of
+        controls sitting *within* a larger section's frame (e.g.
+        "Select Buttons" under "Panel Button Colors")."""
+        return self._settings_titled_block(title, group, _SUBTITLE_PT, _SUBTITLE_STYLE, space_above)
+
+    def _settings_subsubsection(self, title: str, group: QWidget, space_above: bool = True) -> QWidget:
+        """Level 3 (_SUBSUBTITLE_STYLE): a block nested inside a Level 2
+        one (currently "Line colors" and "Line style" under
+        "Indentation Line")."""
+        return self._settings_titled_block(
+            title, group, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE, space_above
+        )
+
+    def _settings_subsection_flow(self, *blocks: QWidget, reorder: bool = True) -> FlowLayout:
+        """The layout for a section's sub-blocks (Level 2 blocks from
+        _settings_subsection inside a Level 1 section's frame, or Level
+        3 ones from _settings_subsubsection inside a Level 2 block):
+        side by side, top-aligned, with _SUBSECTION_GAP between them
+        while the window is wide enough for them, wrapping onto more
+        lines when it isn't -- in whichever arrangement makes the whole
+        block lowest (see FlowLayout). With `reorder` on (the default)
+        that may also change which block comes first, so a block that
+        stacks up when squeezed next to a wide neighbour can move to a
+        line where it has room to spread out; turn it off for blocks
+        whose order means something (Left pane / Right pane). `blocks`
+        are added right away; more can be added later with addWidget,
+        in the order they should appear when nothing's gained by moving
+        them. Add the returned layout to the section's own frame, which
+        is what gives the blocks their indent under the section's
+        title."""
+        flow = FlowLayout(h_spacing=_SUBSECTION_GAP, reorder=reorder)
+        for block in blocks:
+            flow.addWidget(block)
+        return flow
+
+    def _settings_subsection_cascade(self, *blocks: QWidget) -> CascadeFlowLayout:
+        """Like _settings_subsection_flow, but for a short ordered run
+        of sub-blocks that read as one topic split in two or three
+        (e.g. Statistics View Colors' Graph/Info/Buttons, or File List
+        View Colors' Default/Comparison tables): an item that doesn't
+        fit next to the previous one stacks below it instead of
+        starting a whole new row -- see CascadeFlowLayout. `blocks` are
+        added right away, in the order they should cascade."""
+        cascade = CascadeFlowLayout(h_spacing=_SUBSECTION_GAP)
+        for block in blocks:
+            cascade.addWidget(block)
+        return cascade
+    def _build_settings_tab(self) -> QWidget:
+        """Settings tab: a scrollable stack of Level 1 sections, each
+        with its title on a line of its own at the left and its frame
+        (a QGroupBox) below it, built AFTER the Main tab so every
+        widget it links against or shares already exists. Inside a
+        frame, the Level 2 blocks (and Level 3 ones inside those) sit
+        side by side while the window is wide enough for them and
+        wrap below each other when it isn't -- each section has a
+        FlowLayout for them (see _settings_subsection_flow).
+
+        - Global Settings: three Level 2 blocks --
+          - Theme: a Dark/Light switch.
+          - Global Options: synced copies of the Main tab's checkboxes
+            (via _link_checkboxes) -- same settings, just also
+            reachable here.
+          - Misc Colors: GUI, default button, progress and busy bar
+            colors.
+        - Statistics View (common): Font size / Nice bins / Bin count /
+          tick label angle (+ Auto angle), now ONE setting apiece feeding both panes'
+          views at once, rather than set per-pane on the Main tab
+          (removed from there -- see _build_statistics_panel).
+          pane.tl_font_size_spin/tl_nice_bins_cb/tl_bin_count_spin/
+          tl_tick_angle_spin/tl_auto_tick_angle_cb on both panes get pointed at these exact
+          same shared widgets afterward (end of _build_ui), for anything
+          that still expects to find them on the pane.
+        - Specific options: synced copies of each pane's own Log height /
+          Log / Auto Range -- these stay individual per view (unlike the
+          ones above), just with a reachable copy here too.
+        - Statistics View Colors: per-mode (file/folder) palette for
+          each pane's chart, plus one shared background color -- see
+          TimelineOpsMixin._apply_stats_palette.
+        - Panel Button Colors: Select-group, Clipboard and
+          File Op button colors -- buttons only; the file-list row
+          colors for each comparison type (Missing, Matching, ...) are
+          their own "Comparison Type Colors" table under File List
+          View, independent of the Select buttons.
+
+        Save Settings / Load Settings / Reload Defaults live at the
+        bottom of THIS tab now (moved off Global Options -- see there),
+        same height as the Main tab's Cancel button, with their own
+        status line underneath for save/load confirmation messages --
+        separate from the Main tab's transfer_label, since these are two
+        unrelated kinds of status now that they don't share a tab. Kept
+        outside the scroll area (the returned widget is the scroll area
+        plus this row/status line stacked below it, not the scroll area
+        itself), so they -- and any confirmation message -- stay visible
+        regardless of scroll position rather than requiring a scroll to
+        the bottom to reach or see them.
+        """
+        default_bg, default_fg = self._default_button_colors()
+        uniform_w, uniform_h = self._uniform_button_size()
+
+        # Cleared and rebuilt fresh every time this tab is (re)built --
+        # see _make_color_swatch/_refresh_color_swatches.
+        self._color_swatches = []
+
+        # Every plain "[option label][spin box][slider]" row on this tab
+        # (Global Options' thresholds, Indentation Line's Indentation/
+        # Line thickness, Line colors' Nr. of Steps) collects its label
+        # and spin box here as it's built; once the whole tab exists, a
+        # pass right before the final stretch (see below, near "outer.
+        # addStretch(1)") fixes every one of them to the same label/spin
+        # width -- the widest label/spin actually used -- so their
+        # sliders all land at the same x, however far apart their rows
+        # actually are on the page. Rows with other structure (a
+        # leading checkbox, a color swatch, ...) opt out of this and
+        # keep their own local alignment instead -- see each site.
+        self._aligned_option_rows = []
+
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        # Larger, bold section headers -- QGroupBox's native title is
+        # small/plain enough on most platforms/styles that a long
+        # scrollable stack of them (this whole tab) reads as one long
+        # blur rather than clearly separated sections. Bumped to 18pt
+        # (up from an earlier 14pt that wasn't visibly registering --
+        # possibly a native-style QSS quirk on QGroupBox::title; if 18pt
+        # still doesn't show, the title's font is getting overridden
+        # somewhere else entirely and this stylesheet isn't the culprit).
+        page.setStyleSheet("QGroupBox::title { font-size: 14pt; font-weight: bold; }")
+
+        # ---- Theme (Level 2, first block of Global Settings) -- applies
+        # a hand-built dark/light QPalette, then
+        # rebuilds -- simplest way to guarantee every palette-derived
+        # color (e.g. _default_button_colors when not overridden below)
+        # actually recomputes everywhere it's used, rather than trying
+        # to track down and re-style each one by hand. First on the tab,
+        # since it's the one setting here that reshapes every other
+        # color on this whole tab, not just its own. ----
+        theme_group = QGroupBox("")
+        theme_outer = QVBoxLayout(theme_group)
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(QLabel("Theme:"))
+        # One radio button per theme in _THEMES (theme_ops.py) -- adding
+        # a theme there is what adds it here too, nothing to keep in
+        # sync by hand. self.theme_radios[theme] replaces what used to
+        # be separate named attributes (theme_dark_radio, ...) -- if
+        # anything outside this method ever needs a specific one, index
+        # this dict rather than adding those back.
+        self.theme_radios = {}
+        theme_button_group = QButtonGroup(theme_group)
+        for theme in _THEMES:
+            radio = QRadioButton(theme.replace("_", " ").title())
+            radio.setChecked(theme == self._theme)
+            radio.toggled.connect(lambda checked, t=theme: checked and self._on_theme_changed(t))
+            theme_button_group.addButton(radio)
+            theme_row.addWidget(radio)
+            self.theme_radios[theme] = radio
+        theme_row.addStretch(1)
+        theme_outer.addLayout(theme_row)
+        theme_outer.addWidget(self._make_italic_note(
+            "Each theme keeps its own set of colors -- everything on this tab edits the "
+            "set of the theme that's currently selected."
+        ))
+
+        # ---- Global Settings (Level 1): Theme, Misc Colors and Global
+        # Options, in that order, as Level 2 blocks side by side while
+        # the window is wide enough and wrapping below each other when
+        # it isn't. Global Options and Misc Colors are added to this
+        # flow further down, where they're built. ----
+        global_settings_group = QGroupBox("")
+        global_settings_outer = QVBoxLayout(global_settings_group)
+        global_settings_flow = self._settings_subsection_flow()
+        global_settings_outer.addLayout(global_settings_flow)
+        outer.addWidget(self._settings_section("Global Settings", global_settings_group, space_above=False))
+        global_settings_flow.addWidget(self._settings_subsection("Theme", theme_group))
+
+        # ---- Global Options (Level 2 of Global Settings; synced with
+        # the Main tab's own group) ----
+        # A 4-row grid, laid out so each dependent option sits directly
+        # (and indented) below the option that decides its enabled
+        # state, rather than all dependents being lined up together in
+        # one row: col 0 is Dual Pane and its two dependents
+        # (Synchronize Views, Symmetrical GUI); col 2 is Recursive
+        # Folder Selections and its one dependent (Expand To
+        # Selection), pushed a column to the right (col 1 is a bare
+        # spacer) so its column doesn't crowd col 0's now-taller stack;
+        # col 3 is List Directories and its one dependent (Sort
+        # Directories First). The two width-threshold spinboxes get
+        # their own row at the bottom, spanning the full width.
+        global_group = QGroupBox("")
+        global_outer = QVBoxLayout(global_group)
+        global_grid = QGridLayout()
+        global_grid.setColumnMinimumWidth(1, 20)
+        global_grid.setColumnStretch(6, 1)
+
+        def _add_synced(primary, label, row, col, indent=0):
+            secondary = QCheckBox(label)
+            if primary.toolTip():
+                secondary.setToolTip(primary.toolTip())
+            self._link_checkboxes(primary, secondary)
+            if indent:
+                wrapper = QHBoxLayout()
+                wrapper.setContentsMargins(0, 0, 0, 0)
+                wrapper.addSpacing(indent)
+                wrapper.addWidget(secondary)
+                global_grid.addLayout(wrapper, row, col)
+            else:
+                global_grid.addWidget(secondary, row, col)
+            return secondary
+
+        # Row 1: independent/decider options.
+        _add_synced(self.dual_pane_cb, "Dual Pane", 0, 0)
+        _add_synced(self.recursive_folder_contents_cb, "Recursive Folder Selections", 0, 2)
+        _add_synced(self.list_directories_cb, "List Directories", 0, 3)
+        _add_synced(self.list_files_cb, "List Files", 0, 4)
+
+        # Row 2: dependents, each indented below its decider.
+        # Symmetrical GUI/Synchronize Views depend on Dual Pane; Expand
+        # To Selection depends on Recursive Folder Selections; Sort
+        # Directories First depends on List Directories -- same
+        # disable-wiring (plus the shared dim-when-disabled style) as
+        # their Main-tab primaries where they have one, just applied to
+        # these secondary copies too (_link_checkboxes only mirrors
+        # checked state, not enabled state).
+        symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical GUI", 1, 0, indent=20)
+        symmetrical_secondary.setEnabled(self.dual_pane_cb.isChecked())
+        self.dual_pane_cb.toggled.connect(symmetrical_secondary.setEnabled)
+        symmetrical_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+
+        expand_secondary = _add_synced(self.expand_matching_cb, "Expand To Selection", 1, 2, indent=20)
+        expand_secondary.setEnabled(self.recursive_folder_contents_cb.isChecked())
+        self.recursive_folder_contents_cb.toggled.connect(expand_secondary.setEnabled)
+        expand_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+
+        sort_dirs_secondary = _add_synced(self.sort_directories_first_cb, "Sort Directories First", 1, 3, indent=20)
+        sort_dirs_secondary.setEnabled(self.list_directories_cb.isChecked())
+        self.list_directories_cb.toggled.connect(sort_dirs_secondary.setEnabled)
+        sort_dirs_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+
+        # Row 3: Synchronize Views, aligned below Symmetrical GUI (same
+        # indent, same column).
+        sync_secondary = _add_synced(self.synchronize_views_cb, "Synchronize Views", 2, 0, indent=20)
+        sync_secondary.setEnabled(self.dual_pane_cb.isChecked())
+        self.dual_pane_cb.toggled.connect(sync_secondary.setEnabled)
+        sync_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+
+        # Row 4: Unnatural scrolling -- its own independent option, not
+        # indented/dependent on anything above (unlike Synchronize Views
+        # just above it, which IS indented under Dual Pane). Invert
+        # scrollwheel zoom direction sits next to it, same row -- also
+        # independent, and deliberately placed alongside Unnatural
+        # scrolling since the two are meant to be combinable (see either
+        # one's tooltip).
+        _add_synced(self.unnatural_scrolling_cb, "Unnatural scrolling", 3, 0)
+        _add_synced(self.invert_statistics_zoom_cb, "Invert scrollwheel zoom direction", 3, 2)
+
+        # Row 5/6: the two width-threshold spinboxes, each on its own
+        # line now -- slider next to its spin box on both, and the two
+        # sliders line up with each other (see the aligned-rows pass
+        # near "outer.addStretch(1)", which also lines them up with
+        # Indentation/Line thickness/Nr. of Steps further down the tab).
+        dual_thresh_row = QHBoxLayout()
+        dual_thresh_row.setContentsMargins(0, 0, 0, 0)
+        # Sliders: 50 px per position (84 positions over the 800-5000 range)
+        # so no pixel precision is needed; the arrow buttons/spin box give the
+        # fine steps. Not live -- moving a threshold re-lays out the whole
+        # window, so it applies when the handle is released.
+        dual_thresh_secondary = SliderSpinBox()
+        dual_thresh_secondary.setRange(500, 2500)
+        dual_thresh_secondary.setToolTip(self.dual_pane_threshold_spin.toolTip())
+        self._link_spinboxes(self.dual_pane_threshold_spin, dual_thresh_secondary)
+        dual_thresh_label = QLabel("Dual Pane Threshold:")
+        dual_thresh_row.addWidget(spin_slider_inline(
+            dual_thresh_label, dual_thresh_secondary,
+            SpinSlider(dual_thresh_secondary, slider_step=50, live=False),
+        ), 0, Qt.AlignVCenter)
+        dual_thresh_row.addStretch(1)
+        self._aligned_option_rows.append((dual_thresh_label, dual_thresh_secondary))
+
+        single_thresh_row = QHBoxLayout()
+        single_thresh_row.setContentsMargins(0, 0, 0, 0)
+        single_thresh_secondary = SliderSpinBox()
+        single_thresh_secondary.setRange(500, 2500)
+        single_thresh_secondary.setToolTip(self.single_pane_threshold_spin.toolTip())
+        self._link_spinboxes(self.single_pane_threshold_spin, single_thresh_secondary)
+        single_thresh_label = QLabel("Single Pane Threshold:")
+        single_thresh_row.addWidget(spin_slider_inline(
+            single_thresh_label, single_thresh_secondary,
+            SpinSlider(single_thresh_secondary, slider_step=50, live=False),
+        ), 0, Qt.AlignVCenter)
+        single_thresh_row.addStretch(1)
+        self._aligned_option_rows.append((single_thresh_label, single_thresh_secondary))
+
+        # A blank line, as tall as 1/4 of a threshold line itself, + widget overhead(?),
+        # making a comfortable gap between the checkboxes above and it.
+        thresholds_gap = QWidget()
+        thresholds_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        global_grid.addWidget(thresholds_gap, 4, 0, 1, 7)
+        global_grid.addLayout(dual_thresh_row, 5, 0, 1, 7)
+        global_grid.addLayout(single_thresh_row, 6, 0, 1, 7)
+
+        # Row 7: File List View folder-open history -- how many entries
+        # each pane's entry combo box keeps (see panes.DirectoryPane.
+        # folder_history / SettingsMixin._record_folder_history), plus a
+        # button to wipe both panes' history outright. No Main-tab
+        # primary/_link_spinboxes here -- same as flv_font_size_spin/
+        # tree_indentation_spin above, this control only exists on this
+        # tab. Joins _aligned_option_rows so its slider lands at the same
+        # x as the two threshold rows just above (its label's short
+        # enough now, after the "File List View History" rename, not to
+        # blow that alignment out for every other row sharing it).
+        history_gap = QWidget()
+        history_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        global_grid.addWidget(history_gap, 7, 0, 1, 7)
+
+        history_row = QHBoxLayout()
+        history_row.setContentsMargins(0, 0, 0, 0)
+        self.file_list_history_limit_spin = SliderSpinBox()
+        self.file_list_history_limit_spin.setRange(0, 100)
+        self.file_list_history_limit_spin.setValue(self._file_list_history_limit)
+        self.file_list_history_limit_spin.setToolTip(
+            "How many recently opened folders each pane's drop-down keeps, "
+            "most recent first. 0 turns history off entirely."
+        )
+        self.file_list_history_limit_spin.valueChanged.connect(self._on_file_list_history_limit_changed)
+        history_label = QLabel("File List View History:")
+        history_row.addWidget(spin_slider_inline(
+            history_label, self.file_list_history_limit_spin,
+            SpinSlider(self.file_list_history_limit_spin, live=False),
+        ), 0, Qt.AlignVCenter)
+        history_row.addSpacing(20)
+        clear_history_button = QPushButton("Clear history")
+        clear_history_button.setToolTip("Removes every entry from both panes' folder-history drop-downs.")
+        clear_history_button.clicked.connect(self._on_clear_folder_history)
+        history_row.addWidget(clear_history_button)
+        history_row.addStretch(1)
+        self._aligned_option_rows.append((history_label, self.file_list_history_limit_spin))
+        global_grid.addLayout(history_row, 8, 0, 1, 7)
+
+        # Row 9-10: how the File List View scrollbar handle shows the
+        # selection markers beneath it -- custom_widgets._SCROLLBAR_STYLE
+        # ["handle_style"], not an attribute of self, so it survives a UI
+        # rebuild by itself (the radios are just re-checked from it
+        # below). A QButtonGroup whose button ids index
+        # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
+        # it as the checked id (see _widget_value), shared, not per
+        # theme, same as the rest of Global Options. Like the history
+        # row, no Main-tab primary -- this control only exists here.
+        scrollbar_gap = QWidget()
+        scrollbar_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        global_grid.addWidget(scrollbar_gap, 9, 0, 1, 7)
+
+        scrollbar_style_row = QHBoxLayout()
+        scrollbar_style_row.setContentsMargins(0, 0, 0, 0)
+        scrollbar_style_row.addWidget(QLabel("Scrollbar handle style:"))
+        # Parented to the Global Options box so it goes away with it on
+        # a UI rebuild instead of piling up on the main window.
+        self.scrollbar_handle_style_group = QButtonGroup(global_group)
+        for style_id, text, tip in (
+            (0, "Plain",
+             "No magnification: the selection markers under the scrollbar handle stay "
+             "at their ordinary position on the track."),
+            (1, "Fisheye",
+             "Magnifies the selection markers around the middle of what the File List View "
+             "currently shows, spreading them over the whole handle and easing back to "
+             "normal towards its top and bottom edges."),
+            (2, "Mirrored quarter circle (experimental)",
+             "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
+             "of the view, while markers near the handle's edges bunch together."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.scrollbar_handle_style_group.addButton(radio, style_id)
+            scrollbar_style_row.addWidget(radio)
+            if _SCROLLBAR_HANDLE_STYLES[style_id] == _SCROLLBAR_STYLE["handle_style"]:
+                radio.setChecked(True)
+        scrollbar_style_row.addStretch(1)
+        self.scrollbar_handle_style_group.idToggled.connect(self._on_scrollbar_handle_style_toggled)
+        global_grid.addLayout(scrollbar_style_row, 10, 0, 1, 7)
+
+        global_outer.addLayout(global_grid)
+
+        # ---- Default / Out-of-Group Colors -- a real QTableWidget (see
+        # _style_table_widget/_size_table_to_contents), not the
+        # QGridLayout-of-QLabels-and-swatches every one of these tables
+        # used to be -- converted first since Misc Colors is where
+        # the mismatched-cell-height/empty-cell inconsistency that
+        # motivated the switch was most visible, between Busy Bar's
+        # missing Bg swatch and the Title Numeric Colors row's odd
+        # Fg-swatch/Bold-checkbox shape. Same Item | Fg | Bg column
+        # convention as Panel Button Colors below, and every
+        # other Colors & Theme table has since been converted the same
+        # way (Select Buttons, Statistics View Colors/Buttons, Clipboard
+        # Buttons/File Op Buttons). A row with only one real color
+        # (Busy Bar) just leaves its Background cell empty -- a real
+        # QTableWidget grid line still runs across it either way,
+        # instead of needing a hand-placed blank-QLabel placeholder to
+        # fake one.
+        #
+        # Each row supplies a get_fg/get_bg callable (re-derived from
+        # live state every time it's called) rather than a frozen value
+        # -- see _make_color_swatch -- so these swatches stay correct
+        # after load_settings/"Reload Defaults" change this state
+        # in bulk, not just after a click here. ----
+        _DEFAULT_COLOR_ROWS = [
+            ("GUI",
+             lambda: self._effective_gui_colors(self._theme)[0],
+             lambda: self._effective_gui_colors(self._theme)[1],
+             lambda hexc: self._on_gui_color_changed(True, hexc),
+             lambda hexc: self._on_gui_color_changed(False, hexc)),
+            ("Default Button",
+             lambda: (self._custom_default_button_colors or self._default_button_colors())[1],
+             lambda: (self._custom_default_button_colors or self._default_button_colors())[0],
+             lambda hexc: self._on_default_button_color_changed(True, hexc),
+             lambda hexc: self._on_default_button_color_changed(False, hexc)),
+            ("Progress Bar",
+             lambda: self._progress_bar_colors["fg"], lambda: self._progress_bar_colors["bg"],
+             lambda hexc: self._on_progress_bar_color_changed("fg", hexc),
+             lambda hexc: self._on_progress_bar_color_changed("bg", hexc)),
+            ("Busy Bar",
+             lambda: self._progress_bar_colors["busy"], None,
+             lambda hexc: self._on_progress_bar_color_changed("busy", hexc), None),
+            # Title Numeric moved here from File List View Colors: it colors
+            # the numbers in titles all over the Main tab (item counts, sizes,
+            # the "Free:" figure), not just the file lists. Its Bg cell holds
+            # the Bold checkbox instead of a swatch -- built specially below.
+            ("Title Numeric", None, None, None, None),
+            # The two colors of each pane's status-line summary at the bottom
+            # of the Main tab (see SelectionMixin.update_selection_count) --
+            # Fg only. Unselected shows the GUI's own text color until one is
+            # picked.
+            ("Status line Selected info",
+             lambda: self._status_selected_color, None,
+             self._on_status_selected_color_changed, None),
+            ("Status line Unselected",
+             lambda: self._status_unselected_color or self._effective_gui_colors(self._theme)[0], None,
+             self._on_status_unselected_color_changed, None),
+            # Main tab -> Global Options' Refresh button. The theme's
+            # default button colors until one is picked.
+            ("Refresh button",
+             lambda: self._main_button_color_for("refresh")[1],
+             lambda: self._main_button_color_for("refresh")[0],
+             lambda hexc: self._on_main_button_color_changed("refresh", False, hexc),
+             lambda hexc: self._on_main_button_color_changed("refresh", True, hexc)),
+        ]
+        default_colors_table = QTableWidget(len(_DEFAULT_COLOR_ROWS), 3)
+        self._style_table_widget(default_colors_table, ["Item", "Fg", "Bg"])
+
+        for i, (label, get_fg, get_bg, on_fg, on_bg) in enumerate(_DEFAULT_COLOR_ROWS):
+            default_colors_table.setItem(i, 0, self._table_item(label))
+            if label == "Title Numeric":
+                default_colors_table.setCellWidget(
+                    i, 1,
+                    self._center_in_cell(self._make_color_swatch(
+                        lambda: self._title_numeric_color, self._on_title_numeric_color_changed,
+                    )),
+                )
+                title_numeric_bold_cb = QCheckBox("Bold")
+                title_numeric_bold_cb.setToolTip(
+                    "Show the numeric values in the titles (item counts, sizes, "
+                    "file and folder totals, free space) in bold. When off, they're "
+                    "shown in normal weight."
+                )
+                title_numeric_bold_cb.setChecked(self._title_numeric_bold)
+                title_numeric_bold_cb.toggled.connect(self._on_title_numeric_bold_changed)
+                self.title_numeric_bold_cb = title_numeric_bold_cb
+                default_colors_table.setCellWidget(i, 2, self._center_in_cell(title_numeric_bold_cb))
+                continue
+            default_colors_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(get_fg, on_fg)))
+            if on_bg is not None:
+                default_colors_table.setCellWidget(
+                    i, 2, self._center_in_cell(self._make_color_swatch(get_bg, on_bg))
+                )
+        default_colors_table.item(0, 0).setToolTip(
+            "Text and background color of the whole GUI, for the current theme "
+            "(the file lists' and text fields' background follows the Bg)."
+        )
+        default_colors_table.item(4, 0).setToolTip(
+            "Color of the numbers in the titles (item counts, sizes, file and "
+            "folder totals, free space). The Bold option is in the Bg column."
+        )
+        default_colors_table.item(5, 0).setToolTip(
+            "Text color of each pane's status line at the bottom of the window "
+            "while something is selected (\"N selected, X files, Y folders, size\")."
+        )
+        default_colors_table.item(6, 0).setToolTip(
+            "Text color of that status line while nothing is selected, and of "
+            "the operation messages shown there. Follows the GUI text color "
+            "until you pick one."
+        )
+        default_colors_table.item(7, 0).setToolTip(
+            "The Refresh button under Global Options on the Main tab. Uses the "
+            "theme's default button colors until you pick one."
+        )
+        # (Default Folder/Default File and Scrollbar used to be rows here --
+        # they moved to File List View -> File List View Colors below,
+        # since they only color the file lists. Title Numeric started in
+        # File List View Colors and is back here.)
+
+        self._size_table_to_contents(default_colors_table)
+        # Wrapped in a QGroupBox like every other table's subsection
+        # (Comparison Type Colors, Select Buttons, ...) -- handed straight
+        # to _settings_subsection it sat unframed and flush-left, unlike
+        # them.
+        default_colors_group = QGroupBox("")
+        default_colors_group_outer = QVBoxLayout(default_colors_group)
+        default_colors_group_outer.addWidget(default_colors_table)
+        global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
+        # Last Level 2 block of Global Settings (swapped with Misc Colors above it).
+        global_settings_flow.addWidget(self._settings_subsection("Global Options", global_group))
+
+        # ---- File List View (Settings-tab only -- no Main-tab copy,
+        # unlike everything else in this section) ----
+        date_col_group = QGroupBox("")
+        date_col_outer = QVBoxLayout(date_col_group)
+
+        # Row 1: font size of both file lists (per theme; see
+        # _apply_flv_font).
+        flv_font_row = QHBoxLayout()
+        flv_font_row.addWidget(QLabel("Font size:"))
+        self.flv_font_size_spin = SliderSpinBox()
+        self.flv_font_size_spin.setRange(6, 32)
+        self.flv_font_size_spin.setValue(self._default_flv_font_pt())
+        self.flv_font_size_spin.setToolTip(
+            "Point size of the text in both panes' File List View (rows and column "
+            "headers). The default is the application's own font size."
+        )
+        self.flv_font_size_spin.valueChanged.connect(self._on_flv_font_size_changed)
+        flv_font_row.addWidget(self.flv_font_size_spin)
+        flv_font_row.addSpacing(12)
+        # Not live: re-fonting both (possibly huge) file lists on every step
+        # of a drag would stall it -- applied on release.
+        flv_font_row.addWidget(SpinSlider(self.flv_font_size_spin, live=False))
+        flv_font_row.addStretch(1)
+        date_col_outer.addLayout(flv_font_row)
+        # The trees were built before this spin box existed, at the
+        # application's own size -- bring them to whatever it holds now
+        # (same as the Statistics View's font size is applied further
+        # down).
+        self._apply_flv_font(self.flv_font_size_spin.value())
+
+        # Row 2
+        date_col_row = QHBoxLayout()
+        self.force_single_date_column_cb = QCheckBox("Use Only 1 Date Column")
+        self.force_single_date_column_cb.setToolTip(
+            "Always collapse the file list's 3 date columns down to just the one "
+            "matching each pane's own Statistics-view Metric, regardless of window "
+            "width -- the same column collapse the narrow layout already does below "
+            "its threshold, just forced on unconditionally instead."
+        )
+        self.force_single_date_column_cb.setChecked(self._force_single_date_column)
+        self.force_single_date_column_cb.toggled.connect(self._on_force_single_date_column_changed)
+        date_col_row.addWidget(self.force_single_date_column_cb)
+        date_col_row.addStretch(1)
+        date_col_outer.addLayout(date_col_row)
+
+        # The section's Level 2 blocks (Indentation Line, File List View
+        # Colors, Comparison Type Colors, in that order), side by side
+        # while they fit and wrapping below each other when they don't
+        # -- added to this flow where they're built below (File List
+        # View Colors' block only once Indentation Line's is in, since
+        # that one is built further down).
+        flv_flow = self._settings_subsection_flow()
+        date_col_outer.addLayout(flv_flow)
+
+        # ---- Row 3: File List View Colors -- same Item | Fg | Bg
+        # table shape as Misc Colors (see there); a row with only one
+        # real color leaves its other cell empty. Rows: Default
+        # Background (the lists' own background),
+        # Default Selection (the selected-row highlight; a selected row's
+        # text color is its Default File/Folder Fg, so there's no Fg
+        # here), Default File, Default Folder and the lists' scrollbars.
+        _FLV_COLOR_ROWS = [
+            ("Default Background",
+             None, lambda: self._effective_flv_bg(),
+             None, self._on_flv_bg_color_changed),
+            ("Default Selection",
+             None, lambda: self._selection_tint_color,
+             None, self._on_selection_tint_color_changed),
+            ("Default File",
+             lambda: TAG_COLORS.get("file", (None, None))[1] or "#000000",
+             lambda: TAG_COLORS.get("file", (None, None))[0] or "#FFFFFF",
+             lambda hexc: self._on_default_file_color_changed(True, hexc),
+             lambda hexc: self._on_default_file_color_changed(False, hexc)),
+            ("Default Folder",
+             lambda: self._folder_color[0], lambda: self._folder_color[1],
+             lambda hexc: self._on_folder_color_changed(True, hexc),
+             lambda hexc: self._on_folder_color_changed(False, hexc)),
+            ("Scrollbar (Handle/Track)",
+             lambda: _SCROLLBAR_COLORS["handle"], lambda: _SCROLLBAR_COLORS["groove"],
+             lambda hexc: self._on_scrollbar_color_changed("handle", hexc),
+             lambda hexc: self._on_scrollbar_color_changed("groove", hexc)),
+        ]
+        flv_colors_table = QTableWidget(len(_FLV_COLOR_ROWS), 3)
+        self._style_table_widget(flv_colors_table, ["Item", "Fg", "Bg"])
+        for i, (label, get_fg, get_bg, on_fg, on_bg) in enumerate(_FLV_COLOR_ROWS):
+            flv_colors_table.setItem(i, 0, self._table_item(label))
+            if on_fg is not None:
+                flv_colors_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(get_fg, on_fg)))
+            if on_bg is not None:
+                flv_colors_table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(get_bg, on_bg)))
+        flv_colors_table.item(0, 0).setToolTip(
+            "Background of the file lists. Follows the theme's list background "
+            "until you pick a color here."
+        )
+        flv_colors_table.item(1, 0).setToolTip(
+            "Highlight color of selected rows (see Selection opacity "
+            "below). The text color of a selected row is its Default File / Default "
+            "Folder Fg."
+        )
+        self._size_table_to_contents(flv_colors_table)
+        flv_colors_group = QGroupBox("")
+        flv_colors_group_outer = QVBoxLayout(flv_colors_group)
+        flv_colors_group_outer.addWidget(flv_colors_table)
+        # This is now a Level 3 block ("Default / Misc colors"), nested
+        # with Comparison Type Colors inside one merged "File List View
+        # Colors" Level 2 block -- see flv_colors_super_block below,
+        # built once Comparison Type Colors' own block exists too.
+        flv_default_misc_block = self._settings_subsubsection("Default / Misc colors", flv_colors_group)
+
+        # ---- (Inside the File List View Colors block, below its table.)
+        # Selection opacity: how strongly the selection color
+        # (Default Selection above) covers a selected row -- each row's
+        # own diff-tag color, and the list background in the indentation
+        # area left of the names, are tinted toward it by this many %
+        # (see _SelectionColorDelegate/DirDropTreeWidget.drawBranches),
+        # so a selected row keeps showing what its diff outcome was.
+        # 100% is the plain flat highlight. ----
+        tint_row = QHBoxLayout()
+        self.selection_tint_opacity_label = QLabel("Selection opacity:")
+        self.selection_tint_opacity_spin = SliderSpinBox()
+        self.selection_tint_opacity_spin.setRange(10, 100)
+        self.selection_tint_opacity_spin.setSuffix("%")
+        self.selection_tint_opacity_spin.setValue(self._selection_tint_opacity)
+        self.selection_tint_opacity_spin.setToolTip(
+            "How strongly the Default Selection color covers a selected row. Lower "
+            "tints each row's own diff-tag color toward it, so a selected row still "
+            "shows what its diff outcome was; the indentation area to the left of "
+            "the names is tinted the same way, from the list background. 100% is "
+            "one flat highlight color."
+        )
+        self.selection_tint_opacity_spin.valueChanged.connect(self._on_selection_tint_opacity_changed)
+        # The only spin box on its line, at the end of it: its slider
+        # goes right next to it (spin_slider_inline).
+        tint_row.addWidget(spin_slider_inline(
+            self.selection_tint_opacity_label, self.selection_tint_opacity_spin,
+            SpinSlider(self.selection_tint_opacity_spin),
+        ), 0, Qt.AlignVCenter)
+        tint_row.addStretch(1)
+        flv_colors_group_outer.addLayout(tint_row)
+        self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
+
+        # ---- Scrollbar handle opacity: how much of the handle's own
+        # color covers whatever sits under it in the scrollbar track
+        # (the selection markers, on the file lists) -- 100% hides them
+        # completely. Applies to every themed scrollbar (both File List
+        # Views and the Statistics View's), and is saved per theme with
+        # the rest of the color set. ----
+        handle_opacity_row = QHBoxLayout()
+        self.scrollbar_handle_opacity_label = QLabel("Scrollbar handle opacity:")
+        self.scrollbar_handle_opacity_spin = SliderSpinBox()
+        self.scrollbar_handle_opacity_spin.setRange(10, 100)
+        self.scrollbar_handle_opacity_spin.setSuffix("%")
+        self.scrollbar_handle_opacity_spin.setValue(_SCROLLBAR_STYLE["handle_opacity"])
+        self.scrollbar_handle_opacity_spin.setToolTip(
+            "How opaque the scrollbar handle is. Lower shows the selection "
+            "markers under the handle more clearly; 100% hides them behind it."
+        )
+        self.scrollbar_handle_opacity_spin.valueChanged.connect(
+            self._on_scrollbar_handle_opacity_changed
+        )
+        handle_opacity_row.addWidget(spin_slider_inline(
+            self.scrollbar_handle_opacity_label, self.scrollbar_handle_opacity_spin,
+            SpinSlider(self.scrollbar_handle_opacity_spin),
+        ), 0, Qt.AlignVCenter)
+        handle_opacity_row.addStretch(1)
+        flv_colors_group_outer.addLayout(handle_opacity_row)
+        self._aligned_option_rows.append((self.scrollbar_handle_opacity_label, self.scrollbar_handle_opacity_spin))
+
+        # ---- Scrollbar track opacity: how much the track covers the
+        # selection markers drawn in it (both the ordinary ones and the
+        # handle-magnifier ones -- see _SelectionMarkerScrollBar) -- same
+        # direction as "Scrollbar handle opacity" above (higher fades the
+        # markers more), fully independent of it either way, never
+        # compounded together even under the handle. Capped at 90 rather
+        # than 100 -- see _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT's comment.
+        # Also saved per theme with the rest of the color set. ----
+        track_opacity_row = QHBoxLayout()
+        self.scrollbar_track_opacity_label = QLabel("Scrollbar track opacity:")
+        self.scrollbar_track_opacity_spin = SliderSpinBox()
+        self.scrollbar_track_opacity_spin.setRange(0, 90)
+        self.scrollbar_track_opacity_spin.setSuffix("%")
+        self.scrollbar_track_opacity_spin.setValue(_SCROLLBAR_STYLE["track_opacity"])
+        self.scrollbar_track_opacity_spin.setToolTip(
+            "How much the track fades the selection markers drawn in it. "
+            "0% leaves them fully solid; higher fades them out."
+        )
+        self.scrollbar_track_opacity_spin.valueChanged.connect(
+            self._on_scrollbar_track_opacity_changed
+        )
+        track_opacity_row.addWidget(spin_slider_inline(
+            self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin,
+            SpinSlider(self.scrollbar_track_opacity_spin),
+        ), 0, Qt.AlignVCenter)
+        track_opacity_row.addStretch(1)
+        flv_colors_group_outer.addLayout(track_opacity_row)
+        self._aligned_option_rows.append((self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin))
+
+        # ---- Line colors (inside the Indentation Line subsection built
+        # just below): nested at the bottom of File
+        # List View rather than its own top-level subsection -- same
+        # "Nr. of Steps" spin box + 2 swatches (see DirDropTreeWidget.
+        # drawBranches in dnd_widgets.py) plus hover color/opacity.
+        # Steps=1 acts as "static" (only Color 1 matters, Color 2
+        # disabled), Steps=2 is "every other line" alternating between
+        # the two, and higher values are a color-wheel range between
+        # them, cycling by depth once the tree goes deeper than the
+        # step count. ----
+        indent_colors_group = QGroupBox("")
+        indent_colors_outer = QVBoxLayout(indent_colors_group)
+
+        # Nr. of Steps alone on its own line -- only spin box on the
+        # line and last on it, so its slider sits next to it instead
+        # of below; also part of the page-wide aligned-rows group (see
+        # _aligned_option_rows), same as Indentation/Line thickness and
+        # the Global Options thresholds above.
+        indent_steps_row = QHBoxLayout()
+        self.indent_line_steps_label = QLabel("Nr. of Steps:")
+        self.indent_line_steps_spin = SliderSpinBox()
+        # Upper bound is a practical cap, not a technical one --
+        # _indent_wheel_color itself has no limit, but a range this
+        # wide already cycles through the whole color wheel several
+        # times over for any tree depth this app will realistically see.
+        self.indent_line_steps_spin.setRange(1, 32)
+        self.indent_line_steps_spin.setValue(self._indent_line_steps)
+        self.indent_line_steps_spin.valueChanged.connect(self._on_indent_line_steps_changed)
+        indent_steps_row.addWidget(spin_slider_inline(
+            self.indent_line_steps_label, self.indent_line_steps_spin,
+            SpinSlider(self.indent_line_steps_spin),
+        ), 0, Qt.AlignVCenter)
+        indent_steps_row.addStretch(1)
+        indent_colors_outer.addLayout(indent_steps_row)
+        self._aligned_option_rows.append((self.indent_line_steps_label, self.indent_line_steps_spin))
+
+        # Color 1 / Color 2 / Swap / Reverse (row 0) and Hover color
+        # (row 1) below, in one QGridLayout so column 0 (label) and
+        # column 1 (swatch) come out the same width in both rows --
+        # that's what lines "Color 1"/"Hover color" up at the same
+        # indentation and puts one swatch directly above the other,
+        # without hand-measuring either.
+        indent_colors_grid = QGridLayout()
+        indent_colors_grid.setHorizontalSpacing(6)
+        indent_colors_grid.setColumnStretch(6, 1)
+
+        indent_colors_grid.addWidget(QLabel("Color 1:"), 0, 0, Qt.AlignVCenter)
+        self.indent_line_color1_swatch = self._make_color_swatch(
+            lambda: self._indent_line_color1, self._on_indent_line_color1_changed,
+        )
+        indent_colors_grid.addWidget(self.indent_line_color1_swatch, 0, 1, Qt.AlignVCenter)
+
+        self.indent_line_color2_label = QLabel("Color 2:")
+        indent_colors_grid.addWidget(self.indent_line_color2_label, 0, 2, Qt.AlignVCenter)
+        self.indent_line_color2_swatch = self._make_color_swatch(
+            lambda: self._indent_line_color2, self._on_indent_line_color2_changed,
+        )
+        indent_colors_grid.addWidget(self.indent_line_color2_swatch, 0, 3, Qt.AlignVCenter)
+
+        swap_bg, swap_fg = self._default_button_colors()
+        self.indent_line_swap_button = QPushButton("Swap")
+        self.indent_line_swap_button.setFixedHeight(self._uniform_button_size()[1])
+        self.indent_line_swap_button.setStyleSheet(
+            _bevel_button_stylesheet(swap_bg, swap_fg)
+            + " QPushButton:disabled { background-color: "
+            + _press_blend(swap_bg, self._effective_gui_colors(self._theme)[1], 0.65).name()
+            + "; color: " + _press_blend(swap_fg, self._effective_gui_colors(self._theme)[1], 0.55).name()
+            + "; }"
+        )
+        self.indent_line_swap_button.setToolTip(
+            "Swap Color 1 and Color 2, and flip Reverse Color Wheel Direction "
+            "along with them -- so the range keeps covering the same stretch "
+            "of the color wheel, just running the other way (from what was "
+            "Color 2 to what was Color 1)."
+        )
+        self.indent_line_swap_button.clicked.connect(self._on_indent_line_colors_swap)
+        indent_colors_grid.addWidget(self.indent_line_swap_button, 0, 4, Qt.AlignVCenter)
+
+        self.indent_line_reverse_cb = QCheckBox("Reverse Color Wheel Direction")
+        self.indent_line_reverse_cb.setToolTip(
+            "The range between Color 1 and Color 2 always sweeps the color "
+            "wheel the same rotational direction -- this flips which way, "
+            "which changes between the short-way-round and long-way-round "
+            "range for the same two colors. The Swap button flips this "
+            "along with the colors."
+        )
+        self.indent_line_reverse_cb.setChecked(self._indent_line_reverse)
+        self.indent_line_reverse_cb.toggled.connect(self._on_indent_line_reverse_changed)
+        indent_colors_grid.addWidget(self.indent_line_reverse_cb, 0, 5, Qt.AlignVCenter)
+        self._sync_indent_steps_dependents()
+
+        # Hover color (renamed from "Hover Highlight Color") -- row 1,
+        # column 0/1 shared with Color 1 above.
+        indent_colors_grid.addWidget(QLabel("Hover color:"), 1, 0, Qt.AlignVCenter)
+        self.indent_hover_color_swatch = self._make_color_swatch(
+            lambda: self._indent_hover_color, self._on_indent_hover_color_changed,
+        )
+        indent_colors_grid.addWidget(self.indent_hover_color_swatch, 1, 1, Qt.AlignVCenter)
+
+        self.indent_hover_opacity_spin = SliderSpinBox()
+        self.indent_hover_opacity_spin.setRange(10, 90)
+        self.indent_hover_opacity_spin.setSuffix("%")
+        self.indent_hover_opacity_spin.setValue(self._indent_hover_opacity)
+        self.indent_hover_opacity_spin.valueChanged.connect(self._on_indent_hover_opacity_changed)
+        indent_colors_grid.addWidget(spin_slider_inline(
+            QLabel("Opacity:"), self.indent_hover_opacity_spin,
+            SpinSlider(self.indent_hover_opacity_spin),
+        ), 1, 2, 1, 4, Qt.AlignVCenter)
+
+        indent_colors_outer.addLayout(indent_colors_grid)
+
+        # ---- Indentation Line (Level 2): Enable on a row of its own,
+        # then Indentation and Line thickness side by side below it,
+        # then the colors above as their own Level 3 "Line colors" block. All of it is per theme. Enable off greys
+        # out everything below it (see _sync_indent_line_enabled_states)
+        # and DirDropTreeWidget stops drawing and hit-testing the lines
+        # altogether. ----
+        indent_line_group = QGroupBox("")
+        indent_line_outer = QVBoxLayout(indent_line_group)
+
+        indent_enable_row = QHBoxLayout()
+        self.indent_lines_enabled_cb = QCheckBox("Enable")
+        self.indent_lines_enabled_cb.setToolTip(
+            "Draw the indentation guide lines in the File List View. "
+            "When this is off, no lines are drawn, and they can't be "
+            "hovered or clicked either; the rest of these settings are "
+            "greyed out."
+        )
+        self.indent_lines_enabled_cb.setChecked(self._indent_lines_enabled)
+        self.indent_lines_enabled_cb.toggled.connect(self._on_indent_lines_enabled_changed)
+        indent_enable_row.addWidget(self.indent_lines_enabled_cb)
+        indent_enable_row.addStretch(1)
+        indent_line_outer.addLayout(indent_enable_row)
+
+        # Indentation: how far each nesting level is indented in the
+        # file list (and so how far apart the indentation guide lines
+        # sit). Applied live to both trees. Own line now -- see
+        # _aligned_option_rows -- with Line thickness on its own line
+        # below rather than sharing this one.
+        tree_indent_row = QHBoxLayout()
+        self.tree_indent_label = QLabel("Indentation:")
+        self.tree_indentation_spin = SliderSpinBox()
+        self.tree_indentation_spin.setRange(_MIN_TREE_INDENTATION, _MAX_TREE_INDENTATION)
+        self.tree_indentation_spin.setSuffix(" px")
+        self.tree_indentation_spin.setValue(self._tree_indentation)
+        self.tree_indentation_spin.setToolTip(
+            "How far each nested folder level is indented in the File List View, in "
+            "pixels (also the spacing between the indentation guide lines)."
+        )
+        self.tree_indentation_spin.valueChanged.connect(self._on_tree_indentation_changed)
+        tree_indent_row.addWidget(spin_slider_inline(
+            self.tree_indent_label, self.tree_indentation_spin,
+            SpinSlider(self.tree_indentation_spin),
+        ), 0, Qt.AlignVCenter)
+        tree_indent_row.addStretch(1)
+        indent_line_outer.addLayout(tree_indent_row)
+        self._aligned_option_rows.append((self.tree_indent_label, self.tree_indentation_spin))
+
+        # Line thickness, on its own line below Indentation now.
+        line_thickness_row = QHBoxLayout()
+        self.indent_line_thickness_label = QLabel("Line thickness:")
+        self.indent_line_thickness_spin = SliderSpinBox()
+        # One less than the Indentation spin box's own value, so two
+        # neighboring lines can never touch or overlap -- kept in step
+        # with that spin box by _on_tree_indentation_changed.
+        self.indent_line_thickness_spin.setRange(1, max(1, self._tree_indentation - 1))
+        self.indent_line_thickness_spin.setSuffix(" px")
+        self.indent_line_thickness_spin.setValue(self._indent_line_thickness)
+        self.indent_line_thickness_spin.setToolTip(
+            "Width of each indentation guide line, in pixels. The line's "
+            "left edge stays where it is, so a thicker line grows to the "
+            "right. Limited to one pixel less than the Indentation "
+            "setting, so neighboring lines never touch."
+        )
+        self.indent_line_thickness_spin.valueChanged.connect(self._on_indent_line_thickness_changed)
+        # (Its maximum follows the Indentation value -- see _sync_indent_
+        # thickness_limit; the slider follows the spin box's range itself.)
+        line_thickness_row.addWidget(spin_slider_inline(
+            self.indent_line_thickness_label, self.indent_line_thickness_spin,
+            SpinSlider(self.indent_line_thickness_spin),
+        ), 0, Qt.AlignVCenter)
+        line_thickness_row.addStretch(1)
+        indent_line_outer.addLayout(line_thickness_row)
+        self._aligned_option_rows.append((self.indent_line_thickness_label, self.indent_line_thickness_spin))
+
+        self.indent_line_colors_block = self._settings_subsubsection("Line colors", indent_colors_group)
+        indent_line_outer.addWidget(self.indent_line_colors_block)
+
+        # ---- Line style (below Line colors): mutually exclusive shapes
+        # for the guide lines, see DirDropTreeWidget.drawBranches. The
+        # button ids are the stored values (dnd_widgets.LINE_STYLE_*).
+        # Underneath: the tick marks options (short ticks from the line
+        # to each file and/or folder, in the line's color and thickness,
+        # following whichever style is chosen, each type on its own
+        # side of the line). ----
+        indent_style_group = QGroupBox("")
+        indent_style_outer = QVBoxLayout(indent_style_group)
+        indent_style_row = QHBoxLayout()
+        # Parented to the group box so it goes away with it on a UI
+        # rebuild instead of piling up on the main window.
+        self.indent_line_style_group = QButtonGroup(indent_style_group)
+        for style_id, text, tip in (
+            (0, "Straight line",
+             "Plain vertical line, one per nesting level."),
+            (1, "Diagonally indented",
+             "Each line slides half an indentation to the right over the first row "
+             "under its folder, runs straight, and slides back over the last row "
+             "(a single row gets a \">\" tip). Expand arrows move to the right half "
+             "of their column to stay clear of the line."),
+            (2, "Curved indented",
+             "Like Diagonally indented, but the slides are arcs that flare out "
+             "sideways at the very start and end of the line."),
+            (3, "S-curve indented",
+             "Like Diagonally indented, but the slides are smooth S-curves that "
+             "are vertical at both ends."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.indent_line_style_group.addButton(radio, style_id)
+            indent_style_row.addWidget(radio)
+            if style_id == self._indent_line_style:
+                radio.setChecked(True)
+        indent_style_row.addStretch(1)
+        indent_style_outer.addLayout(indent_style_row)
+        self.indent_line_style_group.idClicked.connect(self._on_indent_line_style_changed)
+
+        # Tick marks: a master checkbox on a line of its own, then one
+        # line each for files and folders -- [type checkbox] [Left side]
+        # [length spin box + slider] -- in a grid so the columns line up.
+        # Each type's Left side/length are only available while its own
+        # checkbox is on, and all of it while the master is on (see
+        # _sync_indent_tick_enabled_states). The lengths' maximum follows
+        # the Indentation (see _sync_indent_thickness_limit), like the
+        # line thickness. All of it is stored per theme.
+        self._ensure_indent_tick_state()
+        indent_tick_master_row = QHBoxLayout()
+        self.indent_tick_enabled_cb = QCheckBox("Enable Tick Marks")
+        self.indent_tick_enabled_cb.setToolTip(
+            "Draw a short tick from the indentation line to each file and/or "
+            "folder, in the line's color and thickness. The ticks follow the "
+            "chosen line style, starting where the line actually is on that "
+            "row. Files and folders are set up separately below."
+        )
+        self.indent_tick_enabled_cb.setChecked(self._indent_tick_enabled)
+        self.indent_tick_enabled_cb.toggled.connect(
+            lambda checked: self._on_indent_tick_option_changed("_indent_tick_enabled", bool(checked))
+        )
+        indent_tick_master_row.addWidget(self.indent_tick_enabled_cb)
+        indent_tick_master_row.addStretch(1)
+        indent_style_outer.addLayout(indent_tick_master_row)
+
+        indent_tick_grid = QGridLayout()
+        indent_tick_grid.setContentsMargins(20, 0, 0, 0)
+        indent_tick_grid.setHorizontalSpacing(16)
+        indent_tick_grid.setColumnStretch(3, 1)
+        for grid_row, (kind, type_text, type_tip, length_text, length_tip,
+                       on_attr, left_attr, length_attr, length_spin_name) in enumerate((
+            ("files", "Files",
+             "Draw a tick to each file.",
+             "File tick mark length:",
+             "How far each file tick reaches out from the indentation line, in "
+             "pixels. A tick never goes past its own indentation column, so in "
+             "the diagonal/curved styles (where the line has moved to the right) "
+             "long ticks on the right side are cut off sooner.",
+             "_indent_tick_files", "_indent_tick_files_left", "_indent_tick_length",
+             "indent_tick_length_spin"),
+            ("folders", "Folders",
+             "Draw a tick to each folder. A folder's expand arrow is drawn on top "
+             "of a tick on the right side of the line, so the left side is "
+             "usually the cleaner choice.",
+             "Folder tick mark length:",
+             "How far each folder tick reaches out from the indentation line, in "
+             "pixels. A tick never goes past its own indentation column (right "
+             "side) or the line before it (left side), so long ticks are cut off "
+             "sooner in the diagonal/curved styles.",
+             "_indent_tick_folders", "_indent_tick_folders_left", "_indent_tick_folder_length",
+             "indent_tick_folder_length_spin"),
+        )):
+            type_cb = QCheckBox(type_text)
+            type_cb.setToolTip(type_tip)
+            type_cb.setChecked(getattr(self, on_attr))
+            type_cb.toggled.connect(
+                lambda checked, a=on_attr: self._on_indent_tick_option_changed(a, bool(checked))
+            )
+            left_cb = QCheckBox("Left side")
+            left_cb.setToolTip(
+                "Put the tick on the left side of the indentation line instead of "
+                "the right side."
+            )
+            left_cb.setChecked(getattr(self, left_attr))
+            left_cb.toggled.connect(
+                lambda checked, a=left_attr: self._on_indent_tick_option_changed(a, bool(checked))
+            )
+            length_label = QLabel(length_text)
+            length_spin = SliderSpinBox()
+            length_spin.setRange(1, max(1, self._tree_indentation - 1))
+            length_spin.setSuffix(" px")
+            length_spin.setValue(getattr(self, length_attr))
+            length_spin.setStyleSheet(_DISABLED_SPINBOX_STYLE)
+            length_spin.setToolTip(length_tip)
+            length_spin.valueChanged.connect(
+                lambda value, a=length_attr: self._on_indent_tick_option_changed(a, int(value))
+            )
+            setattr(self, f"indent_tick_{kind}_cb", type_cb)
+            setattr(self, f"indent_tick_{kind}_left_cb", left_cb)
+            setattr(self, f"indent_tick_{kind}_length_label", length_label)
+            setattr(self, length_spin_name, length_spin)
+            indent_tick_grid.addWidget(type_cb, grid_row, 0, Qt.AlignVCenter)
+            indent_tick_grid.addWidget(left_cb, grid_row, 1, Qt.AlignVCenter)
+            indent_tick_grid.addWidget(spin_slider_inline(
+                length_label, length_spin, SpinSlider(length_spin),
+            ), grid_row, 2, Qt.AlignVCenter)
+        indent_style_outer.addLayout(indent_tick_grid)
+        self._sync_indent_tick_enabled_states()
+        self.indent_line_style_block = self._settings_subsubsection("Line style", indent_style_group)
+        indent_line_outer.addWidget(self.indent_line_style_block)
+
+        # Everything below Enable, greyed out together while it's off.
+        self._indent_line_dependents = [
+            self.tree_indent_label, self.tree_indentation_spin,
+            self.indent_line_thickness_label, self.indent_line_thickness_spin,
+            self.indent_line_colors_block, self.indent_line_style_block,
+        ]
+        self._sync_indent_line_enabled_states()
+
+        flv_flow.addWidget(self._settings_subsection("Indentation Line", indent_line_group))
+
+        # ---- Comparison Type Colors: the file-list row Fg/Bg for each
+        # diff outcome, set independently for files and folders
+        # (constants.TAG_COLORS entries) -- separate from the Select-
+        # group button colors under Panel Button Colors below
+        # (which only color the buttons themselves). Rows in the
+        # Select buttons' own order, built from custom_widgets.
+        # _SELECT_KEY_TO_TAG_COLOR_KEYS: (file tag, folder tag), or just
+        # (folder tag,) for Diff Folders, which has no file counterpart
+        # -- those two cells are left as a plain dash. Persisted through
+        # the existing "tag_colors" block (settings_ops._raw_settings_
+        # state), no separate settings key needed. ----
+        comparison_colors_group = QGroupBox("")
+        comparison_colors_outer = QVBoxLayout(comparison_colors_group)
+        _COMPARISON_LABELS = {
+            "missing": "Missing", "matching": "Matching", "newer": "Newer", "older": "Older",
+            "smaller": "Smaller", "larger": "Larger", "diff_folders": "Diff Folders",
+        }
+        comparison_colors_table = QTableWidget(len(_SELECT_KEY_TO_TAG_COLOR_KEYS), 6)
+        self._style_table_widget(
+            comparison_colors_table,
+            ["Comparison type", "File Fg", "File Bg", "Folder Fg", "Folder Bg", "Comparison Type\nSummary Text Color"],
+        )
+        for i, (key, tags) in enumerate(_SELECT_KEY_TO_TAG_COLOR_KEYS.items()):
+            file_tag = tags[0] if len(tags) == 2 else None
+            dir_tag = tags[-1]
+            comparison_colors_table.setItem(i, 0, self._table_item(_COMPARISON_LABELS[key]))
+            for col, (tag, is_fg) in enumerate(
+                ((file_tag, True), (file_tag, False), (dir_tag, True), (dir_tag, False)), start=1,
+            ):
+                if tag is None:
+                    dash = self._table_item("\u2014")
+                    dash.setTextAlignment(Qt.AlignCenter)
+                    comparison_colors_table.setItem(i, col, dash)
+                    continue
+                comparison_colors_table.setCellWidget(i, col, self._center_in_cell(self._make_color_swatch(
+                    lambda t=tag, f=is_fg: self._tag_color_hex(t, f),
+                    lambda hexc, t=tag, f=is_fg: self._on_comparison_color_changed(t, f, hexc),
+                )))
+            comparison_colors_table.setCellWidget(i, 5, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._summary_colors[k],
+                lambda hexc, k=key: self._on_summary_color_changed(k, hexc),
+            )))
+        comparison_colors_table.horizontalHeaderItem(5).setToolTip(
+            "Text color of this type's count in the summary line below each File List View "
+            "(\"Missing: 3 · Matching: 12 ...\"). Independent of the Select button colors."
+        )
+        self._size_table_to_contents(comparison_colors_table)
+        comparison_colors_outer.addWidget(comparison_colors_table)
+        comparison_colors_block = self._settings_subsubsection("Comparison Type Colors", comparison_colors_group)
+
+        # ---- Button Colors (Level 3, after Comparison Type Colors): the
+        # buttons around each pane's File List View. They start at the
+        # theme's default button colors -- see _main_button_color_for. ----
+        flv_buttons_group = self._main_button_color_table([
+            ("up", "Up one folder"), ("select_dir", "Select Directory"),
+            ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
+            ("collapse_all", "Collapse (-)"),
+        ])
+        flv_buttons_block = self._settings_subsubsection("Button Colors", flv_buttons_group)
+
+        # "File List View Colors" (Level 2): Default / Misc colors and
+        # Comparison Type Colors as its two Level 3 blocks, cascading
+        # (Comparison Type Colors stacks below Default / Misc colors,
+        # rather than the whole "File List View Colors" block wrapping
+        # to a new line, once the two no longer fit side by side --
+        # see CascadeFlowLayout).
+        # Flat and zero-margin: this box exists only to give "File List
+        # View Colors" its Level 2 frame; it holds nothing of its own,
+        # just the two Level 3 blocks below (each already framed on its
+        # own), so it doesn't need its own inset on top of theirs.
+        flv_colors_super_group = QGroupBox("")
+        flv_colors_super_group.setFlat(True)
+        flv_colors_super_outer = QVBoxLayout(flv_colors_super_group)
+        flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
+        flv_colors_super_outer.addLayout(
+            self._settings_subsection_cascade(
+                flv_default_misc_block, comparison_colors_block, flv_buttons_block,
+            )
+        )
+        flv_flow.addWidget(self._settings_subsection("File List View Colors", flv_colors_super_group))
+
+        outer.addWidget(self._settings_section("File List View", date_col_group))
+
+        # ---- File List / Statistics Split (both panes) -- the same
+        # ratio the draggable handle between the two views (Main tab)
+        # controls; dragging that handle updates this spin box and vice
+        # versa. See _set_file_list_ratio. ----
+        split_group = QGroupBox("")
+        split_row = QHBoxLayout(split_group)
+        split_row.addWidget(QLabel("File List share:"))
+        self.file_list_ratio_spin = SliderDoubleSpinBox()
+        self.file_list_ratio_spin.setRange(0.05, 0.95)
+        self.file_list_ratio_spin.setSingleStep(0.05)
+        self.file_list_ratio_spin.setDecimals(2)
+        self.file_list_ratio_spin.setValue(self._file_list_ratio)
+        self.file_list_ratio_spin.setToolTip(
+            "Fraction of each pane's vertical space the File List view gets; the "
+            "rest goes to the Statistics view below it. 0.75 means the File List "
+            "gets 3/4 of the height and Statistics view gets 1/4. Same as dragging "
+            "the handle between the two views on the Main tab -- either one "
+            "updates the other, and both panes stay in sync."
+        )
+        self.file_list_ratio_spin.valueChanged.connect(self._on_file_list_ratio_spin_changed)
+        split_row.addWidget(self.file_list_ratio_spin)
+        split_row.addSpacing(12)
+        split_row.addWidget(SpinSlider(self.file_list_ratio_spin))
+        split_row.addStretch(1)
+        outer.addWidget(self._settings_section("File List / Statistics Split (both panes)", split_group))
+
+        # ---- Statistics View (common to both panes) ----
+        # The section's frame holds a flow of Level 2 blocks: "General
+        # options" first (everything common to both panes' views --
+        # font size, label angle, bins, calendar-unit stripping, the
+        # Symmetrical GUI footer option), then the Left/Right Statistics
+        # View and Statistics View Colors blocks further down.
+        stats_group = QGroupBox("")
+        stats_group_outer = QVBoxLayout(stats_group)
+        stats_options_group = QGroupBox("")
+        stats_options_outer = QVBoxLayout(stats_options_group)
+
+        # Row 0: Font size alone (slider next to it). Row 1: Auto angle
+        # alone. Row 2: Axis label angle + spin box (slider next to
+        # it). Row 3: Nice bins + Bin count + spin box (slider next to
+        # it, unchanged otherwise). A QGridLayout rather than separate
+        # QHBoxLayouts -- column 0 holds each row's "everything before
+        # the slider", column 1 the slider itself, so column 0's width
+        # (set by its widest row) is what lines Axis label angle's
+        # slider up directly above Bin count's, without hand-measuring
+        # either row's leading content.
+        stats_top_grid = QGridLayout()
+        stats_top_grid.setHorizontalSpacing(16)
+        stats_top_grid.setVerticalSpacing(6)
+        stats_top_grid.setColumnStretch(2, 1)
+
+        self.common_font_size_spin = SliderSpinBox()
+        self.common_font_size_spin.setRange(6, 24)
+        self.common_font_size_spin.setValue(DEFAULT_LABEL_FONT_PT)
+        self.common_font_size_spin.setToolTip(
+            "Point size for both panes' Statistics view text -- the "
+            "angled date/size labels along the bottom, the vertical-"
+            "axis counts, and the upper-left hover/selection readout."
+        )
+        self.common_font_size_spin.valueChanged.connect(self._on_common_font_size_changed)
+        font_size_lead = QWidget()
+        font_size_lead_row = QHBoxLayout(font_size_lead)
+        font_size_lead_row.setContentsMargins(0, 0, 0, 0)
+        font_size_lead_row.addWidget(QLabel("Font size:"), 0, Qt.AlignVCenter)
+        font_size_lead_row.addWidget(self.common_font_size_spin, 0, Qt.AlignVCenter)
+        stats_top_grid.addWidget(font_size_lead, 0, 0, Qt.AlignVCenter)
+        stats_top_grid.addWidget(SpinSlider(self.common_font_size_spin), 0, 1, Qt.AlignVCenter)
+
+        self.common_auto_tick_angle_cb = QCheckBox("Auto angle")
+        self.common_auto_tick_angle_cb.setToolTip(
+            "On: each pane's axis labels use the shallowest angle that keeps \n"
+            "every label clear of its neighbours -- flat (0\u00b0) whenever a label \n"
+            "plus about one character fits between its tick and the next, \n"
+            "otherwise tilted only as far as needed -- and re-fit as you zoom, \n"
+            "resize, or change the bin count/font size. Disables Axis label \n"
+            "angle.\n"
+            "Off: the fixed Axis label angle is used."
+        )
+        self.common_auto_tick_angle_cb.toggled.connect(self._on_common_auto_tick_angle_changed)
+        stats_top_grid.addWidget(self.common_auto_tick_angle_cb, 1, 0, Qt.AlignVCenter)
+
+        self.common_tick_angle_label = QLabel("Axis label angle:")
+        self.common_tick_angle_spin = SliderSpinBox()
+        self.common_tick_angle_spin.setRange(0, 90)
+        self.common_tick_angle_spin.setSuffix("\u00b0")
+        self.common_tick_angle_spin.setValue(TICK_LABEL_ANGLE_DEG)
+        self.common_tick_angle_spin.setToolTip(
+            "How far down-right the angled date/size labels along the "
+            "bottom of both panes' Statistics views are rotated from "
+            "their tick mark. A shallower angle also needs less room "
+            "below the chart -- see TimelineWidget._recompute_bottom_margin."
+        )
+        self.common_tick_angle_spin.valueChanged.connect(self._on_common_tick_angle_changed)
+        tick_angle_lead = QWidget()
+        tick_angle_lead_row = QHBoxLayout(tick_angle_lead)
+        tick_angle_lead_row.setContentsMargins(0, 0, 0, 0)
+        tick_angle_lead_row.addWidget(self.common_tick_angle_label, 0, Qt.AlignVCenter)
+        tick_angle_lead_row.addWidget(self.common_tick_angle_spin, 0, Qt.AlignVCenter)
+        stats_top_grid.addWidget(tick_angle_lead, 2, 0, Qt.AlignVCenter)
+        stats_top_grid.addWidget(SpinSlider(self.common_tick_angle_spin), 2, 1, Qt.AlignVCenter)
+
+        self.common_nice_bins_cb = QCheckBox("Nice bins")
+        self.common_nice_bins_cb.setChecked(True)
+        self.common_nice_bins_cb.setToolTip(
+            "On: bins snap to calendar units / decimal magnitudes (1 month, "
+            "10 MB, ...), sized to roughly fit bin_count bins across the "
+            "current view.\n"
+            "Off: the visible span is split into an exact bin count, so "
+            "widths change as you pan/zoom."
+        )
+        self.common_nice_bins_cb.toggled.connect(self._on_common_nice_bins_changed)
+        self.common_bin_count_spin = SliderSpinBox()
+        self.common_bin_count_spin.setRange(2, 500)
+        self.common_bin_count_spin.setValue(DEFAULT_BIN_COUNT)
+        self.common_bin_count_spin.valueChanged.connect(self._on_common_bin_count_changed)
+        bin_count_lead = QWidget()
+        bin_count_lead_row = QHBoxLayout(bin_count_lead)
+        bin_count_lead_row.setContentsMargins(0, 0, 0, 0)
+        bin_count_lead_row.addWidget(self.common_nice_bins_cb, 0, Qt.AlignVCenter)
+        bin_count_lead_row.addSpacing(16)
+        bin_count_lead_row.addWidget(QLabel("Bin count:"), 0, Qt.AlignVCenter)
+        bin_count_lead_row.addWidget(self.common_bin_count_spin, 0, Qt.AlignVCenter)
+        stats_top_grid.addWidget(bin_count_lead, 3, 0, Qt.AlignVCenter)
+        # Slider not live: every step re-bins both panes' data.
+        stats_top_grid.addWidget(
+            SpinSlider(self.common_bin_count_spin, live=False), 3, 1, Qt.AlignVCenter
+        )
+
+        stats_options_outer.addLayout(stats_top_grid)
+
+        # Depends on Nice bins (greyed out with it off -- see
+        # _on_common_nice_bins_changed), so indented under it.
+        stats_strip_row = QHBoxLayout()
+        stats_strip_row.addSpacing(20)
+        self.common_strip_units_cb = QCheckBox("Strip most significant calendar units from horizontal labels")
+        self.common_strip_units_cb.setToolTip(
+            "Time axis with Nice bins on: leaves the parts of the x-axis labels that are \n"
+            "larger than the bin size out of the labels (the year from month bins, \n"
+            "year-month from day bins, the date from hour bins, ...) and shows them \n"
+            "once in the Statistics view's upper-left corner instead, next to the bin \n"
+            "size, e.g. \"Bin: 1 hour   Chart: 2024-03-22 - 23\".\n"
+            "Filesize labels are never changed."
+        )
+        self.common_strip_units_cb.setEnabled(self.common_nice_bins_cb.isChecked())
+        self.common_strip_units_cb.toggled.connect(self._on_common_strip_units_changed)
+        stats_strip_row.addWidget(self.common_strip_units_cb, 0, Qt.AlignVCenter)
+        stats_strip_row.addStretch(1)
+        stats_options_outer.addLayout(stats_strip_row)
+
+        # Only meaningful (and only clickable) while the option above is
+        # on -- see _on_common_strip_units_changed, which flips these
+        # two's enabled state the same way Nice bins flips the row above.
+        stats_names_row = QHBoxLayout()
+        stats_names_row.addSpacing(20)
+        self.common_strip_names_cb = QCheckBox("Use calendar unit names instead of numbers")
+        self.common_strip_names_cb.setToolTip(
+            "With the option above on: weekday names for day bins (\"Friday\" rather \n"
+            "than \"22\"), month names for month bins and for the month part of week \n"
+            "bins (\"March\" rather than \"03\"). Also changes how the upper-left \n"
+            "\"Chart: ...\" text writes the dates it covers."
+        )
+        self.common_strip_names_cb.setEnabled(self.common_strip_units_cb.isChecked())
+        self.common_strip_names_cb.toggled.connect(self._on_common_strip_names_changed)
+        stats_names_row.addWidget(self.common_strip_names_cb, 0, Qt.AlignVCenter)
+        stats_names_row.addSpacing(12)
+        self.common_strip_abbreviate_cb = QCheckBox("Abbreviate names")
+        self.common_strip_abbreviate_cb.setToolTip(
+            "Shorten the names the option to its left uses, e.g. \"January\" -> \"Jan\", \n"
+            "\"Monday\" -> \"Mon\"."
+        )
+        self.common_strip_abbreviate_cb.setEnabled(self.common_strip_units_cb.isChecked())
+        self.common_strip_abbreviate_cb.toggled.connect(self._on_common_strip_abbreviate_changed)
+        stats_names_row.addWidget(self.common_strip_abbreviate_cb, 0, Qt.AlignVCenter)
+        stats_names_row.addStretch(1)
+        stats_options_outer.addLayout(stats_names_row)
+
+        stats_week_row = QHBoxLayout()
+        stats_week_row.addSpacing(20)
+        self.common_strip_week_number_cb = QCheckBox("Use week nr. for 1 week bins")
+        self.common_strip_week_number_cb.setToolTip(
+            "With \"Strip most significant calendar units...\" on: for week bins, \n"
+            "label each with the week number of the year it starts on (\"W12\") \n"
+            "instead of its month and day. \"W\" is dropped if Abbreviate names \n"
+            "is also on (\"12\")."
+        )
+        self.common_strip_week_number_cb.setEnabled(self.common_strip_units_cb.isChecked())
+        self.common_strip_week_number_cb.toggled.connect(self._on_common_strip_week_number_changed)
+        stats_week_row.addWidget(self.common_strip_week_number_cb, 0, Qt.AlignVCenter)
+        stats_week_row.addStretch(1)
+        stats_options_outer.addLayout(stats_week_row)
+
+        stats_footer_row = QHBoxLayout()
+        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons and options in Symmetrical GUI")
+        self.mirror_statistics_buttons_cb.setToolTip(
+            "Only while the main Symmetrical GUI setting is also on: mirror the right "
+            "pane's Statistics view footer -- the buttons/options row(s) below the "
+            "chart -- and its hover/selection text, horizontally -- same left/right "
+            "mirroring Symmetrical GUI already applies to the Select/Clipboard/File Op "
+            "groups. The Statistics view's own title line (above the chart) mirrors "
+            "whenever Symmetrical GUI is on, regardless of this setting. The axis and "
+            "bins themselves are never mirrored, on either pane."
+        )
+        self.mirror_statistics_buttons_cb.setChecked(self._mirror_statistics_buttons)
+        self.mirror_statistics_buttons_cb.toggled.connect(self._on_mirror_statistics_buttons_changed)
+        stats_footer_row.addWidget(self.mirror_statistics_buttons_cb)
+        stats_footer_row.addStretch(1)
+        stats_options_outer.addLayout(stats_footer_row)
+
+        # The section's Level 2 blocks (General options, Left/Right
+        # Statistics View, Statistics View Colors), side by side while
+        # they fit and wrapping below each other when they don't --
+        # the rest are added to this flow where they're built, below.
+        stats_flow = self._settings_subsection_flow(
+            self._settings_subsection("General options", stats_options_group)
+        )
+        stats_group_outer.addLayout(stats_flow)
+
+        outer.addWidget(self._settings_section("Statistics View", stats_group))
+
+        # Apply the just-created common values to both panes' views right
+        # away, and point pane.tl_font_size_spin/tl_nice_bins_cb/
+        # tl_bin_count_spin/tl_tick_angle_spin at these same shared
+        # widgets so anything that still looks for them there finds the
+        # real, live controls.
+        for pane in (self.left, self.right):
+            pane.timeline.set_label_font_size(self.common_font_size_spin.value())
+            pane.timeline.set_nice_bins(self.common_nice_bins_cb.isChecked())
+            pane.timeline.set_bin_count(self.common_bin_count_spin.value())
+            pane.timeline.set_tick_label_angle(self.common_tick_angle_spin.value())
+            pane.timeline.set_auto_tick_angle(self.common_auto_tick_angle_cb.isChecked())
+            pane.timeline.set_strip_calendar_units(self.common_strip_units_cb.isChecked())
+            pane.timeline.set_strip_use_names(self.common_strip_names_cb.isChecked())
+            pane.timeline.set_strip_abbreviate_names(self.common_strip_abbreviate_cb.isChecked())
+            pane.timeline.set_strip_use_week_number(self.common_strip_week_number_cb.isChecked())
+            pane.tl_strip_units_cb = self.common_strip_units_cb
+            pane.tl_strip_names_cb = self.common_strip_names_cb
+            pane.tl_strip_abbreviate_cb = self.common_strip_abbreviate_cb
+            pane.tl_strip_week_number_cb = self.common_strip_week_number_cb
+            pane.tl_font_size_spin = self.common_font_size_spin
+            pane.tl_nice_bins_cb = self.common_nice_bins_cb
+            pane.tl_bin_count_spin = self.common_bin_count_spin
+            pane.tl_tick_angle_spin = self.common_tick_angle_spin
+            pane.tl_auto_tick_angle_cb = self.common_auto_tick_angle_cb
+
+        # ---- Specific options (still individual, synced copies): one
+        # Level 2 block holding the left pane's column and the right
+        # pane's next to it, each its own Level 3 block ("Left pane"/
+        # "Right pane") -- normal space_above spacing, same as any other
+        # Level 3 pair, so they stack with the usual gap between them
+        # rather than sitting flush when there's no room side by side. ----
+        view_group = QGroupBox("")
+        view_group_outer = QVBoxLayout(view_group)
+        # Left pane before Right pane, always -- see reorder.
+        view_flow = self._settings_subsection_flow(reorder=False)
+        view_group_outer.addLayout(view_flow)
+        for pane, side_label in ((self.left, "Left pane"), (self.right, "Right pane")):
+            view_col_widget = QWidget()
+            view_col = QVBoxLayout(view_col_widget)
+            view_col.setContentsMargins(0, 0, 0, 0)
+            for primary, label in (
+                (pane.tl_log_scale_cb, "Log height"),
+                (pane.tl_log_size_axis_cb, "Log (Filesize only)"),
+                (pane.tl_auto_vrange_cb, "Auto Range"),
+            ):
+                secondary = QCheckBox(label)
+                if primary.toolTip():
+                    secondary.setToolTip(primary.toolTip())
+                self._link_checkboxes(primary, secondary)
+                view_col.addWidget(secondary)
+            view_flow.addWidget(self._settings_subsubsection(side_label, view_col_widget))
+        stats_flow.addWidget(self._settings_subsection("Specific options", view_group))
+
+        # ---- Statistics View Colors -- Background/Selection/Bins/Grid/
+        # Axis Labels/Hover Info/Selection Info, split by mode (file/
+        # folder) since the two share one chart per pane but never plot
+        # at the same time (see statistics_ops.TimelineOpsMixin module
+        # docstring) -- Background included, now that it's per-mode too
+        # rather than a value shared across both. Applied live via
+        # TimelineOpsMixin._apply_stats_palette -> TimelineWidget.
+        # set_palette. Sits right below the Left/Right Statistics View
+        # settings above -- the last of the Statistics-view-specific
+        # controls -- rather than down inside Colors && Theme with the
+        # rest of the app's color tables. ----
+        # Flat and zero-margin, same reasoning as flv_colors_super_group
+        # above: exists only to give "Statistics View Colors" its Level
+        # 2 frame around the Graph/Info/Buttons blocks, which are
+        # already framed themselves.
+        stats_colors_group = QGroupBox("")
+        stats_colors_group.setFlat(True)
+        stats_colors_outer = QVBoxLayout(stats_colors_group)
+        stats_colors_outer.setContentsMargins(0, 0, 0, 0)
+
+        def _build_stats_color_table(rows) -> QTableWidget:
+            """One "Item / File Mode / Folder Mode" swatch table for the
+            given (stats_colors key, row label) pairs -- shared by the
+            Graph colors and Info text colors tables below, which only
+            differ in which keys they list."""
+            table = QTableWidget(len(rows), 3)
+            self._style_table_widget(table, ["Item", "File Mode", "Folder Mode"])
+            for i, (key, label) in enumerate(rows):
+                table.setItem(i, 0, self._table_item(label))
+                table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
+                    lambda k=key: self._stats_colors["file"][k],
+                    lambda hexc, k=key: self._on_stats_color_changed("file", k, hexc),
+                )))
+                table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(
+                    lambda k=key: self._stats_colors["folder"][k],
+                    lambda hexc, k=key: self._on_stats_color_changed("folder", k, hexc),
+                )))
+            self._size_table_to_contents(table)
+            return table
+
+        def _narrow_opacity_spin(value: int, minimum: int, changed) -> SliderSpinBox:
+            """A 10-100%/0-100% opacity spin box sized for its own 3
+            digits + '%' rather than the page's usual wider spin boxes
+            -- see the Ranged/Hover Opacity rows below, which also give
+            it a narrower (90 px) slider to match."""
+            spin = SliderSpinBox()
+            spin.setRange(minimum, 100)
+            spin.setSuffix("%")
+            spin.setValue(value)
+            spin.setMaximumWidth(QFontMetrics(self.font()).horizontalAdvance("100%") + 30)
+            spin.valueChanged.connect(changed)
+            return spin
+
+        # One label column width for every row of both opacity pairs
+        # below (Ranged Opacity: File/Folder, Hover Opacity: File/
+        # Folder): the widest "<title>: File:" label, so all four spin
+        # boxes and sliders start at the same x.
+        _OPACITY_TITLES = ("Ranged Opacity", "Hover Opacity")
+        opacity_label_w = max(QLabel(f"{t}: File:").sizeHint().width() for t in _OPACITY_TITLES)
+
+        def _opacity_file_folder_rows(
+            title: str, file_spin: SliderSpinBox, folder_spin: SliderSpinBox
+        ) -> QVBoxLayout:
+            """'<title>: File' then, on the line below, an indented
+            'Folder' -- both share one label column (opacity_label_w,
+            the same for every pair, so the pairs line up with each
+            other too), with "Folder" right-aligned in it, so it reads
+            as indented under "File" while its spin box/slider still
+            land in exactly the same columns as the row above, rather
+            than needing a hand-picked indent value."""
+            file_label = QLabel(f"{title}: File:")
+            file_label.setFixedWidth(opacity_label_w)
+            folder_label = QLabel("Folder:")
+            folder_label.setFixedWidth(opacity_label_w)
+            folder_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+            rows = QVBoxLayout()
+            rows.setSpacing(2)
+            file_row = QHBoxLayout()
+            file_row.addWidget(spin_slider_inline(
+                file_label, file_spin, SpinSlider(file_spin, width=90),
+            ), 0, Qt.AlignVCenter)
+            file_row.addStretch(1)
+            rows.addLayout(file_row)
+
+            folder_row = QHBoxLayout()
+            folder_row.addWidget(spin_slider_inline(
+                folder_label, folder_spin, SpinSlider(folder_spin, width=90),
+            ), 0, Qt.AlignVCenter)
+            folder_row.addStretch(1)
+            rows.addLayout(folder_row)
+            return rows
+
+        # Bars/gridlines/axes -- what the chart itself is drawn with --
+        # plus the Ranged/Hover Opacity rows stacked directly below the
+        # table itself (not spanning the full width of the row all
+        # three tables sit in), all under one "Graph colors" Level 3
+        # title. Narrow and two-line (rather than side by side) so this
+        # whole block stays no wider than the table above it, letting
+        # Info text colors sit right beside it instead of leaving a gap.
+        _GRAPH_COLOR_ROWS = [
+            ("background_color", "Background"),
+            ("selection_color", "Selection"),
+            ("hover_color", "Hover"),
+            ("bin_color", "Bins"),
+            ("grid_color", "Grid"),
+            ("axis_label_color", "Axis Labels"),
+        ]
+        graph_colors_table = _build_stats_color_table(_GRAPH_COLOR_ROWS)
+
+        # Ranged opacity: the alpha the Selection color above is drawn
+        # at for the drag-range fill specifically (see set_palette) --
+        # same "swatch + opacity" split as Selection opacity
+        # above, so doesn't fit the table as a swatch
+        # of its own.
+        self.stats_file_selection_opacity_spin = _narrow_opacity_spin(
+            self._stats_colors["file"]["selection_opacity"], 10,
+            lambda v: self._on_stats_opacity_changed("file", v),
+        )
+        self.stats_folder_selection_opacity_spin = _narrow_opacity_spin(
+            self._stats_colors["folder"]["selection_opacity"], 10,
+            lambda v: self._on_stats_opacity_changed("folder", v),
+        )
+        ranged_opacity_rows = _opacity_file_folder_rows(
+            "Ranged Opacity",
+            self.stats_file_selection_opacity_spin, self.stats_folder_selection_opacity_spin,
+        )
+
+        # Hover opacity: how far a hovered bin's bar and x-axis label
+        # are tinted toward the Hover color above (see set_palette).
+        self.stats_file_hover_opacity_spin = _narrow_opacity_spin(
+            self._stats_colors["file"]["hover_opacity"], 0,
+            lambda v: self._on_stats_opacity_changed("file", v, "hover_opacity"),
+        )
+        self.stats_folder_hover_opacity_spin = _narrow_opacity_spin(
+            self._stats_colors["folder"]["hover_opacity"], 0,
+            lambda v: self._on_stats_opacity_changed("folder", v, "hover_opacity"),
+        )
+        hover_opacity_rows = _opacity_file_folder_rows(
+            "Hover Opacity",
+            self.stats_file_hover_opacity_spin, self.stats_folder_hover_opacity_spin,
+        )
+
+        graph_colors_container = QWidget()
+        graph_colors_layout = QVBoxLayout(graph_colors_container)
+        graph_colors_layout.setContentsMargins(0, 0, 0, 0)
+        graph_colors_layout.addWidget(graph_colors_table)
+        graph_colors_layout.addLayout(ranged_opacity_rows)
+        graph_colors_layout.addLayout(hover_opacity_rows)
+        graph_colors_block = self._settings_subsubsection("Graph colors", graph_colors_container)
+
+        # The upper-left readout's text, split by which of its segments
+        # each color paints -- see TimelineWidget._draw_readout_segments
+        # -- plus the selected-count readout's own color.
+        _INFO_COLOR_ROWS = [
+            ("selection_info_color", "Selection Info"),
+            ("hover_label_color", "Hover Info"),
+            ("bin_info_color", "Bin Info"),
+            ("stripped_info_color", "Stripped Info"),
+        ]
+        info_colors_table = _build_stats_color_table(_INFO_COLOR_ROWS)
+        info_colors_block = self._settings_subsubsection("Info text colors", info_colors_table)
+
+        # ---- Buttons -- every button in the Statistics view: Files/
+        # Folders and Zoom to/Reset in its title line, Fit Range and the
+        # +/- zoom buttons in its footer. A third Level 3 table next to
+        # Graph colors/Info text colors. None of them has a color set
+        # here until the user actually picks one -- see
+        # _stats_button_color_for's fallback to _default_button_colors(),
+        # the theme's default button colors. (Copy -->/Move --> used to be
+        # here; they moved to Panel Button Colors -> Clipboard Buttons,
+        # along with the buttons themselves.) ----
+        _STATS_BUTTON_ROWS = [
+            ("files", "Files"), ("folders", "Folders"),
+            ("zoom_to", "Zoom to"), ("reset", "Reset"), ("fit_range", "Fit Range"),
+            ("zoom_in", "Zoom in (+)"), ("zoom_out", "Zoom out (-)"),
+        ]
+        stats_buttons_table = QTableWidget(len(_STATS_BUTTON_ROWS), 3)
+        self._style_table_widget(stats_buttons_table, ["Item", "Fg", "Bg"])
+        for i, (key, label) in enumerate(_STATS_BUTTON_ROWS):
+            stats_buttons_table.setItem(i, 0, self._table_item(label))
+            stats_buttons_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._stats_button_color_for(k)[1],
+                lambda hexc, k=key: self._on_stats_button_color_changed(k, False, hexc),
+            )))
+            stats_buttons_table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._stats_button_color_for(k)[0],
+                lambda hexc, k=key: self._on_stats_button_color_changed(k, True, hexc),
+            )))
+        self._size_table_to_contents(stats_buttons_table)
+        buttons_block = self._settings_subsubsection("Buttons", stats_buttons_table)
+
+        stats_colors_outer.addLayout(
+            self._settings_subsection_cascade(graph_colors_block, info_colors_block, buttons_block)
+        )
+
+        stats_flow.addWidget(self._settings_subsection("Colors (both panes)", stats_colors_group))
+
+        # ---- Panel Button Colors -- Theme and Misc Colors live in Global
+        # Settings at the top of the tab (see there); what's here is
+        # just the Select-group button
+        # colors -- the buttons themselves only; the matching file-list
+        # row colors are their own table (Comparison Type Colors, under
+        # File List View above). The Invert button gets its own row at
+        # the end -- its
+        # two diagonal fill colors (dark side/light side) stand in for
+        # Fg/Bg here, same as every other row, even though it's not a
+        # genuine foreground/background pair. ----
+        select_colors_group = QGroupBox("")
+        select_colors_outer = QVBoxLayout(select_colors_group)
+        _SELECT_LABELS = {
+            "select_all": "Select All", "clear": "Clear", "missing": "Missing",
+            "newer": "Newer", "smaller": "Smaller", "matching": "Matching",
+            "older": "Older", "larger": "Larger", "diff_folders": "Diff Folders",
+            "file_parent": "File Parent", "all_parents": "All Parents",
+        }
+        select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)
+        self._style_table_widget(select_colors_table, ["Button", "Fg", "Bg"])
+        for i, key in enumerate(_DEFAULT_SELECT_COLORS.keys()):
+            select_colors_table.setItem(i, 0, self._table_item(_SELECT_LABELS[key]))
+            select_colors_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._select_colors[k][0],
+                lambda hexc, k=key: self._on_select_color_changed(k, True, hexc),
+            )))
+            select_colors_table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._select_colors[k][1],
+                lambda hexc, k=key: self._on_select_color_changed(k, False, hexc),
+            )))
+
+        invert_row = len(_DEFAULT_SELECT_COLORS)
+        select_colors_table.setItem(invert_row, 0, self._table_item("Invert"))
+        select_colors_table.setCellWidget(invert_row, 1, self._center_in_cell(self._make_color_swatch(
+            lambda: _INVERT_BUTTON_COLORS["dark"],
+            lambda hexc: self._on_invert_button_color_changed("dark", hexc),
+        )))
+        select_colors_table.setCellWidget(invert_row, 2, self._center_in_cell(self._make_color_swatch(
+            lambda: _INVERT_BUTTON_COLORS["light"],
+            lambda hexc: self._on_invert_button_color_changed("light", hexc),
+        )))
+        self._size_table_to_contents(select_colors_table)
+        select_colors_outer.addWidget(select_colors_table)
+
+        # ---- Clipboard Buttons / File Op Buttons -- Copy/Cut/Paste/
+        # Paste Folders/Copy -->/Move --> and Rename/New Folder/Delete.
+        # Rename and Copy -->/Move --> fall back to the theme's default
+        # button colors rather than a fixed design color of their own
+        # (see _main_button_color_for) until customized here. ----
+        clipboard_colors_group = self._main_button_color_table([
+            ("copy", "Copy"), ("cut", "Cut"), ("paste", "Paste"), ("paste_folders", "Paste Folders"),
+            ("copy_across", "Copy -->"), ("move_across", "Move -->"),
+        ])
+        file_op_colors_group = self._main_button_color_table(
+            [("rename", "Rename"), ("new_folder", "New Folder"), ("delete", "Delete")]
+        )
+
+        # "Panel Button Colors" is one section whose frame holds the three
+        # tables side by side, each with its own Level 2 title (see
+        # _settings_subsection) since together they form one section
+        # rather than three independent ones.
+        buttons_group = QGroupBox("")
+        buttons_group_outer = QVBoxLayout(buttons_group)
+        buttons_group_outer.addLayout(self._settings_subsection_flow(
+            self._settings_subsection("Select Buttons", select_colors_group),
+            self._settings_subsection("Clipboard Buttons", clipboard_colors_group),
+            self._settings_subsection("File Op Buttons", file_op_colors_group),
+        ))
+        outer.addWidget(self._settings_section("Panel Button Colors", buttons_group))
+
+        # ---- Line up every collected "[option label][spin box][slider]"
+        # row's slider at the same x, however far apart the rows
+        # actually are on the page -- see _aligned_option_rows. Sized to
+        # the widest label and widest spin box actually in play (not a
+        # guessed constant), so it stays correct if a label's wording or
+        # a spin box's range/suffix ever changes. Both fixed post hoc,
+        # after each row's own tooltip/range/connect setup above, rather
+        # than threading a shared width down into every site that builds
+        # one of these rows. ----
+        if self._aligned_option_rows:
+            aligned_label_w = max(label.sizeHint().width() for label, _ in self._aligned_option_rows)
+            aligned_spin_w = max(spin.sizeHint().width() for _, spin in self._aligned_option_rows)
+            for label, spin in self._aligned_option_rows:
+                label.setFixedWidth(aligned_label_w)
+                spin.setFixedWidth(aligned_spin_w)
+
+        outer.addStretch(1)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        scroll.setFrameShape(QFrame.NoFrame)
+        # Stashed so _capture_ui_state/_restore_ui_state can save/restore
+        # scroll position across a rebuild -- this method builds a brand
+        # new QScrollArea every time, which otherwise always starts back
+        # at the top.
+        self._settings_scroll = scroll
+
+        # ---- Save/Load Settings/Reload Defaults + their own status
+        # line -- kept outside the scroll area (added to tab_container
+        # below, not to `outer`/`page`), so they -- and any save/load/
+        # reset confirmation message -- stay visible regardless of
+        # scroll position, instead of requiring a scroll to the very
+        # bottom to reach the buttons or notice a message.
+        status_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("M")
+
+        save_load_row = QHBoxLayout()
+        save_load_row.addStretch(1)
+
+        # Fixed (bg, fg) copies of the Select group's current Matching/
+        # Missing/File Parent colors at the moment this tab is built
+        # (Save Settings gets Missing's, Load Settings Matching's) --
+        # a literal snapshot, not a live reference: these three buttons
+        # keep this look even if Matching/Missing/File Parent get
+        # recolored afterward in Panel Button Colors above.
+        matching_fg, matching_bg = self._select_colors["matching"]
+        missing_fg, missing_bg = self._select_colors["missing"]
+        file_parent_fg, file_parent_bg = self._select_colors["file_parent"]
+
+        self.save_settings_button = QPushButton("Save Settings")
+        self.save_settings_button.setFixedSize(status_btn_w, uniform_h)
+        self.save_settings_button.setStyleSheet(_bevel_button_stylesheet(missing_bg, missing_fg))
+        self.save_settings_button.setToolTip("Save every option and spinbox on this GUI to disk.")
+        self.save_settings_button.clicked.connect(self.save_settings)
+        save_load_row.addWidget(self.save_settings_button)
+
+        self.load_settings_button = QPushButton("Load Settings")
+        self.load_settings_button.setFixedSize(status_btn_w, uniform_h)
+        self.load_settings_button.setStyleSheet(_bevel_button_stylesheet(matching_bg, matching_fg))
+        self.load_settings_button.setToolTip("Reload every option and spinbox on this GUI from disk.")
+        self.load_settings_button.clicked.connect(lambda checked=False: self.load_settings())
+        save_load_row.addWidget(self.load_settings_button)
+
+        self.reset_settings_button = QPushButton("Reload Defaults")
+        reset_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("Reload Defaults") // 2
+        self.reset_settings_button.setFixedSize(reset_btn_w, uniform_h)
+        self.reset_settings_button.setStyleSheet(_bevel_button_stylesheet(file_parent_bg, file_parent_fg))
+        self.reset_settings_button.setToolTip(
+            "Reset the current theme's colors (and the color-related options) back "
+            "to the program's own built-in defaults -- the other theme's colors are "
+            "left alone, and the saved settings file isn't touched; Save Settings "
+            "afterward if you want the reset to stick."
+        )
+        self.reset_settings_button.clicked.connect(self._reset_to_defaults)
+        save_load_row.addWidget(self.reset_settings_button)
+
+        save_load_row.addStretch(1)
+
+        self.settings_status_label = QLabel("")
+        self.settings_status_label.setAlignment(Qt.AlignCenter)
+        self.settings_status_label.setStyleSheet("padding: 2px 0;")
+
+        tab_container = QWidget()
+        tab_layout = QVBoxLayout(tab_container)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll, stretch=1)
+        tab_layout.addLayout(save_load_row)
+        tab_layout.addWidget(self.settings_status_label)
+        return tab_container
+
+    def _on_common_font_size_changed(self, value):
+        for pane in (self.left, self.right):
+            pane.timeline.set_label_font_size(value)
+
+    def _on_common_nice_bins_changed(self, checked):
+        for pane in (self.left, self.right):
+            pane.timeline.set_nice_bins(checked)
+            self._update_statistics_bin_size_label(pane)
+        # Stripping calendar units only makes sense with nice bins (the
+        # value itself is kept while greyed out).
+        self.common_strip_units_cb.setEnabled(checked)
+
+    def _on_common_strip_units_changed(self, checked):
+        for pane in (self.left, self.right):
+            pane.timeline.set_strip_calendar_units(checked)
+        for cb in (self.common_strip_names_cb, self.common_strip_abbreviate_cb,
+                   self.common_strip_week_number_cb):
+            cb.setEnabled(checked)
+
+    def _on_common_strip_names_changed(self, checked):
+        for pane in (self.left, self.right):
+            pane.timeline.set_strip_use_names(checked)
+
+    def _on_common_strip_abbreviate_changed(self, checked):
+        for pane in (self.left, self.right):
+            pane.timeline.set_strip_abbreviate_names(checked)
+
+    def _on_common_strip_week_number_changed(self, checked):
+        for pane in (self.left, self.right):
+            pane.timeline.set_strip_use_week_number(checked)
+
+    def _on_common_bin_count_changed(self, value):
+        for pane in (self.left, self.right):
+            pane.timeline.set_bin_count(value)
+            self._update_statistics_bin_size_label(pane)
+
+    def _on_common_tick_angle_changed(self, value):
+        for pane in (self.left, self.right):
+            pane.timeline.set_tick_label_angle(value)
+
+    def _on_common_auto_tick_angle_changed(self, checked):
+        # Axis label angle (label + spin box) is what auto mode replaces,
+        # so it's greyed out while auto is on -- its value is left alone
+        # and takes effect again as soon as auto goes back off.
+        self.common_tick_angle_label.setEnabled(not checked)
+        self.common_tick_angle_spin.setEnabled(not checked)
+        for pane in (self.left, self.right):
+            pane.timeline.set_auto_tick_angle(checked)
+
+    def _on_mirror_statistics_buttons_changed(self, checked):
+        self._mirror_statistics_buttons = bool(checked)
+        # Row1's RightToLeft direction flip and the TimelineWidget's
+        # own set_mirrored are both applied once at construction time in
+        # _build_statistics_panel -- a full rebuild is the simplest way
+        # to get both panes' Statistics views re-evaluated against the
+        # new setting, same as every other app-wide toggle that affects
+        # more than one already-built widget.
+        self._rebuild_ui()
+
+    # -------------------------------------------------------------- Colors & Theme
+
+    def _make_color_swatch(self, get_hex, on_pick) -> QPushButton:
+        """A small flat-colored button that opens a QColorDialog on
+        click and reports the chosen color back via on_pick(hex_string)
+        -- used for every color picker in the Colors & Theme section
+        instead of building a picker dialog by hand each time.
+
+        `get_hex` is a zero-arg callable that re-derives the color from
+        its actual live source (self._select_colors/TAG_COLORS/
+        _SCROLLBAR_COLORS/...) every time it's called, rather than a
+        fixed hex string frozen at construction -- this button registers
+        its own refresh (alongside every other swatch, in
+        self._color_swatches) so _refresh_color_swatches can re-paint
+        all of them to whatever their underlying setting currently
+        holds. That's needed for the couple of places (load_settings,
+        "Reload Defaults") that change this state in bulk directly,
+        bypassing the individual _on_*_color_changed handlers a click
+        here goes through -- a plain fixed string would have no way to
+        notice a change made that way."""
+        btn = QPushButton()
+        # A little taller than a single line of label text plus the
+        # QTableWidget cell padding (padding: 1px 9px, 2px of that
+        # vertical) that _style_table_widget sets on every Item cell in
+        # these tables -- a label cell's *row* therefore ends up a
+        # couple px taller than an 18px-tall swatch, and _center_in_cell
+        # centers a fixed-size widget rather than stretching it, so a
+        # smaller swatch's own border would stop short of the row's
+        # top/bottom edge -- a plain background gap where a grid line
+        # should be. 22px clears that gap on every platform/font this
+        # app's default sizes need to support.
+        btn.setFixedSize(22, 22)
+
+        def _refresh():
+            # border/margin baked into the same setStyleSheet() call as
+            # background-color (rather than set once at construction
+            # and left alone) since setStyleSheet() replaces the whole
+            # string -- without repeating them here every refresh (a
+            # color pick, or the bulk refresh load_settings/"Reload
+            # Defaults" trigger) would silently drop them, leaving the
+            # button unbordered/adrift of its cell's grid line after
+            # the first refresh. 0 margin sits the swatch's own border
+            # flush against the table's own gridline-color border
+            # instead of leaving a visible gap on every side.
+            # Disabled look: the same color, mostly faded into the window
+            # background (a plain stylesheet background otherwise looks
+            # identical whether the button is enabled or not).
+            faded = _press_blend(get_hex(), self._effective_gui_colors(self._theme)[1], 0.65).name()
+            btn.setStyleSheet(
+                f"QPushButton {{ background-color: {get_hex()}; border: 1px solid #555555;"
+                f" margin: 0px; }}"
+                f"QPushButton:disabled {{ background-color: {faded}; border: 1px solid #777777; }}"
+            )
+
+        _refresh()
+        self._color_swatches.append(_refresh)
+
+        def _on_click(checked=False):
+            # Qt's own dialog rather than QColorDialog.getColor: on
+            # GTK-themed systems that call opens the platform-native
+            # chooser, whose "+" (custom color) editor always starts from
+            # a fixed default color, whatever color it was given. Qt's
+            # own one opens with the current color already loaded into
+            # its editor (and has a "Pick Screen Color" button too).
+            dialog = QColorDialog(QColor(get_hex()), self)
+            dialog.setOption(QColorDialog.ColorDialogOption.DontUseNativeDialog, True)
+            dialog.setWindowTitle("Pick a color")
+            color = dialog.currentColor() if dialog.exec() else QColor()
+            if color.isValid():
+                on_pick(color.name())
+                try:
+                    _refresh()
+                except RuntimeError:
+                    # on_pick can itself trigger a full _rebuild_ui() (see
+                    # _on_default_button_color_changed) which tears this
+                    # very button down as part of rebuilding the whole
+                    # Settings tab -- nothing left here to refresh.
+                    pass
+
+        btn.clicked.connect(_on_click)
+        return btn
+
+    def _make_italic_note(self, text: str) -> QLabel:
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setStyleSheet("color: #A0A0A0; font-style: italic;")
+        return label
+
+    def _style_table_widget(self, table: QTableWidget, header_labels: list):
+        """Common QTableWidget setup shared by every Colors & Theme
+        table (Misc Colors, and everything converted the same way
+        after it) -- header labels/styling, read-only/no-selection/
+        no-focus behavior (these are display + click-to-pick tables,
+        not something to navigate or edit cell text in), and real grid
+        lines instead of the old QGridLayout+per-cell-border-QSS trick
+        every one of these tables used before conversion. Doesn't size
+        the table -- call _size_table_to_contents once every row/cell
+        widget has actually been added, since it needs the real content
+        in place to measure."""
+        table.setHorizontalHeaderLabels(header_labels)
+        table.verticalHeader().setVisible(False)
+        table.setSelectionMode(QAbstractItemView.NoSelection)
+        table.setFocusPolicy(Qt.NoFocus)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setShowGrid(True)
+        table.setStyleSheet(
+            "QTableWidget { gridline-color: #555555; border: 1px solid #555555; } "
+            "QTableWidget::item { padding: 1px 9px; }"
+        )
+        table.horizontalHeader().setStyleSheet(
+            f"QHeaderView::section {{ {_TABLE_HEADER_STYLE} "
+            "border: 1px solid #555555; padding: 1px 9px; background-color: transparent; }"
+        )
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.horizontalHeader().setStretchLastSection(False)
+        table.horizontalHeader().setSectionsClickable(False)
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+
+    def _main_button_color_table(self, rows: list) -> QGroupBox:
+        """A framed "Item | Fg | Bg" swatch table for buttons whose colors
+        live in self._main_button_colors -- `rows` is (key, label) pairs.
+        Shared by Panel Button Colors' Clipboard/File Op Buttons tables and
+        File List View Colors' Button Colors table. A button without a
+        color of its own shows (and starts from) the theme's default
+        button colors -- see _main_button_color_for."""
+        group = QGroupBox("")
+        group_outer = QVBoxLayout(group)
+        table = QTableWidget(len(rows), 3)
+        self._style_table_widget(table, ["Item", "Fg", "Bg"])
+        for i, (key, label) in enumerate(rows):
+            table.setItem(i, 0, self._table_item(label))
+            table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._main_button_color_for(k)[1],
+                lambda hexc, k=key: self._on_main_button_color_changed(k, False, hexc),
+            )))
+            table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(
+                lambda k=key: self._main_button_color_for(k)[0],
+                lambda hexc, k=key: self._on_main_button_color_changed(k, True, hexc),
+            )))
+        self._size_table_to_contents(table)
+        group_outer.addWidget(table)
+        return group
+
+    def _table_item(self, text: str) -> QTableWidgetItem:
+        """A plain, non-interactive label cell -- Qt.ItemIsEnabled only
+        (no ItemIsSelectable/ItemIsEditable), matching the read-only
+        QLabel cells these tables used before conversion."""
+        item = QTableWidgetItem(text)
+        item.setFlags(Qt.ItemIsEnabled)
+        return item
+
+    def _center_in_cell(self, widget: QWidget) -> QWidget:
+        """Wraps `widget` (a fixed-size swatch button, a checkbox) in a
+        plain container so it can be centered inside a QTableWidget
+        cell. setCellWidget resizes/positions its widget to fill the
+        cell's own rect directly rather than respecting alignment or a
+        fixed size the way QGridLayout.addWidget(..., Qt.AlignCenter)
+        does, so a fixed-size widget passed to it straight sits pinned
+        to the cell's top-left corner instead of centered -- wrapping
+        it in an otherwise-empty QHBoxLayout with Qt.AlignCenter is
+        what actually centers it.
+
+        1px top/bottom margin (rather than 0) so the swatch's own
+        22x22 fixed size is what drives each row's height via
+        resizeRowsToContents (see _size_table_to_contents) with a
+        little headroom on top of it, instead of the swatch exactly
+        filling the row -- flush top-to-bottom left it looking a touch
+        cramped/short against the row's grid lines."""
+        wrap = QWidget()
+        layout = QHBoxLayout(wrap)
+        layout.setContentsMargins(0, 1, 0, 1)
+        layout.addWidget(widget, 0, Qt.AlignCenter)
+        return wrap
+
+    def _size_table_to_contents(self, table: QTableWidget):
+        """Sizes `table` to exactly fit its own header + rows + columns,
+        with no internal scrollbars -- it's meant to sit statically
+        alongside its row's other widgets (see _settings_subsection/
+        "own row + trailing stretch"), never to scroll internally.
+
+        First cut of this hand-summed frameWidth()/columnWidth()/
+        rowHeight() into a setFixedSize() call -- close, but
+        consistently landed a bit short (only 5 of 7 Misc Colors
+        rows and part of the Bg column visible, needing the table's
+        own scrollbars to reach the rest) once actually on screen
+        rather than in an offscreen smoke test. Root cause: hand-
+        summing pixel metrics is exactly the fragile approach
+        AdjustToContents exists to replace -- it's QAbstractScrollArea's
+        own sanctioned mechanism for "size this scroll area to its
+        content, not a fixed request," so it's what every future table
+        conversion should use here too rather than another manual sum."""
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        table.resizeColumnsToContents()
+        # resizeColumnsToContents only measures header/item text, never
+        # cell widgets -- so a column holding nothing but a widget wider
+        # than its header (the "Bold" checkbox under the Misc Colors
+        # table's "Bg" header) came out too narrow and clipped the
+        # widget's own text.
+        for col in range(table.columnCount()):
+            needed = table.columnWidth(col)
+            for row in range(table.rowCount()):
+                cell_widget = table.cellWidget(row, col)
+                if cell_widget is not None:
+                    # Polished first, so the size hint reflects the
+                    # style/stylesheet the widget will actually be
+                    # drawn with rather than an unstyled default.
+                    cell_widget.ensurePolished()
+                    for child in cell_widget.findChildren(QWidget):
+                        child.ensurePolished()
+                    hint = max(cell_widget.sizeHint().width(), cell_widget.minimumSizeHint().width())
+                    needed = max(needed, hint + 12)
+            table.setColumnWidth(col, needed)
+        table.resizeRowsToContents()
+        table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        table.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)

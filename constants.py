@@ -1,0 +1,200 @@
+"""
+Shared constants for the Directory Comparison app: the clipboard MIME type
+used for GNOME/Nemo/Nautilus/Dolphin interop, the custom QTreeWidgetItem
+data roles that back the nested/expandable folder view, the per-tag
+color table, the tag -> (severity rank, direction) lookup used by the
+Select group's search buttons, the platform-dependent "changed date"
+column label, and -- in the last section -- the layout/style constants
+shared by ui_builder.py and the mixins split out of it.
+"""
+
+import sys
+
+from PySide6.QtCore import Qt
+
+GNOME_COPIED_FILES_MIME = "x-special/gnome-copied-files"
+
+# Timeline Explorer is the old name of Statistics View.
+# Scrollbar-to-timeline-view mapping resolution for each pane's embedded
+# TimelineWidget -- same value Timeline Explorer's own MainWindow uses
+# (SCROLLBAR_RANGE there), kept as a named constant here since it's now
+# shared between ui_builder.py (building the scrollbar) and
+# timeline_ops.py (converting between its value and the timeline's
+# view_start/view_end).
+TIMELINE_SCROLLBAR_RANGE = 100_000
+
+# st_ctime means different things on different platforms (same split as
+# Timeline Explorer's file_scanner.py, which this mirrors so the two
+# apps describe the same column the same way):
+#  - Linux/macOS (POSIX): "metadata changed" time (renamed, chmod'd,
+#    written to, etc) -- NOT a creation/birth time. Python's os.stat()
+#    has no portable way to get a real birth time on Linux.
+#  - Windows: st_ctime IS the file's creation time.
+IS_WINDOWS = sys.platform.startswith("win")
+CHANGED_FIELD_IS_CREATION = IS_WINDOWS
+CHANGED_FIELD_LABEL = "Created" if IS_WINDOWS else "Changed (ctime)"
+
+# The diff-outcome entries below (everything but "directory"/"file"/
+# "error") are what the Settings tab's "Comparison type colors (File
+# List View)" table edits, one file entry and one folder entry per
+# comparison type -- independent of the Select-group button colors, but
+# seeded with the very same (bg, fg) values as custom_widgets.
+# _DEFAULT_SELECT_COLORS for the matching button, for files and folders
+# alike (which is also what "Reload Defaults" restores them to -- see
+# UiBuilderMixin._reset_to_defaults (theme_ops.py) -- so a fresh start and a reset look
+# the same).
+TAG_COLORS = {
+    # tag: (background, foreground)
+    "common_file": ("#90E0C0", "black"),
+    "common_dir": ("#90E0C0", "black"),
+    "missing_file": ("#FFA0A0", "black"),
+    "missing_dir": ("#FFA0A0", "black"),
+    "diff_size_smaller_file": ("#D9BCF0", "black"),
+    "diff_size_larger_file": ("#B98CE0", "black"),
+    "diff_date_newer_file": ("#DECFA3", "black"),
+    "diff_date_older_file": ("#C9A96E", "black"),
+    "diff_count_smaller_dir": ("#D9BCF0", "black"),
+    "diff_count_larger_dir": ("#B98CE0", "black"),
+    "diff_date_newer_dir": ("#DECFA3", "black"),
+    "diff_date_older_dir": ("#C9A96E", "black"),
+    "diff_content_dir": ("#7777DD", "blue"),
+    "directory": ("#E0E090", "blue"),
+    "file": (None, None),
+    "error": ("#FFB6C1", "red"),
+}
+
+# Custom item-data roles (stored on column 0) that support the nested,
+# expandable folder view: an item's absolute path, whether it's a
+# directory, the absolute path of its counterpart on the other pane (used
+# for diff coloring at any depth, not just the top level), and whether its
+# children have been lazily populated yet.
+PATH_ROLE = Qt.UserRole + 1
+IS_DIR_ROLE = Qt.UserRole + 2
+OTHER_DIR_ROLE = Qt.UserRole + 3
+POPULATED_ROLE = Qt.UserRole + 4
+
+# Maps a leaf diff tag to (severity rank, direction), used to check whether
+# an item matches a given Select button by tag instead of by cross-tree name
+# lookup. Note "missing" is rank 3 here but folders never actually store
+# that rank internally for aggregate/recursive comparison (see
+# _dir_content_rank) -- only a literal "this doesn't exist on the other
+# side at all" uses "missing_dir"/"missing_file".
+#
+# Priority order when an item differs from its counterpart in more than
+# one way at once (e.g. both larger AND older): Missing > Newer/Older >
+# Smaller/Larger > Matching -- so rank 2 (date) outranks rank 1 (size),
+# same as the top-level severity 3 (missing) outranks both. See
+# diff_engine._diff_tag/_file_diff_rank, which apply this same priority
+# when deciding which single tag an item that differs both ways gets.
+# Which snapshot date field (mtime/ctime/atime) a given Statistics-view
+# Metric corresponds to -- used to tie diff coloring's Newer/Older
+# comparison (and the Select group's own Newer/Older searches) to
+# whichever date type a pane's Metric combo currently has selected,
+# instead of always comparing Modified regardless of what's actually
+# being plotted. "size" has no date of its own and isn't a key here --
+# every caller falls back to "mtime" (Modified) for it, the same
+# fallback responsive_layout.py's own _METRIC_TO_DATE_COLUMN already uses for
+# the narrow-layout single collapsed date column, for the same reason.
+# See statistics_ops.TimelineOpsMixin._pane_diff_date_field.
+METRIC_DATE_FIELDS = {"modified": "mtime", "changed": "ctime", "accessed": "atime"}
+
+_DIFF_RANK = {
+    "common_file": (0, None), "common_dir": (0, None),
+    "directory": (0, None), "file": (0, None),
+    "diff_size_smaller_file": (1, "smaller"), "diff_size_larger_file": (1, "larger"),
+    "diff_count_smaller_dir": (1, "smaller"), "diff_count_larger_dir": (1, "larger"),
+    "diff_date_newer_file": (2, "newer"), "diff_date_older_file": (2, "older"),
+    "diff_date_newer_dir": (2, "newer"), "diff_date_older_dir": (2, "older"),
+    "missing_file": (3, None), "missing_dir": (3, None),
+}
+
+
+# ------------------------------------------------------------------
+# UI layout / style constants -- shared by ui_builder.py, settings_tab.py,
+# pane_builder.py and responsive_layout.py (all one UiBuilderMixin at
+# runtime). Plain literals only, so this file stays free of imports
+# from the rest of the app.
+# ------------------------------------------------------------------
+
+# No longer a fixed height for each pane's embedded TimelineWidget --
+# its height now tracks the draggable File List/Statistics splitter
+# (see _build_directory_widgets; TimelineWidget sets its own 65px
+# minimum height itself, in statistics_widget.py). Kept only as the
+# mirrored/right-pane layout math elsewhere in this file still refers
+# to it.
+PANE_TIMELINE_HEIGHT = 220
+
+# Window width (px) below which dual-pane mode switches to the "narrow"
+# layout: Clipboard drops to its own row above Select, File Op stays put
+# next to Select on the row underneath, and each pane's file list
+# collapses its three date columns down to just the one matching that
+# pane's Statistics-view Metric. A single-pane mode's own threshold
+# (roadmap item, not built yet) is meant to be half this. Plain module
+# constant for now -- move into settings_ops.py once layout thresholds
+# become user-configurable, per the roadmap.
+DUAL_PANE_NARROW_THRESHOLD = 1650
+
+# Test value while dual-pane mode is the only one that exists -- how far
+# the window is allowed to shrink. Below this the narrow-layout button
+# clusters/groups still have their own minimum size hints, so the window
+# itself won't visually shrink all the way to 800 on a wide monitor;
+# this just removes the artificial floor that used to sit above it.
+MINIMUM_WINDOW_WIDTH = 800
+
+# Explicit disabled-state color for the Global Options dependent
+# checkboxes (Synchronize Views/Symmetrical GUI/Expand To Selection/
+# Sort Directories First) -- the app's hand-built dark/light QPalette
+# doesn't visibly distinguish its Disabled color group from
+# Active/Inactive, so a disabled checkbox's label reads the same as an
+# enabled one without this. Applied directly rather than fixed at the
+# palette level, since that palette isn't built in this file.
+_DISABLED_CHECKBOX_STYLE = "QCheckBox:disabled { color: #7A7A7A; }"
+# Fixed gap (px) between the Select/File Op/Clipboard groups inside a
+# pane's cluster row (see _layout_pane_cluster). Fixed rather than
+# stretchy so both panes always show identical gaps regardless of how
+# wide each pane currently is -- the leftover width goes to one edge
+# stretch instead, on whichever side the row is aligned away from. 0:
+# the groups sit as close together as they can (their own frames
+# touching); raise it for breathing room between them.
+_CLUSTER_GROUP_GAP = 0
+# Settings tab's small color-table column headers (Item/Fg/Bg/...) --
+# bold alone still read at the same point size as the rest of the row,
+# so a size bump goes here too, distinct from (and smaller than) the
+# section headers below.
+_TABLE_HEADER_STYLE = "font-size: 11pt; font-weight: bold;"
+# Settings tab's section headers -- rendered as a real QLabel above
+# each (now title-less) QGroupBox rather than through QGroupBox's own
+# native title text. font-size on QGroupBox::title turned out not to
+# be respected by whatever Qt style is active here even at 18pt (see
+# _build_settings_tab's now-vestigial page-level stylesheet), so this
+# sidesteps that platform quirk entirely -- a plain QLabel reliably
+# honors font-size via QSS the way the small table headers above
+# already do.
+_SECTION_HEADER_PT = 14
+_SECTION_HEADER_STYLE = f"font-size: {_SECTION_HEADER_PT}pt; font-weight: bold;"
+# Settings tab's smaller sub-headers -- above an individual table within
+# a larger section (e.g. "Select Colors" under the "Button Colors"
+# section) rather than a whole section on its own.
+_SUBTITLE_PT = 12
+_SUBTITLE_STYLE = f"font-size: {_SUBTITLE_PT}pt; font-weight: bold;"
+# Settings tab title levels: 1 = section (_SECTION_HEADER_STYLE, 14pt),
+# 2 = subsection (_SUBTITLE_STYLE, 12pt), 3 = sub-subsection (this one,
+# 10pt -- still bold, so it reads as a heading against the normal-weight
+# controls around it). Every title has an empty band above it as tall as
+# the title itself (see _settings_titled_block).
+_SUBSUBTITLE_PT = 10
+_SUBSUBTITLE_STYLE = f"font-size: {_SUBSUBTITLE_PT}pt; font-weight: bold;"
+# Horizontal gap between Level 2 blocks side by side in a row.
+_SUBSECTION_GAP = 16
+# Same issue, for the Opacity spinbox (only meaningful -- and only
+# enabled -- while Transparent Selection Highlight is on).
+_DISABLED_SPINBOX_STYLE = "QSpinBox:disabled { color: #7A7A7A; }"
+# File List View tree indentation (px per nesting level) -- Settings tab ->
+# File List View -> "Indentation". 20 is what Qt's own QTreeView default
+# comes to (nothing in this app overrode it before this setting existed),
+# so the default leaves the tree looking exactly as it always has.
+_DEFAULT_TREE_INDENTATION = 20
+# Lower bound keeps the expand/collapse arrow column (drawn one indent wide
+# -- see DirDropTreeWidget.drawBranches) at least barely usable, and
+# never 0, which DirDropTreeWidget._line_at would divide by.
+_MIN_TREE_INDENTATION, _MAX_TREE_INDENTATION = 4, 100

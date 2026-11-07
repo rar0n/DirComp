@@ -368,6 +368,13 @@ class SettingsMixin:
         trigger, which shouldn't spam "Settings saved to ..." on every
         folder open the way an explicit Save Settings click should."""
         data = {}
+        if not quiet:
+            # Explicit Save Settings: this is what makes a dropdown DEL
+            # permanent -- see DirectoryPane.saved_folder_history.
+            for side in ("left", "right"):
+                pane = getattr(self, side, None)
+                if pane is not None:
+                    pane.saved_folder_history = list(pane.folder_history)
         for name, widget in self._settings_widgets().items():
             if name not in _SHARED_WIDGET_KEYS:
                 continue  # per-theme: saved inside each theme's set below
@@ -381,7 +388,7 @@ class SettingsMixin:
         for side in ("left", "right"):
             pane = getattr(self, side, None)
             if pane is not None:
-                data[f"{side}_folder_history"] = list(pane.folder_history)
+                data[f"{side}_folder_history"] = list(pane.saved_folder_history)
         data["_raw"] = self._raw_settings_state()
         path = self._settings_path()
         try:
@@ -426,6 +433,7 @@ class SettingsMixin:
             key = f"{side}_folder_history"
             if key in data:
                 pane.folder_history = list(data[key])
+                pane.saved_folder_history = list(data[key])
                 self._refresh_history_combo(pane)
         if "_raw" in data:
             self._apply_raw_settings_state(data["_raw"], data)
@@ -452,6 +460,13 @@ class SettingsMixin:
         history.insert(0, norm)
         limit = self.file_list_history_limit_spin.value() if hasattr(self, "file_list_history_limit_spin") else 10
         del history[limit:]
+        # The on-disk copy gets the same push (it may still hold entries
+        # deleted from the dropdown but not yet saved -- see
+        # _on_history_entry_deleted).
+        saved = pane.saved_folder_history
+        saved[:] = [p for p in saved if p != norm]
+        saved.insert(0, norm)
+        del saved[limit:]
         self._refresh_history_combo(pane)
         self.save_settings(quiet=True)
 
@@ -461,6 +476,17 @@ class SettingsMixin:
         leaves whatever path the box is currently displaying untouched."""
         if pane.entry is not None:
             pane.entry.set_history(pane.folder_history)
+
+    def _on_history_entry_deleted(self, pane, path: str):
+        """DEL on a single entry in `pane`'s history dropdown (see
+        DirDropComboBox.historyEntryDeleted). The combo has already
+        removed the row itself, so only the backing list is updated --
+        no _refresh_history_combo, which would rebuild the dropdown
+        under the still-open popup. Deliberately NOT saved: the entry
+        stays in pane.saved_folder_history (what every automatic save
+        writes) until an explicit Save Settings click, so Load Settings
+        brings it back after an accidental delete."""
+        pane.folder_history[:] = [p for p in pane.folder_history if p != path]
 
     def _on_clear_folder_history(self):
         """Settings tab -> Global Options -> "Clear history" button:
@@ -480,6 +506,7 @@ class SettingsMixin:
             return
         for pane in (self.left, self.right):
             pane.folder_history.clear()
+            pane.saved_folder_history.clear()
             self._refresh_history_combo(pane)
         self.save_settings(quiet=True)
         self._set_settings_status("Folder history cleared.")
@@ -495,6 +522,7 @@ class SettingsMixin:
         a folder's next opened, whichever comes first)."""
         self._file_list_history_limit = value
         for pane in (self.left, self.right):
+            del pane.saved_folder_history[value:]
             if len(pane.folder_history) > value:
                 del pane.folder_history[value:]
                 self._refresh_history_combo(pane)

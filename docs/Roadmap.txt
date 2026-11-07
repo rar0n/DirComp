@@ -27,10 +27,72 @@ Be a file explorer supplement (light replacement?), with focus on dual folder co
 -- Duplicate select buttons w custom color, duplicate custom FLV custom color (in settings tab).
 
 
+==============================================================================
+Agreed plan: comparison types, hashing, folder snapshots (decided 2026-11-07)
+==============================================================================
 
+Order (each step depends on the one before)
+ 1. History: DEL on a hovered drop-down entry removes it (no confirmation).
+ 2. Comparison type setting (Settings > Global Options) + "Ignore file extensions".
+ 3. Hashing: hashes stored on snapshot nodes, per-pane Hash button, progress, cancel.
+ 4. .fss folder snapshot: Save Snapshot, load via Select Directory / drag-and-drop.
+ 5. Snapshot mode: file ops disabled, "File Parent" -> "Item Parent", Select buttons
+    verified for snapshot-vs-live and snapshot-vs-snapshot.
 
+Comparison types (Global Options, shared by both panes)
+ - Name, size and date: the CURRENT behavior. Default, and the fall-back whenever
+   hashes are unavailable (unhashed files, snapshot saved without hashes, snapshot
+   whose comparison type conflicts with the current one).
+ - Hash value (algorithm selectable: MD5, SHA-1, SHA-256 [default], BLAKE2b).
+ - Fingerprint: lossy partial hash = file size + start chunk + end chunk (chunk sizes
+   settable in kB; whole file hashed if smaller than both chunks combined).
+ - "Ignore file extensions" (applies to the name-based type only): files match or
+   don't match by name without extension; size and dates are NOT compared. Any
+   matching counts as matching, even if several files match in the other folder.
 
+Hash/fingerprint pairing
+ - Files are paired within the same relative folder by CONTENT, ignoring file name
+   (a renamed file still matches; a file moved to another folder does not).
+ - Pass 1: equal hashes pair one-to-one (identical names preferred on ties).
+   Pass 2: leftover files with the same name = "Content differs". Rest = missing.
+ - Folders still pair by name only.
+ - Synchronize Views / selection mirroring use the same counterpart rule.
+   Move/Copy across stay name-based (they act on the real filesystem).
+ - Equal hash = "matching" even if dates differ. Different hash keeps the
+   newer/older/larger/smaller tags; if size and date are equal -> "Content differs".
+ - Unhashed files (hash types only) get their own colors: Comparison Type Colors
+   table, new row "Unhashed" (File/Folder Fg/Bg).
+ - Settings > Comparison Type Colors: row "Diff Folders" renamed "Content differs";
+   gains File Fg/Bg swatches (Folder Fg/Bg keep working as-is).
+ - Select button "Diff Folders" -> "Diff Items" (folders and "Content differs" files).
 
+Hash button (per pane, before "Clear view"; colors in Button Colors table)
+ - Disabled when the active type uses no hashes, and on snapshot panes.
+ - Recursive Folder Selections on: hash everything in the pane. Off: hash only what
+   is visible (expanded). Press again after expanding; already-hashed files are
+   skipped (cache keyed by path+size+mtime; invalid after Refresh change or when
+   algorithm / chunk sizes change).
+ - Enumerate first (busy bar), then progress bar by bytes. Cancel via the pane's
+   Cancel button; hashes already computed are kept.
 
+Folder snapshot (.fss, JSON)
+ - Stores: format version, comparison settings used, original root path + name,
+   creation time, tree of names + metadata (size, dates) + hashes if present.
+ - Recursive Folder Selections on: full tree. Off: expanded folders' contents only;
+   unexpanded folders get a dummy child "Content not scanned" (+ size/item count).
+ - Save Snapshot button next to Select Directory (own row in Button Colors table).
+   In hash mode with no hashes: prompt Hash now / Save without hashes / Cancel.
+   Also works on a pane already showing a snapshot (re-save).
+ - Select Directory and drag-and-drop (FLV or Statistics View) load .fss files.
+ - Snapshot pane: Hash, file ops, clipboard, Make New Folder, Open/Properties,
+   drag-out disabled; cross-pane Move/Copy disabled if either pane is a snapshot.
+   "Clear view" clears it and returns the pane to normal.
+ - Loading a snapshot whose comparison type differs from the current one: prompt to
+   adopt the snapshot's settings; if declined, fall back to Name/size/date and show
+   a red status message (until the next status message). Red = Misc Colors row.
+ - History drop-down: snapshots listed by .fss file name (full path as tooltip),
+   own text color (Misc Colors, default light gray, no Bg); live-folder entries get
+   a color setting too. A small label above the combo shows the stored original
+   path + root name for snapshots (hidden for live folders).
 
-
+Later (phase 3 / loose ideas): see the original idea list kept outside this file.

@@ -39,6 +39,13 @@ class DirectoryPane:
         # isn't a single-value widget _settings_widgets() can handle
         # generically -- see settings_ops.save_settings/load_settings.
         self.folder_history: list = []
+        # What the settings file holds for this pane's history: the same
+        # list, except that entries removed with DEL in the dropdown stay
+        # here until an explicit Save Settings click (or Clear history),
+        # so reloading the settings undoes an accidental delete -- see
+        # SettingsMixin._on_history_entry_deleted. Every automatic save
+        # writes this list, never folder_history.
+        self.saved_folder_history: list = []
         self.select_group: QGroupBox | None = None
         # File Op / Clipboard groups, tracked the same way select_group
         # already was -- needed now so UiBuilderMixin._layout_pane_cluster

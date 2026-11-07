@@ -89,6 +89,8 @@ class PaneBuilderMixin:
         # since) before it's treated as a real navigation -- see
         # SyncMixin._on_history_entry_activated.
         entry.historyEntryActivated.connect(lambda path, p=pane: self._on_history_entry_activated(p, path))
+        # DEL on a dropdown entry removes it from the history.
+        entry.historyEntryDeleted.connect(lambda path, p=pane: self._on_history_entry_deleted(p, path))
         file_list_layout.addWidget(entry)
         pane.entry = entry
         # Repopulate the freshly built combo's dropdown from this pane's

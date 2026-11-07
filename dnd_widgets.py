@@ -10,8 +10,8 @@ GNOME/Nemo/Nautilus/Dolphin-compatible drag source (see
 import math
 import os
 
-from PySide6.QtCore import Qt, QUrl, Signal, QMimeData, QRect, QPointF
-from PySide6.QtGui import QDrag, QPainter, QPalette, QPolygonF
+from PySide6.QtCore import Qt, QEvent, QUrl, Signal, QMimeData, QRect, QPointF
+from PySide6.QtGui import QCursor, QDrag, QPainter, QPalette, QPolygonF
 from PySide6.QtWidgets import (
     QComboBox, QLineEdit, QTreeWidget, QAbstractItemView, QStyle, QStyleOptionViewItem,
 )
@@ -346,6 +346,10 @@ class DirDropComboBox(QComboBox):
     # A real dropdown pick (mouse or keyboard), never a programmatic
     # setText()/set_history() -- see _on_activated.
     historyEntryActivated = Signal(str)
+    # DEL pressed on an entry in the open dropdown -- see eventFilter.
+    # Already removed from this widget's own list by the time it fires;
+    # the owner only needs to drop it from its backing history list.
+    historyEntryDeleted = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -364,6 +368,41 @@ class DirDropComboBox(QComboBox):
         # auto-select-on-pick has already overwritten it with a path
         # that turned out not to exist.
         self._current_valid_text = ""
+        # The dropdown's list view is a separate popup widget that owns
+        # the keyboard while it is open, so DEL is caught there.
+        self.view().installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        """DEL while the dropdown is open removes the entry under the
+        mouse cursor (or, if the cursor isn't over an entry, the
+        keyboard-highlighted one) -- no confirmation. The popup stays
+        open so several entries can be removed in a row."""
+        if (obj is self.view() and event.type() == QEvent.KeyPress
+                and event.key() == Qt.Key_Delete):
+            view = self.view()
+            index = view.indexAt(view.viewport().mapFromGlobal(QCursor.pos()))
+            if not index.isValid():
+                index = view.currentIndex()
+            if index.isValid():
+                self._delete_history_row(index.row())
+            return True  # swallow DEL either way: never reaches the line edit
+        return super().eventFilter(obj, event)
+
+    def _delete_history_row(self, row: int):
+        path = self.itemText(row)
+        # removeItem can move the current index, which makes the combo
+        # overwrite the edit text -- block signals and restore it, same
+        # reasoning as set_history.
+        current = self.currentText()
+        line_edit = self.lineEdit()
+        self.blockSignals(True)
+        line_edit.blockSignals(True)
+        self.removeItem(row)
+        self.setEditText(current)
+        line_edit.blockSignals(False)
+        self.blockSignals(False)
+        if path:
+            self.historyEntryDeleted.emit(path)
 
     def text(self) -> str:
         return self.currentText()

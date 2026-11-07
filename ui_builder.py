@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
 from constants import IS_DIR_ROLE, CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, TAG_COLORS
 from constants import CMP_NAME_SIZE_DATE, DEFAULT_HASH_ALGORITHM, DEFAULT_FINGERPRINT_CHUNK_KB
 from panes import DirectoryPane
+from snapshot_ops import is_snapshot_file_name
 from dnd_widgets import DirDropLineEdit, DirDropTreeWidget
 from statistics_widget import TimelineWidget, DEFAULT_BIN_COUNT, DEFAULT_LABEL_FONT_PT, TICK_LABEL_ANGLE_DEG
 from listing_ops import COL_MODIFIED, COL_CHANGED, COL_ACCESSED
@@ -353,6 +354,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._status_selected_color = "#F5D400"
         if not hasattr(self, "_status_unselected_color"):
             self._status_unselected_color = None
+        if not hasattr(self, "_status_warning_color"):
+            # Misc Colors -> "Status line warning": e.g. a loaded snapshot
+            # that cannot be compared by hash.
+            self._status_warning_color = "#FF5050"
         if not hasattr(self, "_history_live_color"):
             # Misc Colors -> "History: live folder" / "History: snapshot
             # file" (Fg only): drop-down text colors of the entry combos.
@@ -872,6 +877,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 "up": getattr(pane, "up_button", None),
                 "select_dir": getattr(pane, "select_button", None),
                 "hash": getattr(pane, "hash_button", None),
+                "save_snapshot": getattr(pane, "save_snapshot_button", None),
                 "clear_view": getattr(pane, "clear_view_button", None),
                 "expand_all": getattr(pane, "expand_all_button", None),
                 "collapse_all": getattr(pane, "collapse_all_button", None),
@@ -1265,7 +1271,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             if entry is None:
                 continue
             try:
-                if os.path.isdir(entry.text()):
+                if self._isdir(entry.text()):
                     return True
             except RuntimeError:
                 # The entry from before a UI rebuild, already deleted.
@@ -1771,6 +1777,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         update_listings() triggers via _refresh_pane_snapshot is enough
         on its own now that it unconditionally refreshes the timeline
         too."""
+        self._unload_snapshot(pane)
         pane.entry.setText("")
         if not self._any_folder_set():
             # That was the last folder: the Global File Filter goes with
@@ -1786,8 +1793,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
     def select_directory(self, pane: DirectoryPane):
         start_dir = pane.entry.text()
+        if is_snapshot_file_name(start_dir) or self._is_snapshot_path(start_dir):
+            start_dir = os.path.dirname(getattr(pane, "snapshot_file", None) or start_dir)
         if not os.path.isdir(start_dir):
             start_dir = ""
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory", start_dir)
+        # A folder, or a folder snapshot file (.fss) -- see
+        # SnapshotOpsMixin._choose_directory_or_snapshot.
+        directory = self._choose_directory_or_snapshot(start_dir)
         if directory:
             self._navigate_pane(pane, directory)

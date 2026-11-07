@@ -109,8 +109,9 @@ class HashOpsMixin:
         the current comparison type. Enumerates first (busy bar), then
         shows progress by bytes; the pane's Cancel button stops it and
         keeps what was done. Afterwards both panes are re-tagged."""
-        if not self._hash_mode_active() or pane.snapshot_root is None:
-            return
+        if (not self._hash_type_selected() or pane.snapshot_root is None
+                or getattr(pane, "snapshot_file", None)):
+            return False
         key = self._comparison_key()
         progress = self._start_transfer_progress(total=None, label="Enumerating...", pane=pane)
         hashed = failed = 0
@@ -172,12 +173,13 @@ class HashOpsMixin:
             message += f". The other pane still has {waiting} unhashed file{'s' if waiting != 1 else ''}; " \
                        "hash it too to compare."
         self._set_transfer_label(message, pane)
+        return not progress.cancelled
 
     def _update_hash_buttons_enabled(self, operation_enabled: bool = True):
         """Hash buttons only work for the hash comparison types (and not
         while another operation runs)."""
-        enabled = operation_enabled and self._hash_mode_active()
+        enabled = operation_enabled and self._hash_type_selected()
         for pane in (getattr(self, "left", None), getattr(self, "right", None)):
             button = getattr(pane, "hash_button", None) if pane is not None else None
             if button is not None:
-                button.setEnabled(enabled)
+                button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))

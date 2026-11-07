@@ -91,6 +91,13 @@ class PaneBuilderMixin:
         entry.historyEntryActivated.connect(lambda path, p=pane: self._on_history_entry_activated(p, path))
         # DEL on a dropdown entry removes it from the history.
         entry.historyEntryDeleted.connect(lambda path, p=pane: self._on_history_entry_deleted(p, path))
+        # Where a loaded snapshot came from (original path, root name); hidden
+        # for live folders -- see SnapshotOpsMixin._update_snapshot_label.
+        snapshot_info_label = QLabel("")
+        snapshot_info_label.setVisible(False)
+        pane.snapshot_info_label = snapshot_info_label
+        self._update_snapshot_label(pane)
+        file_list_layout.addWidget(snapshot_info_label)
         file_list_layout.addWidget(entry)
         pane.entry = entry
         # Repopulate the freshly built combo's dropdown from this pane's
@@ -320,6 +327,16 @@ class PaneBuilderMixin:
         select_button.clicked.connect(lambda checked=False, p=pane: self.select_directory(p))
         pane.select_button = select_button
 
+        save_snapshot_button = QPushButton("Save Snapshot")
+        save_snapshot_button.setToolTip(
+            "Save what this pane shows (names, sizes, dates and, if hashed, hashes) "
+            "to a snapshot file (.fss) that can be loaded later and compared against a folder."
+        )
+        save_snapshot_button.setFixedHeight(uniform_h)
+        save_snapshot_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("save_snapshot")))
+        save_snapshot_button.clicked.connect(lambda checked=False, p=pane: self._on_save_snapshot(p))
+        pane.save_snapshot_button = save_snapshot_button
+
         # Empties this pane's directory/tree/timeline entirely -- see
         # clear_pane_view. Placed at the outer edge of this row, right
         # next to (but the opposite end from) Select Directory -- right-
@@ -345,7 +362,7 @@ class PaneBuilderMixin:
         hash_button.setFixedHeight(uniform_h)
         hash_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("hash")))
         hash_button.clicked.connect(lambda checked=False, p=pane: self._hash_pane(p))
-        hash_button.setEnabled(self._hash_mode_active())
+        hash_button.setEnabled(self._hash_type_selected())
         pane.hash_button = hash_button
 
         free_space_label = QLabel("")
@@ -380,6 +397,7 @@ class PaneBuilderMixin:
         if layout_left:
             toolbar_layout.addWidget(up_button)
             toolbar_layout.addWidget(select_button)
+            toolbar_layout.addWidget(save_snapshot_button)
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(total_items_label)
             toolbar_layout.addStretch(1)
@@ -395,6 +413,7 @@ class PaneBuilderMixin:
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(total_items_label)
             toolbar_layout.addStretch(1)
+            toolbar_layout.addWidget(save_snapshot_button)
             toolbar_layout.addWidget(select_button)
             toolbar_layout.addWidget(up_button)
 

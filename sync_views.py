@@ -17,6 +17,9 @@ from constants import PATH_ROLE
 from panes import DirectoryPane
 
 
+from snapshot_ops import is_snapshot_file_name
+
+
 class SyncMixin:
     def _navigate_pane(self, pane: DirectoryPane, path, reset_sync=True, refresh=True, record_history=True):
         """Navigate `pane` to `path`. `reset_sync` (the default) marks this
@@ -52,6 +55,15 @@ class SyncMixin:
         "opening" a new one) and for _restore_ui_state's replay of a prior
         session's roots across a cosmetic rebuild (already recorded when
         each was originally opened)."""
+        if (is_snapshot_file_name(path) and os.path.isfile(path)
+                and getattr(pane, "snapshot_file", None) != os.path.normpath(os.path.abspath(path))):
+            if not self._load_snapshot_into_pane(pane, path):
+                return
+            path = pane.snapshot_file
+        elif is_snapshot_file_name(path) and getattr(pane, "snapshot_file", None):
+            path = pane.snapshot_file  # that snapshot is already loaded here
+        elif getattr(pane, "snapshot_file", None) and not self._in_pane_snapshot(pane, path):
+            self._unload_snapshot(pane)
         pane.entry.setText(path)
         if record_history:
             self._record_folder_history(pane, path)
@@ -62,6 +74,10 @@ class SyncMixin:
         if refresh:
             self.update_listings(initiating_pane=pane)
             self._recount_pane_items_with_indicator(pane)
+            warning = getattr(self, "_pending_snapshot_warning", None)
+            if warning:
+                self._pending_snapshot_warning = None
+                self._show_warning_status(*warning)
 
     def _on_history_entry_activated(self, pane: DirectoryPane, path: str):
         """A folder picked from entry's own dropdown history (see
@@ -71,7 +87,7 @@ class SyncMixin:
         roll the combo's displayed text back to the pane's actual current
         folder (Qt already overwrote it with the missing entry's text as
         part of choosing it), and say so instead."""
-        if os.path.isdir(path):
+        if self._isdir(path) or (is_snapshot_file_name(path) and os.path.isfile(path)):
             self._navigate_pane(pane, path)
             return
         pane.entry.setText(pane.entry._current_valid_text)
@@ -102,8 +118,9 @@ class SyncMixin:
         # program, same confirmation) -- see ContextMenuMixin._open_paths.
         # Checked ahead of the guard below: opening a file doesn't clear
         # or rebuild either tree, so it's harmless mid-operation.
-        if full_path and not os.path.isdir(full_path):
-            self._open_paths([full_path])
+        if full_path and not self._isdir(full_path):
+            if not self._is_snapshot_path(full_path):  # a snapshot's files don't exist on disk
+                self._open_paths([full_path])
             return
         if getattr(self, "active_transfer_progress", None) is not None:
             return
@@ -117,7 +134,7 @@ class SyncMixin:
         old_root = pane.entry.text()
         pane_root, other_root = self._sync_reference_roots(pane)
         cp = self._counterpart_path(pane.tree, full_path, root=pane_root, other_root=other_root)
-        moved_other = bool(cp and os.path.isdir(cp))
+        moved_other = bool(cp and self._isdir(cp))
 
         self._navigate_pane(pane, full_path, reset_sync=False, refresh=False, record_history=False)
         if moved_other:
@@ -158,6 +175,8 @@ class SyncMixin:
         current = pane.entry.text()
         if not current:
             return
+        if getattr(pane, "snapshot_file", None) and os.path.normpath(current) == pane.snapshot_file:
+            return  # a snapshot's root has no parent folder to go up to
         parent = os.path.dirname(os.path.normpath(current))
         if not parent or parent == os.path.normpath(current):
             return
@@ -172,7 +191,7 @@ class SyncMixin:
         # parent we're headed to is above pane_root, so this needs
         # `allow_ancestor` to resolve on the other side at all.
         cp = self._counterpart_path(pane.tree, parent, allow_ancestor=True, root=pane_root, other_root=other_root)
-        moved_other = bool(cp and os.path.isdir(cp))
+        moved_other = bool(cp and self._isdir(cp))
 
         self._navigate_pane(pane, parent, reset_sync=False, refresh=False, record_history=False)
         if moved_other:
@@ -402,7 +421,7 @@ class SyncMixin:
         for item in tree.selectedItems():
             path = item.data(0, PATH_ROLE)
             cp = self._counterpart_path(tree, path)
-            if cp and os.path.exists(cp):
+            if cp and self._exists(cp):
                 targets.append(cp)
         self._sync_guard = True
         try:
@@ -493,7 +512,7 @@ class SyncMixin:
                 or getattr(other_pane, "_tree_rebuild_pending", False)):
             return
         cp = self._counterpart_path(tree, item.data(0, PATH_ROLE))
-        if not cp or not os.path.isdir(cp):
+        if not cp or not self._isdir(cp):
             return
         other_item = self._find_item_by_path(other_pane.tree, cp)
         if other_item is None:

@@ -520,11 +520,11 @@ class SelectionMixin:
         total_size = 0
 
         directory = pane.entry.text()
-        if not directory or not os.path.isdir(directory):
+        if not directory or not self._isdir(directory):
             return counts, 0, 0
         other_pane = self.right if pane is self.left else self.left
         other_root = other_pane.entry.text()
-        if not other_root or not os.path.isdir(other_root):
+        if not other_root or not self._isdir(other_root):
             other_root = None
 
         # This pane's own Statistics-view Metric decides which date
@@ -556,7 +556,7 @@ class SelectionMixin:
                 # times over.
                 if e["is_dir"]:
                     other_full = os.path.join(other_d, e["name"]) if other_d else None
-                    has_other = bool(other_full and os.path.isdir(other_full))
+                    has_other = bool(other_full and self._isdir(other_full))
                     if not has_other:
                         # No counterpart -- either directly (other_d is
                         # set but nothing named e["name"] exists there),
@@ -803,11 +803,11 @@ class SelectionMixin:
             return count
 
         root_dir = pane.entry.text()
-        if not root_dir or not os.path.isdir(root_dir):
+        if not root_dir or not self._isdir(root_dir):
             return 0
         other_pane = self.right if pane is self.left else self.left
         other_root = other_pane.entry.text()
-        if not other_root or not os.path.isdir(other_root):
+        if not other_root or not self._isdir(other_root):
             if require_other_root:
                 return 0
             other_root = None
@@ -1148,7 +1148,7 @@ class SelectionMixin:
         single "select_subtree" shortcut that's correct for an inverted
         selection the way there is for a uniform one."""
         root_dir = pane.entry.text()
-        if not root_dir or not os.path.isdir(root_dir):
+        if not root_dir or not self._isdir(root_dir):
             return
 
         self._set_transfer_label("Scanning...")
@@ -1491,7 +1491,7 @@ class SelectionMixin:
                 return matches
             if e["is_dir"]:
                 other_full = os.path.join(other_dir, e["name"]) if other_dir else None
-                if not other_full or not os.path.isdir(other_full):
+                if not other_full or not self._isdir(other_full):
                     if (want_rank, want_direction) == (3, None):
                         matches.append(e["full_path"])
                     continue  # nothing on the other side to recurse into
@@ -1546,7 +1546,7 @@ class SelectionMixin:
                         found.append(e["full_path"])
                 continue
             other_full = os.path.join(other_dir, e["name"]) if other_dir else None
-            if not other_full or not os.path.isdir(other_full):
+            if not other_full or not self._isdir(other_full):
                 continue  # doesn't exist on the other side at all -- that's Missing, not a difference
             rank, _direction = self._dir_content_rank(e["full_path"], other_full, date_field)
             if rank > 0:

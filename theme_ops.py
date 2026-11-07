@@ -752,6 +752,11 @@ class ThemeOpsMixin:
         self._status_unselected_color = hex_color
         self._apply_status_line_colors()
 
+    def _on_status_warning_color_changed(self, hex_color: str):
+        """Settings tab -> Misc Colors -> "Status line warning". Applies to
+        the next warning shown."""
+        self._status_warning_color = hex_color
+
     def _on_history_color_changed(self, snapshot: bool, hex_color: str):
         """Settings tab -> Misc Colors -> "History: live folder" /
         "History: snapshot file": text color of that kind of entry in the
@@ -946,6 +951,7 @@ class ThemeOpsMixin:
             "status_unselected_color": None,
             # Folder-history drop-down text (Misc Colors): live folders
             # and snapshot (.fss) files. Fg only.
+            "status_warning_color": "#C00000" if theme == "light" else "#FF5050",
             "history_live_color": "#000000" if theme == "light" else "#FFFFFF",
             "history_snapshot_color": "#707070" if theme == "light" else "#C8C8C8",
             "indent_line_color1": "#909090" if theme == "light" else "#A0A0A0",
@@ -1002,6 +1008,7 @@ class ThemeOpsMixin:
             "title_numeric_color": self._title_numeric_color,
             "status_selected_color": self._status_selected_color,
             "status_unselected_color": self._status_unselected_color,
+            "status_warning_color": self._status_warning_color,
             "history_live_color": self._history_live_color,
             "history_snapshot_color": self._history_snapshot_color,
             "indent_line_color1": self._indent_line_color1,
@@ -1085,6 +1092,7 @@ class ThemeOpsMixin:
         self._title_numeric_color = cs["title_numeric_color"]
         self._status_selected_color = cs.get("status_selected_color", "#F5D400")
         self._status_unselected_color = cs.get("status_unselected_color")
+        self._status_warning_color = cs.get("status_warning_color", "#FF5050")
         self._history_live_color = cs.get("history_live_color", "#FFFFFF")
         self._history_snapshot_color = cs.get("history_snapshot_color", "#C8C8C8")
         self._indent_line_color1 = cs["indent_line_color1"]

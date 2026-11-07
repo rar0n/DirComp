@@ -46,6 +46,19 @@ class DirectoryPane:
         # SettingsMixin._on_history_entry_deleted. Every automatic save
         # writes this list, never folder_history.
         self.saved_folder_history: list = []
+        # A loaded folder snapshot (.fss) -- see snapshot_ops.py. While set,
+        # this pane shows the snapshot instead of a folder on disk:
+        # snapshot_file is its virtual root path (the .fss path), the
+        # full_* pair holds the whole loaded tree (snapshot_root /
+        # snapshot_index above then cover just the part currently shown),
+        # snapshot_hash_key the comparison key its stored hashes belong to.
+        self.snapshot_file: str | None = None
+        self.snapshot_meta: dict | None = None
+        self.snapshot_full_root = None
+        self.snapshot_full_index = None
+        self.snapshot_hash_key = None
+        self.snapshot_info_label: QLabel | None = None
+        self.save_snapshot_button = None
         self.select_group: QGroupBox | None = None
         # File Op / Clipboard groups, tracked the same way select_group
         # already was -- needed now so UiBuilderMixin._layout_pane_cluster

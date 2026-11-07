@@ -45,6 +45,7 @@ from panes import DirectoryPane
 from progress import _CancellableProgress
 from diff_engine import DiffEngineMixin
 from hash_ops import HashOpsMixin
+from snapshot_ops import SnapshotOpsMixin
 from listing_ops import ListingMixin
 from selection_ops import SelectionMixin
 from transfer_ops import TransferMixin
@@ -64,6 +65,7 @@ class DirectoryComparisonApp(
     SyncMixin,
     DiffEngineMixin,
     HashOpsMixin,
+    SnapshotOpsMixin,
     TimelineOpsMixin,
     SettingsMixin,
     ContextMenuMixin,

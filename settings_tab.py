@@ -670,6 +670,9 @@ class SettingsTabMixin:
              lambda: self._main_button_color_for("refresh")[0],
              lambda hexc: self._on_main_button_color_changed("refresh", False, hexc),
              lambda hexc: self._on_main_button_color_changed("refresh", True, hexc)),
+            ("Status line warning",
+             lambda: self._status_warning_color, None,
+             self._on_status_warning_color_changed, None),
             # Text colors of the folder-history drop-downs (Fg only).
             ("History: live folder",
              lambda: self._history_live_color, None,
@@ -728,9 +731,13 @@ class SettingsTabMixin:
             "theme's default button colors until you pick one."
         )
         default_colors_table.item(8, 0).setToolTip(
-            "Text color of live-folder entries in each pane's folder-history drop-down."
+            "Text color of a warning in a pane's status line, e.g. when a loaded snapshot "
+            "cannot be compared by hash and the comparison falls back to name, size and date."
         )
         default_colors_table.item(9, 0).setToolTip(
+            "Text color of live-folder entries in each pane's folder-history drop-down."
+        )
+        default_colors_table.item(10, 0).setToolTip(
             "Text color of folder-snapshot (.fss) entries in each pane's folder-history drop-down."
         )
         # (Default Folder/Default File and Scrollbar used to be rows here --
@@ -1349,6 +1356,7 @@ class SettingsTabMixin:
         # theme's default button colors -- see _main_button_color_for. ----
         flv_buttons_group = self._main_button_color_table([
             ("up", "Up one folder"), ("select_dir", "Select Directory"),
+            ("save_snapshot", "Save Snapshot"),
             ("hash", "Hash"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
             ("collapse_all", "Collapse (-)"),
         ])

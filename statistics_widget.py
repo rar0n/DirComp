@@ -2349,7 +2349,7 @@ class TimelineWidget(QWidget):
     def dropEvent(self, event):
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if os.path.isdir(path):
+            if os.path.isdir(path) or (os.path.isfile(path) and path.lower().endswith(".fss")):
                 self.directoryDropped.emit(path)
                 event.acceptProposedAction()
                 return

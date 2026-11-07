@@ -298,8 +298,8 @@ class ListingMixin:
 
         left_dir = self.left.entry.text()
         right_dir = self.right.entry.text()
-        left_valid = bool(left_dir) and os.path.isdir(left_dir)
-        right_valid = bool(right_dir) and os.path.isdir(right_dir)
+        left_valid = bool(left_dir) and self._isdir(left_dir)
+        right_valid = bool(right_dir) and self._isdir(right_dir)
 
         progress = getattr(self, "active_transfer_progress", None)
         owns_progress = progress is None
@@ -513,8 +513,8 @@ class ListingMixin:
         just being thorough, not correcting anything this skipped."""
         left_dir = self.left.entry.text()
         right_dir = self.right.entry.text()
-        left_valid = bool(left_dir) and os.path.isdir(left_dir)
-        right_valid = bool(right_dir) and os.path.isdir(right_dir)
+        left_valid = bool(left_dir) and self._isdir(left_dir)
+        right_valid = bool(right_dir) and self._isdir(right_dir)
         if left_valid:
             self.update_listing(left_dir, self.left, right_dir if right_valid else None,
                                  refresh_snapshot=False, retag_only=False)
@@ -582,6 +582,10 @@ class ListingMixin:
         self._invalidate_dir_rank_cache()
         if directory is None:
             pane.snapshot_root, pane.snapshot_index = None, {}
+        elif self._in_pane_snapshot(pane, directory):
+            # A loaded snapshot: nothing to scan, just show the part of it
+            # that `directory` names.
+            pane.snapshot_root, pane.snapshot_index = self._select_snapshot_subtree(pane, directory)
         else:
             pane.snapshot_root, pane.snapshot_index = self._build_snapshot(directory, progress=progress)
             if pane.snapshot_root is None:
@@ -723,7 +727,7 @@ class ListingMixin:
         if getattr(pane, "free_space_label", None) is None or getattr(pane, "entry", None) is None:
             return  # called mid-construction, before this pane's toolbar exists
         path = pane.entry.text()
-        if path and os.path.isdir(path):
+        if path and not self._is_snapshot_path(path) and os.path.isdir(path):
             try:
                 free = shutil.disk_usage(path).free
                 pane.free_space_label.setText(f"Free: {self._numeric_span(self.format_size(free))}")
@@ -1345,7 +1349,7 @@ class ListingMixin:
         (see _recount_pane_items_with_indicator / _recount_all_panes),
         lets the caller show a shared busy indicator and cancel early."""
         directory = pane.entry.text()
-        if not directory or not os.path.isdir(directory):
+        if not directory or not self._isdir(directory):
             pane.item_count = 0
             return
         if not self._recursive_folder_contents_enabled():

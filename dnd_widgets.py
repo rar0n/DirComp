@@ -303,6 +303,11 @@ def _tick_rects(path, outer_path, has_outer, x0, indent, thickness, length,
     return [QRect(start, row, end - start, count) for start, end, row, count in runs]
 
 
+def _droppable(path: str) -> bool:
+    """A dropped path DirComp can open: a folder, or a folder snapshot file."""
+    return os.path.isdir(path) or (os.path.isfile(path) and path.lower().endswith(".fss"))
+
+
 class DirDropLineEdit(QLineEdit):
     """QLineEdit that accepts a dropped directory (from a file manager)."""
     directoryDropped = Signal(str)
@@ -318,7 +323,7 @@ class DirDropLineEdit(QLineEdit):
     def dropEvent(self, event):
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if os.path.isdir(path):
+            if _droppable(path):
                 self.directoryDropped.emit(path)
                 event.acceptProposedAction()
                 return
@@ -389,7 +394,7 @@ class DirDropComboBox(QComboBox):
         return super().eventFilter(obj, event)
 
     def _delete_history_row(self, row: int):
-        path = self.itemText(row)
+        path = self.itemData(row, Qt.UserRole) or self.itemText(row)
         # removeItem can move the current index, which makes the combo
         # overwrite the edit text -- block signals and restore it, same
         # reasoning as set_history.
@@ -431,11 +436,17 @@ class DirDropComboBox(QComboBox):
         self.blockSignals(True)
         line_edit.blockSignals(True)
         self.clear()
-        self.addItems(list(paths))
         live = getattr(self, "_history_live_color", None)
         snap = getattr(self, "_history_snapshot_color", None)
         for i, path in enumerate(paths):
-            color = snap if path.lower().endswith(".fss") else live
+            # The real path lives in the item's user data (that is what a
+            # pick or DEL acts on); a snapshot file shows just its file
+            # name, the full path as tooltip.
+            is_snapshot = path.lower().endswith(".fss")
+            self.addItem(os.path.basename(path) if is_snapshot else path, path)
+            if is_snapshot:
+                self.setItemData(i, path, Qt.ToolTipRole)
+            color = snap if is_snapshot else live
             if color:
                 self.setItemData(i, QBrush(QColor(color)), Qt.ForegroundRole)
         self.setEditText(current)
@@ -443,7 +454,7 @@ class DirDropComboBox(QComboBox):
         self.blockSignals(False)
 
     def _on_activated(self, index):
-        path = self.itemText(index)
+        path = self.itemData(index, Qt.UserRole) or self.itemText(index)
         if path:
             self.historyEntryActivated.emit(path)
 
@@ -454,7 +465,7 @@ class DirDropComboBox(QComboBox):
     def dropEvent(self, event):
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if os.path.isdir(path):
+            if _droppable(path):
                 self.directoryDropped.emit(path)
                 event.acceptProposedAction()
                 return
@@ -921,7 +932,7 @@ class DirDropTreeWidget(QTreeWidget):
         urls = event.mimeData().urls()
         if len(urls) == 1:
             path = urls[0].toLocalFile()
-            if os.path.isdir(path):
+            if _droppable(path):
                 self.directoryDropped.emit(path)
                 event.acceptProposedAction()
                 return

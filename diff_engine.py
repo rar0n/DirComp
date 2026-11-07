@@ -169,8 +169,15 @@ class DiffEngineMixin:
                     getattr(self, "_cmp_chunk_start_kb", 64), getattr(self, "_cmp_chunk_end_kb", 64))
         return (CMP_NAME_SIZE_DATE, self._stem_mode())
 
-    def _hash_mode_active(self) -> bool:
+    def _hash_type_selected(self) -> bool:
+        """The Settings tab's comparison type is Hash value / Fingerprint."""
         return getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) in (CMP_HASH, CMP_FINGERPRINT)
+
+    def _hash_mode_active(self) -> bool:
+        """Files are actually compared by hash: a hash type is selected and
+        every loaded snapshot has hashes made under the current settings.
+        Otherwise the comparison falls back to name, size and date."""
+        return self._hash_type_selected() and self._snapshot_hashes_ok()
 
     def _node_hash(self, node):
         """The digest stored on a file node, if it was computed under the

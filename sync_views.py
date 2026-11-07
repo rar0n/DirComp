@@ -256,6 +256,38 @@ class SyncMixin:
 
     # --------------------------------------- Select-group search progress
 
+    def _counterpart_paths(self, tree, path) -> list:
+        """Every item in the other pane that `path` (an item of `tree`'s
+        pane) corresponds to, for selection mirroring. Folders map by
+        relative path. A file is matched the way the comparison matches
+        it: by content (hash / fingerprint, names ignored; with no
+        content match, the same-name file if any), or by name without
+        extension / first part of the name -- every file in the
+        counterpart folder that matches, so an ambiguous match selects
+        them all. Plain name, size and date comparison: same relative path."""
+        cp = self._counterpart_path(tree, path)
+        if not cp:
+            return []
+        exact = [cp] if self._exists(cp) else []
+        node = self._snapshot_lookup(path)
+        hash_mode = self._hash_mode_active()
+        stem_mode = self._stem_mode() != 0
+        if node is None or node["is_dir"] or not (hash_mode or stem_mode):
+            return exact
+        parent = self._snapshot_lookup(os.path.dirname(cp))
+        if parent is None or not parent["is_dir"]:
+            return []
+        files = [c for c in (parent["children"] or {}).values() if not c["is_dir"]]
+        if hash_mode:
+            digest = self._node_hash(node)
+            if digest is not None:
+                same = [c["full_path"] for c in files if self._node_hash(c) == digest]
+                if same:
+                    return same
+            return exact
+        stem = self._name_stem(node["name"])
+        return [c["full_path"] for c in files if self._name_stem(c["name"]) == stem]
+
     def _counterpart_path(self, tree, path, allow_ancestor=False, root=None, other_root=None):
         """Map `path` (which belongs to `tree`'s pane) to where the
         equivalent item would be in the *other* pane, for view-
@@ -420,9 +452,7 @@ class SyncMixin:
         targets = []
         for item in tree.selectedItems():
             path = item.data(0, PATH_ROLE)
-            cp = self._counterpart_path(tree, path)
-            if cp and self._exists(cp):
-                targets.append(cp)
+            targets.extend(self._counterpart_paths(tree, path))
         self._sync_guard = True
         try:
             self._select_paths_in_tree(
@@ -464,9 +494,9 @@ class SyncMixin:
         }
         targets = []
         for path in paths:
-            cp = self._counterpart_path(tree, path)
-            if cp and os.path.normpath(cp) in other_selected:
-                targets.append(cp)
+            for cp in self._counterpart_paths(tree, path):
+                if os.path.normpath(cp) in other_selected:
+                    targets.append(cp)
         if not targets:
             return 0
         self._sync_guard = True

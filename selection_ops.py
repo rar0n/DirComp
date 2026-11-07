@@ -352,6 +352,37 @@ class SelectionMixin:
                 btn.blockSignals(True)
                 btn.setChecked(False)
                 btn.blockSignals(False)
+        self._select_duplicates_of_current(pane)
+
+    def _select_duplicates_of_current(self, pane: DirectoryPane):
+        """Hash / Fingerprint comparison: selecting a file by hand also
+        selects the other files of the same folder with identical content
+        (its duplicates). Only the item just clicked / moved to is
+        expanded, and only when it ended up selected -- deselecting one
+        leaves its duplicates alone, and Select-group operations (which
+        never reach here) are unaffected."""
+        if getattr(self, "_dup_select_guard", False) or not self._hash_mode_active():
+            return
+        item = pane.tree.currentItem()
+        if item is None or not item.isSelected() or item.data(0, IS_DIR_ROLE):
+            return
+        node = self._snapshot_lookup(item.data(0, PATH_ROLE))
+        digest = self._node_hash(node) if node is not None else None
+        parent = self._snapshot_lookup(os.path.dirname(item.data(0, PATH_ROLE)))
+        if digest is None or parent is None:
+            return
+        selected = {os.path.normpath(i.data(0, PATH_ROLE)) for i in pane.tree.selectedItems()}
+        extra = [c["full_path"] for c in (parent["children"] or {}).values()
+                 if not c["is_dir"] and os.path.normpath(c["full_path"]) not in selected
+                 and self._node_hash(c) == digest]
+        if not extra:
+            return
+        self._dup_select_guard = True
+        try:
+            self._select_paths_in_tree(pane.tree, extra, additive=True, select_subtree=False,
+                                       auto_expand=False, expand_matched_dirs=False)
+        finally:
+            self._dup_select_guard = False
 
     def update_selection_count(self, tree, pane: DirectoryPane):
         if getattr(self, "_bulk_select_guard", False) or getattr(pane, "_tree_rebuild_pending", False):

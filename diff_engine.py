@@ -352,7 +352,7 @@ class DiffEngineMixin:
         immediate item count and date are compared -- the original,
         cheaper behavior."""
         if other_dir is None:
-            return "directory" if is_dir else "file"
+            return self._lone_tag(full_path, is_dir)
 
         other_full = os.path.join(other_dir, name)
         if not is_dir and full_path and self._hash_mode_active():
@@ -393,6 +393,40 @@ class DiffEngineMixin:
         if date_direction is not None:
             return f"diff_date_{date_direction}_dir" if is_dir else f"diff_date_{date_direction}_file"
         return f"diff_count_{size_direction}_dir" if is_dir else f"diff_size_{size_direction}_file"
+
+    def _lone_tag(self, full_path, is_dir):
+        """Tag for an item with nothing to compare against: plain, except
+        under a hash comparison type where a hashed file (or a folder whose
+        files are all hashed) gets the "Hashed, but not compared" look."""
+        plain = "directory" if is_dir else "file"
+        if not full_path or not self._hash_type_selected():
+            return plain
+        node = self._snapshot_lookup(full_path)
+        if node is None:
+            return plain
+        if not is_dir:
+            return "hashed_file" if self._node_hash(node) is not None else plain
+        cache = getattr(self, "_dir_rank_cache", None)
+        if cache is None:
+            cache = self._dir_rank_cache = {}
+        key = ("hashed", os.path.normpath(full_path), self._comparison_key())
+        state = cache.get(key)
+        if state is None:
+            files = 0
+            state = True
+            stack = [node]
+            while stack and state:
+                for child in (stack.pop()["children"] or {}).values():
+                    if child["is_dir"]:
+                        stack.append(child)
+                    else:
+                        files += 1
+                        if self._node_hash(child) is None:
+                            state = False
+                            break
+            state = bool(state and files)
+            cache[key] = state
+        return "hashed_dir" if state else plain
 
     def _diff_axes(self, is_dir, size_str, date_str, other_full, date_field="mtime", own_full=None):
         """Both ways an entry differs from its counterpart at `other_full`

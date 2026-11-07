@@ -68,6 +68,10 @@ TAG_COLORS = {
     # Settings -> Comparison Type Colors -> "Unhashed"). Neutral greys.
     "unhashed_file": ("#C8C8C8", "black"),
     "unhashed_dir": ("#B0B0B0", "blue"),
+    # Hash comparison types: hashed, but with nothing to compare against
+    # (the other pane is empty, or Dual Pane is off).
+    "hashed_file": ("#B8E0E8", "black"),
+    "hashed_dir": ("#9CCBD6", "blue"),
 }
 
 # Custom item-data roles (stored on column 0) that support the nested,

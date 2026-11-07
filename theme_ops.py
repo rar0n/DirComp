@@ -15,7 +15,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
 
-from constants import IS_DIR_ROLE, TAG_COLORS
+from constants import IS_DIR_ROLE, PATH_ROLE, TAG_COLORS
 from custom_widgets import (
     SELECTION_HIGHLIGHT_COLOR, _DEFAULT_MAIN_BUTTON_COLORS, _DEFAULT_SELECT_COLORS,
     _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT, _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT,
@@ -140,7 +140,7 @@ class ThemeOpsMixin:
                     continue
                 if not self._dual_pane_enabled and tag not in ("file", "directory"):
                     is_dir = item.data(0, IS_DIR_ROLE)
-                    tag = "directory" if is_dir else "file"
+                    tag = self._lone_tag(item.data(0, PATH_ROLE), is_dir)
                 self._apply_tag(item, tag)
 
     def _repaint_all_scrollbars(self):
@@ -888,6 +888,7 @@ class ThemeOpsMixin:
         tag_colors = {
             "directory": ["#E0E090", "blue"], "file": [None, None], "error": ["#FFB6C1", "red"],
             "unhashed_file": ["#C8C8C8", "black"], "unhashed_dir": ["#B0B0B0", "blue"],
+            "hashed_file": ["#B8E0E8", "black"], "hashed_dir": ["#9CCBD6", "blue"],
         }
         for key, tag_keys in _SELECT_KEY_TO_TAG_COLOR_KEYS.items():
             fg, bg = _DEFAULT_SELECT_COLORS[key]
@@ -901,6 +902,7 @@ class ThemeOpsMixin:
             for tag_keys in _SELECT_KEY_TO_TAG_COLOR_KEYS.values():
                 tag_colors[tag_keys[-1]][1] = defaults["folder_fg_override"]
             tag_colors["unhashed_dir"][1] = defaults["folder_fg_override"]
+            tag_colors["hashed_dir"][1] = defaults["folder_fg_override"]
         stats_palette = {
             "background_color": defaults["stats_bg"],
             "selection_color": "#E68C14",

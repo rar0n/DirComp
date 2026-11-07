@@ -173,6 +173,12 @@ class DiffEngineMixin:
         """The Settings tab's comparison type is Hash value / Fingerprint."""
         return getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) in (CMP_HASH, CMP_FINGERPRINT)
 
+    def _hash_comparison_blocked(self) -> bool:
+        """A hash type is selected but a loaded snapshot's hashes don't fit
+        the current settings: nothing is compared; every item shows the
+        "Hashed, not compared" look instead."""
+        return self._hash_type_selected() and not self._snapshot_hashes_ok()
+
     def _hash_mode_active(self) -> bool:
         """Files are actually compared by hash: a hash type is selected and
         every loaded snapshot has hashes made under the current settings.
@@ -351,7 +357,7 @@ class DiffEngineMixin:
         If Recursive Folder Contents is off, only the folder's own
         immediate item count and date are compared -- the original,
         cheaper behavior."""
-        if other_dir is None:
+        if other_dir is None or self._hash_comparison_blocked():
             return self._lone_tag(full_path, is_dir)
 
         other_full = os.path.join(other_dir, name)
@@ -404,12 +410,16 @@ class DiffEngineMixin:
         node = self._snapshot_lookup(full_path)
         if node is None:
             return plain
+        # Blocked: a snapshot's hashes made under other settings still
+        # count as "hashed".
+        blocked = self._hash_comparison_blocked()
+        has_hash = (lambda n: n.get("hash") is not None) if blocked else (lambda n: self._node_hash(n) is not None)
         if not is_dir:
-            return "hashed_file" if self._node_hash(node) is not None else plain
+            return "hashed_file" if has_hash(node) else plain
         cache = getattr(self, "_dir_rank_cache", None)
         if cache is None:
             cache = self._dir_rank_cache = {}
-        key = ("hashed", os.path.normpath(full_path), self._comparison_key())
+        key = ("hashed", os.path.normpath(full_path), self._comparison_key(), blocked)
         state = cache.get(key)
         if state is None:
             files = 0
@@ -421,7 +431,7 @@ class DiffEngineMixin:
                         stack.append(child)
                     else:
                         files += 1
-                        if self._node_hash(child) is None:
+                        if not has_hash(child):
                             state = False
                             break
             state = bool(state and files)

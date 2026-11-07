@@ -598,6 +598,7 @@ class SettingsMixin:
         # applied at startup, before any listing exists).
         if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
             self.update_listings(rescan_disk=False)
+            self._warn_if_comparison_blocked()
 
     def _set_settings_status(self, message: str):
         """Settings tab's own status line (see ui_builder._build_status_

@@ -191,14 +191,18 @@ class HashOpsMixin:
             pane.tree.items_not_draggable = snap
             # Larger/Smaller/Newer/Older mean nothing when files are
             # compared by content.
-            for key in ("larger", "smaller", "newer", "older"):
+            blocked = self._hash_comparison_blocked()
+            keys = (("missing", "matching", "larger", "smaller", "newer", "older", "diff_folders")
+                    if blocked else ("larger", "smaller", "newer", "older"))
+            for key in ("missing", "matching", "larger", "smaller", "newer", "older", "diff_folders"):
                 btn = (getattr(pane, "select_toggle_buttons", None) or {}).get(key)
                 if btn is not None:
-                    if self._hash_mode_active() and btn.isChecked():
+                    off = key in keys and (blocked or self._hash_mode_active())
+                    if off and btn.isChecked():
                         btn.blockSignals(True)
                         btn.setChecked(False)
                         btn.blockSignals(False)
-                    btn.setEnabled(not self._hash_mode_active())
+                    btn.setEnabled(not off)
             # Clipboard (incl. its Copy/Move across buttons) too.
             for attr in ("file_op_group", "clipboard_group"):
                 group = getattr(pane, attr, None)

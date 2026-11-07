@@ -332,8 +332,8 @@ class SnapshotOpsMixin:
         """A hash comparison needs the snapshot's hashes to have been made
         with the settings in effect now. If they weren't: offer to adopt
         the snapshot's settings; if declined (or the snapshot has no
-        hashes), the comparison falls back to name, size and date, and the
-        status line says so in the warning color."""
+        hashes), nothing is compared (see DiffEngineMixin._hash_comparison_blocked)
+        and the status line says so in the warning color."""
         if not self._hash_type_selected():
             return
         if hash_key == tuple(self._comparison_key()):
@@ -347,10 +347,23 @@ class SnapshotOpsMixin:
             if reply == QMessageBox.Yes:
                 self._adopt_comparison_settings(comparison)
                 return
-            message = "Snapshot hashes use other settings: comparing by name, size and date."
-        else:
-            message = "Snapshot has no hashes: comparing by name, size and date."
-        self._pending_snapshot_warning = (pane, message)
+        self._pending_snapshot_warning = (pane, self._snapshot_mismatch_message(pane))
+
+    def _snapshot_mismatch_message(self, pane) -> str:
+        if getattr(pane, "snapshot_hash_key", None):
+            return ("Snapshot hashes were made with other comparison settings: "
+                    "nothing is compared (shown as hashed, not compared).")
+        return "Snapshot has no hashes: nothing is compared."
+
+    def _warn_if_comparison_blocked(self):
+        """After a comparison setting changed: say so if a loaded snapshot's
+        hashes no longer fit them."""
+        if not self._hash_comparison_blocked():
+            return
+        for pane in (self.left, self.right):
+            if getattr(pane, "snapshot_file", None) and pane.snapshot_hash_key != tuple(self._comparison_key()):
+                self._show_warning_status(pane, self._snapshot_mismatch_message(pane))
+                return
 
     def _adopt_comparison_settings(self, comparison):
         """Put the snapshot's comparison settings into the Settings-tab

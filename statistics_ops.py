@@ -559,6 +559,10 @@ class TimelineOpsMixin:
         page = (view_end - view_start) / full_span
         sb = pane.tl_scrollbar
         sb.blockSignals(True)
+        # All values (e.g. identical timestamps) can make full_span tiny
+        # while the view is wider: clamp so the ints stay in range.
+        page = min(max(page, 0.0), 1.0)
+        pos = min(max(pos, 0.0), 1.0)
         sb.setPageStep(max(1, int(page * TIMELINE_SCROLLBAR_RANGE)))
         sb.setValue(int(pos * TIMELINE_SCROLLBAR_RANGE))
         sb.blockSignals(False)

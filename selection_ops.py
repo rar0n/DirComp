@@ -359,6 +359,17 @@ class SelectionMixin:
         return {os.path.normpath(p) for p in
                 (i.data(0, PATH_ROLE) for i in pane.tree.selectedItems()) if p}
 
+    def _shown_paths(self, pane: DirectoryPane) -> set:
+        """Normalized paths of the rows actually listed (populated) in the pane."""
+        shown = set()
+        stack = [pane.tree.topLevelItem(i) for i in range(pane.tree.topLevelItemCount())]
+        while stack:
+            it = stack.pop()
+            shown.add(os.path.normpath(it.data(0, PATH_ROLE) or ""))
+            if it.data(0, POPULATED_ROLE):
+                stack.extend(it.child(i) for i in range(it.childCount()))
+        return shown
+
     def _hash_groups_index(self, pane: DirectoryPane):
         """{digest: [file nodes]} over the pane's whole snapshot, built
         once and kept until the next snapshot rebuild / settings change
@@ -418,13 +429,7 @@ class SelectionMixin:
                     current.add(cp)
         if not same_folder and not recursive and extra:
             # Pane-wide, but only what is actually listed (populated).
-            shown = set()
-            stack = [pane.tree.topLevelItem(i) for i in range(pane.tree.topLevelItemCount())]
-            while stack:
-                it = stack.pop()
-                shown.add(os.path.normpath(it.data(0, PATH_ROLE) or ""))
-                if it.data(0, POPULATED_ROLE):
-                    stack.extend(it.child(i) for i in range(it.childCount()))
+            shown = self._shown_paths(pane)
             keep = [p for p in extra if os.path.normpath(p) in shown]
             current -= {os.path.normpath(p) for p in extra if p not in keep}
             extra = keep

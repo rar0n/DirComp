@@ -570,8 +570,8 @@ class SettingsTabMixin:
                   self.fingerprint_end_label.sizeHint().width())
         self.fingerprint_start_label.setFixedWidth(_lw)
         self.fingerprint_end_label.setFixedWidth(_lw)
-        global_grid.addLayout(fp_start_row, 15, 0, 1, 7)
-        global_grid.addLayout(fp_end_row, 16, 0, 1, 7)
+        global_grid.addLayout(fp_start_row, 16, 0, 1, 7)
+        global_grid.addLayout(fp_end_row, 17, 0, 1, 7)
 
         ignore_ext_row = QHBoxLayout()
         ignore_ext_row.setContentsMargins(0, 0, 0, 0)
@@ -623,7 +623,7 @@ class SettingsTabMixin:
         )
         multi_row.addWidget(self.multi_select_same_folder_cb)
         multi_row.addStretch(1)
-        global_grid.addLayout(multi_row, 17, 0, 1, 7)
+        global_grid.addLayout(multi_row, 15, 0, 1, 7)
         self.multi_select_matching_cb.toggled.connect(self._on_multi_select_setting_changed)
         self.multi_select_same_folder_cb.toggled.connect(self._on_multi_select_setting_changed)
 

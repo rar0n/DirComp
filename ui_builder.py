@@ -870,6 +870,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 "rename": pane.rename_button,
                 "up": getattr(pane, "up_button", None),
                 "select_dir": getattr(pane, "select_button", None),
+                "hash": getattr(pane, "hash_button", None),
                 "clear_view": getattr(pane, "clear_view_button", None),
                 "expand_all": getattr(pane, "expand_all_button", None),
                 "collapse_all": getattr(pane, "collapse_all_button", None),

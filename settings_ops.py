@@ -563,6 +563,7 @@ class SettingsMixin:
         self._cmp_chunk_end_kb = self.fingerprint_end_spin.value()
         self._cmp_ignore_ext = self.ignore_file_extensions_cb.isChecked()
         self._update_comparison_controls_enabled()
+        self._update_hash_buttons_enabled()
         key = self._comparison_key()
         if key == self._cmp_applied_key:
             return

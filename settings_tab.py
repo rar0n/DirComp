@@ -1275,7 +1275,7 @@ class SettingsTabMixin:
         comparison_colors_outer = QVBoxLayout(comparison_colors_group)
         _COMPARISON_LABELS = {
             "missing": "Missing", "matching": "Matching", "newer": "Newer", "older": "Older",
-            "smaller": "Smaller", "larger": "Larger", "diff_folders": "Diff Folders",
+            "smaller": "Smaller", "larger": "Larger", "diff_folders": "Content differs",
         }
         comparison_colors_table = QTableWidget(len(_SELECT_KEY_TO_TAG_COLOR_KEYS) + 1, 6)
         self._style_table_widget(
@@ -1335,7 +1335,7 @@ class SettingsTabMixin:
         # theme's default button colors -- see _main_button_color_for. ----
         flv_buttons_group = self._main_button_color_table([
             ("up", "Up one folder"), ("select_dir", "Select Directory"),
-            ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
+            ("hash", "Hash"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
             ("collapse_all", "Collapse (-)"),
         ])
         flv_buttons_block = self._settings_subsubsection("Button Colors", flv_buttons_group)
@@ -1848,7 +1848,7 @@ class SettingsTabMixin:
         _SELECT_LABELS = {
             "select_all": "Select All", "clear": "Clear", "missing": "Missing",
             "newer": "Newer", "smaller": "Smaller", "matching": "Matching",
-            "older": "Older", "larger": "Larger", "diff_folders": "Diff Folders",
+            "older": "Older", "larger": "Larger", "diff_folders": "Diff Items",
             "file_parent": "File Parent", "all_parents": "All Parents",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)

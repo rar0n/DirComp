@@ -128,6 +128,21 @@ class _CancellableProgress:
             self._on_tick(self._count)
         return not self.cancelled
 
+    def advance(self, units: int) -> bool:
+        """Like tick(), but moves the bar (and the real count) forward by
+        `units` at once -- for work measured in something other than
+        items, such as bytes hashed (see HashOpsMixin). Never calls the
+        live item-count label callback, since `units` aren't items.
+        Returns False once cancelled, same contract as tick()."""
+        self._count += units
+        if self._bar.maximum() > 0:
+            self._bar.setValue(min(self._count, self._bar.maximum()))
+        now = time.monotonic()
+        if now - self._last_pump >= self._PUMP_INTERVAL:
+            self._last_pump = now
+            QApplication.processEvents()
+        return not self.cancelled
+
     def pump(self) -> bool:
         """Keep the UI responsive and let Cancel be noticed, without
         advancing the bar or the live count/duration label -- for

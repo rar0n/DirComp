@@ -22,7 +22,15 @@ A future change to how dates are compared/typed, or to what counts as
 import os
 import datetime
 
-from constants import CMP_NAME_SIZE_DATE
+from constants import CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT
+
+# Sentinel results of DiffEngineMixin._diff_axes for a file the Smaller/
+# Larger/Newer/Older axes can't describe: hash comparison with no hash
+# yet, or same-name files whose content differs while size and date agree.
+# Neither is a (size, date) direction pair, so SelectionMixin._attrs_from_axes
+# drops them; the count code checks for them by identity.
+AXES_UNHASHED = ("unhashed", "unhashed")
+AXES_CONTENT_DIFFERS = ("content", "content")
 
 
 class DiffEngineMixin:
@@ -74,6 +82,7 @@ class DiffEngineMixin:
         index[norm] = node
         if not is_dir:
             node["size"] = st.st_size
+            self._attach_cached_hash(node, norm)
             return node
 
         try:
@@ -132,7 +141,119 @@ class DiffEngineMixin:
         now they reduce to the same key (and the same behavior) as the
         plain name/size/date type; once hashing exists they get their
         own entries here, with the algorithm and chunk sizes."""
+        ctype = getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE)
+        if ctype == CMP_HASH:
+            return (CMP_HASH, getattr(self, "_cmp_algorithm", 2))
+        if ctype == CMP_FINGERPRINT:
+            return (CMP_FINGERPRINT, getattr(self, "_cmp_algorithm", 2),
+                    getattr(self, "_cmp_chunk_start_kb", 64), getattr(self, "_cmp_chunk_end_kb", 64))
         return (CMP_NAME_SIZE_DATE, self._ignore_extensions_active())
+
+    def _hash_mode_active(self) -> bool:
+        return getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) in (CMP_HASH, CMP_FINGERPRINT)
+
+    def _node_hash(self, node):
+        """The digest stored on a file node, if it was computed under the
+        comparison settings in effect now (type, algorithm, chunk sizes);
+        None = unhashed."""
+        stored = node.get("hash")
+        if stored and stored[0] == self._comparison_key():
+            return stored[1]
+        return None
+
+    def _attach_cached_hash(self, node, norm_path):
+        """Called while a snapshot is built: give a file node back its
+        hash from the app-wide cache, if the file's size and mtime are
+        still what they were when it was hashed (and the settings match,
+        which _node_hash checks)."""
+        cache = getattr(self, "_hash_cache", None)
+        if not cache:
+            return
+        entry = cache.get(norm_path)
+        if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
+            node["hash"] = (entry[2], entry[3])
+
+    def _pair_dir_files(self, node_a, node_b):
+        """Hash comparison: pair the FILES of two counterpart folders by
+        content, ignoring names. Returns (states_a, states_b), each
+        {file name: (state, other_node)} with state one of:
+        "matched" (same hash, one-to-one; identical names preferred on
+        ties), "differs" (no content partner, but a still-unpaired file
+        with the same name exists: other_node), "unhashed" (this file
+        has no hash yet, or it has no partner while the other folder
+        still has unhashed files that could be it), "missing".
+        Memoized; cleared with the rank cache."""
+        cache = getattr(self, "_pair_cache", None)
+        if cache is None:
+            cache = self._pair_cache = {}
+        key = (os.path.normpath(node_a["full_path"]), os.path.normpath(node_b["full_path"]),
+               self._comparison_key())
+        if key in cache:
+            return cache[key]
+        files_a = {n: c for n, c in (node_a["children"] or {}).items() if not c["is_dir"]}
+        files_b = {n: c for n, c in (node_b["children"] or {}).items() if not c["is_dir"]}
+        states_a, states_b = {}, {}
+        by_hash_a, by_hash_b = {}, {}
+        unhashed_a = unhashed_b = False
+        for files, by_hash, states in ((files_a, by_hash_a, states_a), (files_b, by_hash_b, states_b)):
+            for name, child in files.items():
+                digest = self._node_hash(child)
+                if digest is None:
+                    states[name] = ("unhashed", None)
+                else:
+                    by_hash.setdefault(digest, []).append(name)
+        unhashed_a = bool(states_a)
+        unhashed_b = bool(states_b)
+        # Pass 1: equal hashes, one-to-one, identical names first.
+        for digest, names_a in by_hash_a.items():
+            names_b = by_hash_b.get(digest)
+            if not names_b:
+                continue
+            set_b = set(names_b)
+            same = [n for n in names_a if n in set_b]
+            for n in same:
+                states_a[n] = ("matched", files_b[n])
+                states_b[n] = ("matched", files_a[n])
+            rest_a = sorted(set(names_a) - set(same))
+            rest_b = sorted(set_b - set(same))
+            for na, nb in zip(rest_a, rest_b):
+                states_a[na] = ("matched", files_b[nb])
+                states_b[nb] = ("matched", files_a[na])
+        # Pass 2: leftovers.
+        for files, states, other_files, other_states, other_unhashed in (
+                (files_a, states_a, files_b, states_b, unhashed_b),
+                (files_b, states_b, files_a, states_a, unhashed_a)):
+            for name in files:
+                if name in states:
+                    continue
+                if other_unhashed:
+                    states[name] = ("unhashed", None)
+                    continue
+                other = other_files.get(name)
+                if other is not None and other_states.get(name, (None,))[0] != "matched":
+                    states[name] = ("differs", other)
+                else:
+                    states[name] = ("missing", None)
+        result = (states_a, states_b)
+        cache[key] = result
+        return result
+
+    def _hash_file_state(self, own_full, other_full):
+        """(state, other_node) of the file at `own_full` against the
+        folder holding `other_full`, per _pair_dir_files; None if the
+        files' folders aren't both in the snapshots (caller falls back to
+        the name-based comparison)."""
+        own = self._snapshot_lookup(own_full)
+        if own is None or own["is_dir"]:
+            return None
+        own_parent = self._snapshot_lookup(os.path.dirname(own_full))
+        other_parent = self._snapshot_lookup(os.path.dirname(other_full))
+        if own_parent is None:
+            return None
+        if other_parent is None or not other_parent["is_dir"]:
+            return ("missing", None)
+        states_a, _states_b = self._pair_dir_files(own_parent, other_parent)
+        return states_a.get(own["name"], ("missing", None))
 
     @staticmethod
     def _stem_index(dir_node):
@@ -199,6 +320,23 @@ class DiffEngineMixin:
             return "directory" if is_dir else "file"
 
         other_full = os.path.join(other_dir, name)
+        if not is_dir and full_path and self._hash_mode_active():
+            hashed = self._hash_file_state(full_path, other_full)
+            if hashed is not None:
+                state, other_node = hashed
+                if state == "missing":
+                    return "missing_file"
+                if state == "unhashed":
+                    return "unhashed_file"
+                if state == "matched":
+                    return "common_file"
+                size_direction, date_direction = self._diff_axes_vs_node(
+                    other_node, False, size_str, date_str, date_field)
+                if size_direction is None and date_direction is None:
+                    return "diff_content_file"
+                if date_direction is not None:
+                    return f"diff_date_{date_direction}_file"
+                return f"diff_size_{size_direction}_file"
         other_node = self._counterpart_node(other_full, is_dir)
         if other_node is None:
             return "missing_dir" if is_dir else "missing_file"
@@ -225,7 +363,7 @@ class DiffEngineMixin:
             return f"diff_date_{date_direction}_dir" if is_dir else f"diff_date_{date_direction}_file"
         return f"diff_count_{size_direction}_dir" if is_dir else f"diff_size_{size_direction}_file"
 
-    def _diff_axes(self, is_dir, size_str, date_str, other_full, date_field="mtime"):
+    def _diff_axes(self, is_dir, size_str, date_str, other_full, date_field="mtime", own_full=None):
         """Both ways an entry differs from its counterpart at `other_full`
         -- (size_direction, date_direction), each "larger"/"smaller" and
         "newer"/"older" respectively, or None where that attribute
@@ -244,6 +382,18 @@ class DiffEngineMixin:
         For a directory this is its *immediate* item count and date --
         the non-recursive comparison -- regardless of Recursive Folder
         Contents; aggregate folder differences are Diff Folders' job."""
+        if not is_dir and own_full and other_full and self._hash_mode_active():
+            hashed = self._hash_file_state(own_full, other_full)
+            if hashed is not None:
+                state, other_node = hashed
+                if state == "missing":
+                    return None
+                if state == "unhashed":
+                    return AXES_UNHASHED
+                if state == "matched":
+                    return (None, None)
+                axes = self._diff_axes_vs_node(other_node, False, size_str, date_str, date_field)
+                return AXES_CONTENT_DIFFERS if axes == (None, None) else axes
         other_node = self._counterpart_node(other_full, is_dir) if other_full else None
         if other_node is None:
             return None
@@ -277,7 +427,9 @@ class DiffEngineMixin:
 
     def _tag_from_rank(self, rank, direction, is_dir):
         suffix = "dir" if is_dir else "file"
-        if rank <= 0:
+        if rank < 0:
+            return f"unhashed_{suffix}"
+        if rank == 0:
             return f"common_{suffix}"
         if rank == 2:
             return f"diff_date_{direction}_{suffix}"
@@ -360,6 +512,7 @@ class DiffEngineMixin:
         new snapshot, so it has to be thrown away wholesale rather than
         picked through entry by entry."""
         self._dir_rank_cache = {}
+        self._pair_cache = {}
 
     def _dir_content_rank(self, dir_a, dir_b, date_field="mtime"):
         """Memoized wrapper around _dir_content_rank_uncached.
@@ -468,7 +621,33 @@ class DiffEngineMixin:
         ignore_ext = self._ignore_extensions_active()
         stems_a = self._stem_index(node_a) if ignore_ext else None
         stems_b = self._stem_index(node_b) if ignore_ext and node_b is not None else {}
+        # Hash comparison: files pair by content (see _pair_dir_files);
+        # folders still pair by name. saw_unhashed: something here could
+        # not be judged yet because it has no hash -- see the end.
+        hash_pairs = self._hash_mode_active() and node_b is not None
+        states_a, states_b = self._pair_dir_files(node_a, node_b) if hash_pairs else ({}, {})
+        saw_unhashed = False
         for name, child_a in children_a.items():
+            if hash_pairs and not child_a["is_dir"]:
+                state, other = states_a.get(name, ("missing", None))
+                if state == "matched":
+                    continue
+                if state == "unhashed":
+                    saw_unhashed = True
+                    continue
+                if state == "missing":
+                    saw_missing = True
+                    continue
+                rank, direction = self._file_diff_rank(child_a, other, date_field)
+                if rank == 0:
+                    # Same size and date but different content.
+                    rank, direction = 1, "larger"
+                if rank > best_rank:
+                    best_rank = rank
+                    best_directions = {direction: 1}
+                elif rank == best_rank and direction:
+                    best_directions[direction] = best_directions.get(direction, 0) + 1
+                continue
             child_b = children_b.get(name)
             if ignore_ext and not child_a["is_dir"] and (child_b is None or child_b["is_dir"]):
                 child_b = stems_b.get(os.path.splitext(name)[0])
@@ -477,6 +656,9 @@ class DiffEngineMixin:
                 continue
             if child_a["is_dir"]:
                 rank, direction = self._dir_content_rank(child_a["full_path"], child_b["full_path"], date_field)
+                if rank < 0:
+                    saw_unhashed = True
+                    continue
             else:
                 rank, direction = self._file_diff_rank(child_a, child_b, date_field)
             if rank > best_rank:
@@ -486,7 +668,19 @@ class DiffEngineMixin:
                 best_directions[direction] = best_directions.get(direction, 0) + 1
 
         # Symmetric check: dir_b may hold items dir_a simply doesn't have.
-        if ignore_ext:
+        if hash_pairs:
+            for name, child_b in children_b.items():
+                if child_b["is_dir"]:
+                    child_a = children_a.get(name)
+                    if child_a is None or not child_a["is_dir"]:
+                        saw_missing = True
+                    continue
+                state = states_b.get(name, ("missing", None))[0]
+                if state == "missing":
+                    saw_missing = True
+                elif state == "unhashed":
+                    saw_unhashed = True
+        elif ignore_ext:
             for name, child_b in children_b.items():
                 child_a = children_a.get(name)
                 if child_a is not None and child_a["is_dir"] == child_b["is_dir"]:
@@ -503,7 +697,9 @@ class DiffEngineMixin:
             best_directions = {}
 
         if best_rank == 0:
-            return 0, None
+            # Nothing definitely differs; if anything was left unjudged for
+            # want of a hash, say so (rank -1) rather than "matching".
+            return (-1, "unhashed") if saw_unhashed else (0, None)
         if len(best_directions) == 1:
             return best_rank, next(iter(best_directions))
         if best_rank == 2:

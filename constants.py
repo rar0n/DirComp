@@ -58,6 +58,9 @@ TAG_COLORS = {
     "diff_date_newer_dir": ("#DECFA3", "black"),
     "diff_date_older_dir": ("#C9A96E", "black"),
     "diff_content_dir": ("#7777DD", "blue"),
+    # Hash comparison: same-name files whose content differs while size
+    # and date agree (the file counterpart of diff_content_dir).
+    "diff_content_file": ("#7777DD", "blue"),
     "directory": ("#E0E090", "blue"),
     "file": (None, None),
     "error": ("#FFB6C1", "red"),

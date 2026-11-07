@@ -44,6 +44,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QGroupBox
 from panes import DirectoryPane
 from progress import _CancellableProgress
 from diff_engine import DiffEngineMixin
+from hash_ops import HashOpsMixin
 from listing_ops import ListingMixin
 from selection_ops import SelectionMixin
 from transfer_ops import TransferMixin
@@ -62,6 +63,7 @@ class DirectoryComparisonApp(
     TransferMixin,
     SyncMixin,
     DiffEngineMixin,
+    HashOpsMixin,
     TimelineOpsMixin,
     SettingsMixin,
     ContextMenuMixin,

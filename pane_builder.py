@@ -333,6 +333,21 @@ class PaneBuilderMixin:
         clear_view_button.clicked.connect(lambda checked=False, p=pane: self.clear_pane_view(p))
         pane.clear_view_button = clear_view_button
 
+        # Hashes this pane's files for the Hash value / Fingerprint
+        # comparison types -- see HashOpsMixin._hash_pane. Only enabled
+        # while one of those types is selected.
+        hash_button = QPushButton("Hash")
+        hash_button.setToolTip(
+            "Compute hashes for this pane's files (Hash value / Fingerprint comparison types). "
+            "With Recursive Folder Selections on, every file; otherwise only the visible ones. "
+            "Files already hashed are skipped."
+        )
+        hash_button.setFixedHeight(uniform_h)
+        hash_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("hash")))
+        hash_button.clicked.connect(lambda checked=False, p=pane: self._hash_pane(p))
+        hash_button.setEnabled(self._hash_mode_active())
+        pane.hash_button = hash_button
+
         free_space_label = QLabel("")
         free_space_label.setStyleSheet("font-weight: bold;")
         # Rich text so the size figure can carry the Title Numeric color
@@ -370,9 +385,11 @@ class PaneBuilderMixin:
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)
+            toolbar_layout.addWidget(hash_button)
             toolbar_layout.addWidget(clear_view_button)
         else:
             toolbar_layout.addWidget(clear_view_button)
+            toolbar_layout.addWidget(hash_button)
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)
@@ -697,7 +714,7 @@ class PaneBuilderMixin:
             btn.setStyleSheet(_bevel_button_stylesheet(bg, fg))
             pane.select_toggle_buttons[type_key] = btn
 
-        diff_folders_button = QPushButton("Diff Folders")
+        diff_folders_button = QPushButton("Diff Items")
         diff_folders_button.setCheckable(True)
         diff_folders_button.toggled.connect(
             lambda checked, p=pane: self.select_diff_folders(p, select=checked)

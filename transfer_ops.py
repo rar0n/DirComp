@@ -159,6 +159,7 @@ class TransferMixin:
                 widget = getattr(pane, attr, None)
                 if widget is not None:
                     widget.setEnabled(enabled)
+        self._update_hash_buttons_enabled(enabled)
 
     def _begin_timed_operation(self, pane: "DirectoryPane | None" = None):
         """Record the start of an operation that reports a result count

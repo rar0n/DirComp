@@ -128,7 +128,7 @@ _SELECT_KEY_TO_TAG_COLOR_KEYS = {
     "older": ("diff_date_older_file", "diff_date_older_dir"),
     "smaller": ("diff_size_smaller_file", "diff_count_smaller_dir"),
     "larger": ("diff_size_larger_file", "diff_count_larger_dir"),
-    "diff_folders": ("diff_content_dir",),
+    "diff_folders": ("diff_content_file", "diff_content_dir"),
 }
 
 # Default (fg, bg) for every Select-group button, seeded from what used
@@ -181,7 +181,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "past
 # Colors).
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
-    "up", "select_dir", "clear_view", "expand_all", "collapse_all",
+    "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->

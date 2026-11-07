@@ -31,6 +31,7 @@ from constants import PATH_ROLE, IS_DIR_ROLE, POPULATED_ROLE, _DIFF_RANK, GNOME_
 from listing_ops import _DATE_FIELD_TO_ENTRY_KEY, _DATE_FIELD_TO_COLUMN, COL_SIZE
 from panes import DirectoryPane
 from progress import _CancellableProgress
+from diff_engine import AXES_UNHASHED, AXES_CONTENT_DIFFERS
 
 
 class _NoTargets(Exception):
@@ -38,6 +39,11 @@ class _NoTargets(Exception):
     when `paths` is empty so the empty-targets case can still fall
     through to that method's shared finally/notify tail below instead of
     returning early from inside the try and skipping it -- see there."""
+
+
+# The four attribute types a _diff_axes result can name; anything else in
+# it (the AXES_UNHASHED / AXES_CONTENT_DIFFERS sentinels) is not one.
+_AXIS_TYPES = ("smaller", "larger", "newer", "older")
 
 
 class SelectionMixin:
@@ -51,7 +57,7 @@ class SelectionMixin:
         "larger": ("Larger", "#B98CE0"),
         "newer": ("Newer", "#DECFA3"),
         "older": ("Older", "#C9A96E"),
-        "diff_folders": ("Diff Folders", "#7777DD"),
+        "diff_folders": ("Diff Items", "#7777DD"),
     }
     _SELECT_TYPE_ORDER = ["missing", "matching", "smaller", "larger", "newer", "older", "diff_folders"]
 
@@ -102,7 +108,7 @@ class SelectionMixin:
         DiffEngineMixin._diff_axes result -- its directions *are* those
         type keys, so this just drops the attributes that agree. () for
         no counterpart (None) or no difference."""
-        return tuple(d for d in axes if d) if axes else ()
+        return tuple(d for d in axes if d in _AXIS_TYPES) if axes else ()
 
     def _item_select_attrs(self, pane: DirectoryPane, item, date_field) -> tuple:
         """Every attribute type (Smaller/Larger/Newer/Older) a tree row
@@ -122,6 +128,7 @@ class SelectionMixin:
         return self._diff_axes(
             bool(item.data(0, IS_DIR_ROLE)), item.text(COL_SIZE),
             item.text(_DATE_FIELD_TO_COLUMN[date_field]), other_full, date_field,
+            own_full=item.data(0, PATH_ROLE),
         )
 
     # ------------------------------------------- Last-used diff coloring
@@ -482,7 +489,7 @@ class SelectionMixin:
             else:
                 for attr in self._item_select_attrs(pane, item, date_field):
                     counts[attr] += 1
-            if is_dir and tag in self._DIR_DIFF_TAGS:
+            if (is_dir and tag in self._DIR_DIFF_TAGS) or tag == "diff_content_file":
                 counts["diff_folders"] += 1
         return counts, total_count, total_size
 
@@ -571,8 +578,9 @@ class SelectionMixin:
                         rank, _direction = self._dir_content_rank(e["full_path"], other_full, date_field)
                         if rank > 0:
                             counts["diff_folders"] += 1
-                        else:
+                        elif rank == 0:
                             counts["matching"] += 1
+                        # rank < 0: not hashed yet -- counted as neither.
                     walk(e["full_path"], other_full if has_other else None)
                 elif other_d:
                     # _diff_axes rather than the single _diff_tag -- see
@@ -582,9 +590,14 @@ class SelectionMixin:
                     # difference counts, so a newer-and-larger file is
                     # tallied under both Newer and Larger.
                     axes = self._diff_axes(False, e["size_str"], e[date_entry_key],
-                                           os.path.join(other_d, e["name"]), date_field)
+                                           os.path.join(other_d, e["name"]), date_field,
+                                           own_full=e["full_path"])
                     if axes is None:
                         counts["missing"] += 1
+                    elif axes is AXES_UNHASHED:
+                        pass  # not hashed yet: counted as neither
+                    elif axes is AXES_CONTENT_DIFFERS:
+                        counts["diff_folders"] += 1
                     else:
                         attrs = self._attrs_from_axes(axes)
                         if not attrs:
@@ -886,7 +899,8 @@ class SelectionMixin:
                 self._collect_diff_folders(root, other, progress, df)
             )
             predicate = lambda item: (
-                item.data(0, IS_DIR_ROLE) and item.data(0, Qt.UserRole) in self._DIR_DIFF_TAGS
+                (item.data(0, IS_DIR_ROLE) and item.data(0, Qt.UserRole) in self._DIR_DIFF_TAGS)
+                or item.data(0, Qt.UserRole) == "diff_content_file"
             )
             return collector, predicate, True, False
         want_rank, want_direction = self._RANK_SELECT_TYPES[type_key]
@@ -1495,7 +1509,8 @@ class SelectionMixin:
                 # _RANK_SELECT_TYPES), so e.g. a file both newer and
                 # larger used to be invisible to Larger.
                 axes = self._diff_axes(False, e["size_str"], e[date_entry_key],
-                                       os.path.join(other_dir, e["name"]), date_field)
+                                       os.path.join(other_dir, e["name"]), date_field,
+                                       own_full=e["full_path"])
                 if want_direction in self._attrs_from_axes(axes):
                     matches.append(e["full_path"])
         return matches
@@ -1516,11 +1531,19 @@ class SelectionMixin:
         entries = self._build_entries(directory)
         if entries is None:
             return []
+        date_entry_key = _DATE_FIELD_TO_ENTRY_KEY[date_field]
         found = []
         for e in entries:
             if progress is not None and not progress.tick():
                 return found
             if not e["is_dir"]:
+                # Hash comparison: same-name files whose content differs
+                # while size and date agree ("Content differs") count too.
+                if other_dir and self._hash_mode_active():
+                    tag = self._diff_tag(e["name"], False, e["size_str"], e[date_entry_key], other_dir,
+                                          e["full_path"], date_field=date_field)
+                    if tag == "diff_content_file":
+                        found.append(e["full_path"])
                 continue
             other_full = os.path.join(other_dir, e["name"]) if other_dir else None
             if not other_full or not os.path.isdir(other_full):

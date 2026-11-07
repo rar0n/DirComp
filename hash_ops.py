@@ -198,3 +198,14 @@ class HashOpsMixin:
             into_snap = bool(getattr(other, "snapshot_file", None))
             for b in (getattr(pane, "_across_buttons", None) or {}).values():
                 b.setEnabled(not into_snap)
+            # The buttons themselves too: in the narrow layout they live in
+            # the Controls group instead, so the group-level disable above
+            # doesn't reach them.
+            own = [getattr(pane, a, None) for a in ("rename_button", "new_folder_button", "delete_button")]
+            own += list((getattr(pane, "_clipboard_buttons", None) or {}).values())
+            for b in own:
+                if b is not None:
+                    b.setEnabled(not snap)
+            if snap:
+                for b in (getattr(pane, "_across_buttons", None) or {}).values():
+                    b.setEnabled(False)

@@ -1,0 +1,36 @@
+Preliminary roadmap:
+
+Be a file explorer supplement (light replacement?), with focus on dual folder conmparison / syncing (manual and / or automatic?)
+
+- Have a single and dual pane mode
+
+- Opotional Sticky scroll
+
+- A Settings tab or menu, where most / all Theme colors can be set, and an extended set of Global options.
+
+- If double-clicking a file, launch it or launch it with the default associated program. Must have a confirmation dialogue first, with choice of open file
+
+- A right-click menu in file list view with some commands (cut/copy/paste and others to be specified later. Like file / folder properties, rename, etc.)
+
+- Possibly have a Locations tab, with stored locations for dual or single panes, for quickly finding folders to compare / sync (History?).
+
+- Bulk operations?
+
+- Folder snapshot (metadata only): Show a snapshot of a folder in FLV and SV, and compare against either the folder live, or another snapshot.
+-- How and where to store snapshots, own settings file, "loose" files w save/load snapshots?
+
+- Statistics by extension or file type, as a bar chart with click-to-select
+
+- Comparison modes: File name, fingerprint (partial hash start and end), hash (SHA256 or similar)
+
+- Duplicate finder within one pane, using the same hashing
+-- Duplicate select buttons w custom color, duplicate custom FLV custom color (in settings tab).
+
+
+
+
+
+
+
+
+

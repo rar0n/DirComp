@@ -1,0 +1,483 @@
+State of DirComp app file structure (pr. 2026.09.21 at 07:00)
+
+File                   - Lines - Comment
+--------------------------------------------------------------------------------------
+binning.py             -   400 - Pluggable "nice" binning strategies for TimelineWidget.
+constants.py           -   200 - 
+custom_widgets.py      -   950 - now also holds the slider classes
+diff_engine.py         -   468
+dircomp_settings.json  -   505 - The stored settings file.
+dnd_widgets.py         -   622
+listing_ops.py         - 1,770
+main.py                -   140
+pane_builder.py        - 1,305 - one pane's widgets, Statistics panel, splitter
+panes.py               -   130 - a plain state holder for DirectoryPane
+progress.py            -   172
+responsive_layout.py   -   668 - wide/narrow layout switching
+selection_ops.py       - 1,904
+settings_ops.py        -   406
+settings_tab.py        - 1,536 - Settings tab construction and helpers
+statistics_ops.py      -   828
+statistics_widget.py   - 2,043
+sync_views.py          -   560
+theme_ops.py           -   949 - color/theme handlers, palette, color sets
+transfer_ops.py        - 1,098
+trash_compat.py        -    15
+ui_builder.py          - 1,599 - window skeleton, status line, filter and global options
+
+
+
+More in-depth, taken from top comments of each file
+------------------------------------------------------------------
+Note: Timeline Explorer is the old name of Statistics View (imported project).
+
+
+
+binning.py
+----------------------
+Pluggable "nice" binning strategies for TimelineWidget.
+
+The widget used to divide whatever window was visible into `num_bins`
+equal-width slices, which meant bin widths changed every time you panned or
+zoomed. A `BinAxis` instead snaps bins to a fixed, human-meaningful grid -
+calendar units for time (decade -> year -> month -> week -> day -> hour ->
+minute -> second) or decimal orders of magnitude for size (TB -> GB -> MB ->
+kB -> B) - so panning only changes which bins are visible, never their
+width or alignment.
+
+A `BinAxis` knows nothing about files or `FileRecord` - it only deals in
+plain floats (a unix timestamp, or a byte count). That keeps it reusable
+for any other "plot a distribution of numeric values over a range" widget.
+
+
+
+
+
+constants.py
+----------------------
+Shared constants for the Directory Comparison app: the clipboard MIME type
+used for GNOME/Nemo/Nautilus/Dolphin interop, the custom QTreeWidgetItem
+data roles that back the nested/expandable folder view, the per-tag
+color table, the tag -> (severity rank, direction) lookup used by the
+Select group's search buttons, the platform-dependent "changed date"
+column label, and -- in the last section -- the layout/style constants
+shared by ui_builder.py and the mixins split out of it.
+
+
+
+
+
+custom_widgets.py
+----------------------
+Custom-painted widgets and their shared color constants/stylesheet
+helpers -- the pieces of ui_builder.py that don't depend on
+UiBuilderMixin or any `self.` state at all: the 3D-bevel button look
+(_bevel_button_stylesheet, InvertButton's own hand-painted diagonal
+fill), the themed dark-groove/light-handle scrollbars
+(_ThemedScrollBar/_SelectionMarkerScrollBar), and _SelectionColorDelegate
+(keeps file/folder text color distinguishable on a selected row), and the
+Settings tab's spin-box sliders (SliderSpinBox/SliderDoubleSpinBox +
+SpinSlider, plus the two small layout helpers that go with them).
+
+Split out of ui_builder.py as a first, low-risk step toward
+modularizing that file -- everything here is self-contained (only
+PySide6 + constants.IS_DIR_ROLE), so nothing in ui_builder.py or any
+other mixin needs to change how it imports these names: ui_builder.py
+re-imports them below, which binds them in its own namespace exactly
+as if they were still defined there.
+
+
+
+
+
+diff_engine.py
+----------------------
+DiffEngineMixin: the pure comparison logic that decides how any two items
+(a file, or a whole folder's recursive contents) differ -- tags, ranks,
+sizes, dates. No Qt widgets are touched here.
+
+Everything in this file now reads from each pane's in-memory snapshot
+(see _build_snapshot / ListingMixin.update_listing) instead of hitting
+the filesystem directly. The snapshot is a plain nested-dict mirror of a
+pane's directory tree, taken once per load/Refresh/post-transfer
+update_listings() call -- the same point that already rebuilds both
+trees from scratch -- so every comparison/search that used to re-stat or
+re-walk the disk on every single call (once per Select-group button
+press, once per folder expand, redundantly at every level of a
+recursive folder comparison) now just reads a dict. A directory's total
+size is summed bottom-up once while the snapshot is built, rather than
+being recomputed with a fresh os.walk every time it's needed.
+
+A future change to how dates are compared/typed, or to what counts as
+"the same" between two entries, still belongs in this file.
+
+
+
+
+
+
+dnd_widgets.py
+----------------------
+Small custom Qt widgets shared by both panes: a QLineEdit that accepts a
+directory dropped on it (from a file manager), and the QTreeWidget used
+for each pane's listing -- native Qt drag-and-drop (no external dnd
+library needed), a name column that resizes to fill leftover space, and a
+GNOME/Nemo/Nautilus/Dolphin-compatible drag source (see
+"x-special/gnome-copied-files" in constants.py).
+
+
+
+
+
+listing_ops.py
+----------------------
+ListingMixin: populates and refreshes each pane's tree (talking to
+DiffEngineMixin for the actual per-item comparison), lazy-loads folders on
+expand, keeps the item counts and free-space labels current, and handles
+column sorting. This is the "what's on screen" layer -- selection and
+transfer are handled elsewhere.
+
+Six columns per row: Name, Size, Type, Modified Date, the platform-
+dependent Changed/Created date (see constants.CHANGED_FIELD_LABEL), and
+Accessed Date -- see COL_* below. Diff coloring (_diff_tag) still only
+ever compares size and Modified Date, same as before; the two extra
+columns are informational, not part of what makes an item "differ" from
+its counterpart.
+"""
+
+
+
+
+
+main.py
+----------------------
+This file is the entry point. It composes DirectoryComparisonApp out of
+mixins that each own one concern, so a change usually only touches one
+file
+
+
+
+
+
+
+pane_builder.py
+----------------------
+PaneBuilderMixin: builds one pane's widgets -- the toolbar/tree/item-count
+row/Select+Clipboard groups (_build_directory_widgets), its Statistics
+view panel (_build_statistics_panel) and the File List/Statistics
+splitter handling (_apply_file_list_ratio_to_splitter, _set_file_list_ratio,
+...)
+
+
+
+
+
+
+panes.py 
+----------------------
+DirectoryPane: bundles the widgets and per-pane state that make up one
+side (left or right) of the app. Built by pane_builder.py (through
+UiBuilderMixin, ui_builder.py); read/written by every other mixin
+
+
+
+
+
+progress.py
+----------------------
+Cancellation/progress-bar helper shared by the Select group's search
+buttons, the central move/paste bar, and the item-recount that runs when "Recursive Folder Contents" is toggled.
+
+
+
+
+
+responsive_layout.py 
+----------------------
+The resize-driven part of the UI -- resizeEvent/showEvent,
+_update_responsive_layout (wide vs narrow switching) and the per-group
+layout helpers it drives (_layout_pane_cluster, _layout_controls_group,
+_layout_select_group/_layout_file_op_group/_layout_clipboard_group,
+_relayout_shared_controls, _update_pane_date_columns).
+
+
+
+
+
+selection_ops.py 
+----------------------
+SelectionMixin: the Select group's buttons -- Invert/Clear, Missing/
+Matching, Smaller/Larger, Newer/Older, Diff Folders, File Parents, and
+Folder Parents -- and the recursive filesystem search behind most of
+them (used whenever "Recursive Folder Selections" is on; "Expand To
+Selection" additionally auto-expands folders to visually reveal what
+was found). Leans on DiffEngineMixin for the actual per-item comparison
+and on TransferMixin's central Transfer-group bar/Cancel button (shared
+with actual transfers -- see _start_select_progress) for the search's
+progress display.
+
+Every tag-based button (everything except Diff Folders, which reasons
+about directory aggregates rather than a single per-item tag) is driven
+by one shared engine: _RANK_SELECT_TYPES/_tag_select_type classify a tag
+into a type key, and _run_select/_select_by_type run the actual
+"visible-only, or full search" logic once, generically, instead of each
+button repeating it. Diff Folders shares the same _run_select plumbing
+(progress/cancel/apply-selection) but supplies its own directory-based
+collector and visible-fallback predicate, since a differing folder isn't
+something a single tag captures.
+
+
+
+
+
+settings_ops.py 
+----------------------
+SettingsMixin: Save Settings / Load Settings (see ui_builder's Status
+group) persist every checkbox/spinbox/combobox/text field across the
+whole GUI -- Global Options, File Filter, and each pane's own Statistics
+view controls -- to a single JSON file, and restore them from it.
+
+Deliberately generic rather than one get/set pair per named widget:
+_settings_widgets() is the only place that lists *which* widgets are
+persisted; save/load themselves dispatch purely on Qt widget *type*
+(QCheckBox/QSpinBox/QDoubleSpinBox/QComboBox/QLineEdit), so adding a
+new persisted control later is a one-line addition there, not a new
+branch in both save_settings and load_settings.
+
+Restoring a value goes through the widget's normal setChecked/setValue/
+setCurrentIndex/setText rather than writing some internal state
+directly, so every side effect a user's own change to that control
+would trigger (update_listings, a layout mirror rebuild, a timeline
+re-bucket, ...) still happens -- load_settings doesn't need its own
+copy of that logic, it just re-plays the same widget-level change the
+GUI already knows how to react to.
+
+
+
+
+
+settings_tab.py 
+----------------------
+SettingsTabMixin: the Settings tab -- _build_settings_tab and everything that
+exists only to build or feed it: the title-level helpers
+(_settings_section/_subsection/_subsubsection), the Main<->Settings copy
+linkers (_link_checkboxes/_link_spinboxes), the color swatch and
+color-table helpers, and the handlers of the Statistics View (common)
+controls.
+
+
+
+
+
+statistics_ops.py 
+----------------------
+TimelineOpsMixin: wires each pane's embedded TimelineWidget (see
+ui_builder.UiBuilderMixin._build_statistics_panel) to that pane's
+in-memory snapshot (DiffEngineMixin._build_snapshot) and to that pane's
+tree selection -- the same bidirectional-selection pattern Timeline
+Explorer's own MainWindow uses between its TimelineWidget and its
+FileTable (see main_window.py), just adapted to read files out of a
+snapshot node tree instead of a flat FileRecord list, and to select
+paths in a QTreeWidget instead of table rows.
+
+DirComp's snapshot nodes are plain dicts (name/full_path/is_dir/mtime/
+ctime/atime/size/children -- see _build_snapshot), not FileRecord
+objects, so this bypasses TimelineWidget.set_records()'s built-in
+attribute-lookup defaults entirely via its value_of/path_of parameters
+rather than constructing FileRecord instances just to satisfy them.
+
+The Statistics view plots one of two things at a time, per pane
+(pane.tl_folder_mode, toggled via the Files/Folders buttons next to its
+title -- see ui_builder._build_directory_widgets): files (the default),
+or folders. Never both at once -- a folder's own recursive-total size
+would otherwise sit right next to the very files it's the sum of,
+double-counting the same bytes twice on the same chart. In Folder mode,
+the pane's own opened root folder is deliberately excluded from the
+plotted points -- see _flatten_folders -- since its size is always
+100% of everything else in the pane combined, and its own mtime just
+means "something directly inside it last changed"; neither is
+comparable to any other folder in the same chart. This does mean the
+timeline's own total will generally read lower than the corresponding
+figure in pane.total_items_label/pane.count_label, by design -- it's
+never showing both files and folders at once the way those do.
+
+File mode and Folder mode also keep entirely independent Statistics-
+view drag-range overlays (see pane.tl_mode_selections and
+_on_timeline_mode_changed) -- the discrete file/folder selection
+itself is shared, persistent tree state instead, not tracked per mode
+at all
+
+
+
+
+
+statistics_widget.py
+----------------------
+A zoomable / pannable / selectable timeline-style bar-chart widget.
+
+Originally this only plotted files over time. It's now metric-agnostic: it
+plots any numeric "metric" extracted from a list of records against a
+`BinAxis` (see binning.py) that snaps bins to a fixed, human-meaningful
+grid - calendar units for time, decimal orders of magnitude for size - so
+panning the view never changes bin widths, only which bins are visible.
+Arbitrary (non-"nice") bins are likewise anchored to a fixed absolute grid
+rather than being re-divided from the current view on every pan, so their
+edges - and anything tracking one, like a selection or hover highlight -
+stay put in absolute terms and only zooming changes the grid.
+
+Behaviour summary
+------------------
+- The full data range (`global_start` .. `global_end`) is the span covered by
+  every loaded record. `reset_view()` sets the *visible* window to that full
+  span - this is the "default zoom level" the view starts at. It's a
+  view-only operation: it never touches the current selection.
+- The visible window (`view_start` .. `view_end`) is divided into bins whose
+  width is chosen automatically from `axis.choose_step()`, aiming for
+  `bin_count` bins (a hint, not an exact count, since bins must land on nice
+  boundaries).
+- Mouse wheel zooms in/out, centred on the cursor.
+- Plain left-drag pans the view.
+- Shift+left-drag *or* right-drag selects a range (drawn as an overlay with
+  start/end markers). The selection is stored as an absolute range, so it
+  survives panning/zooming until explicitly changed.
+- A plain right-click (no drag) zooms out, centred on the click.
+- Ctrl+click a bar toggles that bin's files into/out of the current
+  selection, independent of any drag-range/shift-range selection -
+  builds up a discrete multi-bin selection one click at a time. See
+  _toggle_bin_selection.
+- A plain left-click (no drag):
+    - if there's an active drag-selected range and the click lands inside
+      it -> zoom to that range;
+    - if there's an active drag-selected range and the click lands outside
+      it -> clear the selection;
+    - if Shift is held and a single bin was the last plain click -> select
+      the inclusive range between that bin and this one (same result as
+      dragging between them);
+    - if the clicked bin is already fully selected -> zoom to it, same as
+      clicking inside a drag-selected range;
+    - otherwise, if the click lands on a bar -> show info (count) for the
+      bin that was clicked, via the `binInfo` signal, and select its files;
+    - otherwise (missed every bar - past the axis edges, or above a bar, in
+      the empty space over it) -> clear the selection.
+- "Zoom to selection" makes the selected range the new full view - bins
+  recompute to a finer nice step automatically. With no active range
+  (e.g. after a plain or ctrl+click bin selection), it falls back to the
+  span covered by whatever bins are currently selected - see
+  _selected_bins_bounds.
+
+Selection is bidirectional and file-based, not bin-based
+----------------------------------------------------------
+`selected_paths` is the single source of truth for which files are
+selected - clicking/dragging here sets it (and emits `selectionChanged` to
+tell the host); `set_external_selection()` lets a host app (e.g. a file
+list shown alongside this timeline) set it the other way, without
+bouncing an echo back via `selectionChanged`. Either way, every bin is
+recolored on every change: a bin with every one of its files selected
+gets the normal selection color, a bin with only *some* selected gets a
+blended "partial" color, and this is recomputed fresh after every pan,
+zoom, or reset - so zooming out can merge several selected bins into one
+partially-selected bin, and zooming in can split one bin's partial
+selection back out across its children, all without touching
+`selected_paths` itself.
+
+
+
+
+
+sync_views.py
+----------------------
+SyncMixin: "Synchronize Views" -- mirroring double-click navigation,
+"up one folder", selection, expand/collapse, and scrolling onto the other
+pane whenever a counterpart exists, while leaving the two panes' own root
+folders alone. Falls back gracefully (leaves the other pane where it is)
+whenever no counterpart can be found, and tracks a per-pane "sync anchor"
+so that still works correctly after a navigation had to leave the other
+pane behind.
+
+
+
+
+
+
+theme_ops.py 
+----------------------
+ThemeOpsMixin: what the Settings tab's controls DO -- the color/theme
+change handlers, palette application (_apply_theme_palette), the
+per-theme color sets (_builtin_color_set/_capture_color_set/
+_load_color_set_into_live), _refresh_color_dependent_widgets and
+_reset_to_defaults.
+
+Split out of ui_builder.py unchanged -- same methods, still reached as
+`self._...` because UiBuilderMixin inherits this class.
+
+
+
+
+
+transfer_ops.py
+----------------------
+TransferMixin: the Clipboard group (Cut/Copy/Paste/Delete), the cross-pane
+Move/Copy buttons, "Make New Folder", and the low-level file-transfer
+machinery (overwrite confirmation, free-space checks, nested-selection
+dedup, and the central progress bar/Cancel/operation-label) they all
+share. That central bar is also reused by SelectionMixin for the Select
+group's recursive searches -- see _start_transfer_progress -- since only
+one such operation can ever be in flight at once.
+
+
+
+
+
+trash_compat.py
+----------------------
+Optional dependency shim: send2trash is used by delete_selected (see
+transfer_ops.py) to send files to the desktop trash instead of permanently
+deleting them. It's optional -- if it's not installed, the app still runs;
+Delete just raises a clear error instead of silently doing nothing.
+
+
+
+
+
+ui_builder.py 
+----------------------
+UiBuilderMixin: constructs every widget and layout in the app -- the two
+panes (toolbar, tree, item-count row, Select/Clipboard groups), the
+central "Transfer" group (operation label, progress bar, Copy/Move
+across-pane buttons, Cancel -- kept aligned with the Clipboard/Select
+groups' outer edges as the window/splitter resize), the shared "File
+Filter" group, and the shared "Global Options" group at the bottom. The
+Transfer group's bar/Cancel are shared by both actual transfers and the
+Select group's recursive searches (see TransferMixin/SelectionMixin) --
+there's no per-pane progress bar anymore. Pure layout/construction; the
+behavior wired up here lives in the other mixins.
+
+Two runtime-toggleable layout settings live here:
+  - self._symmetrical_buttons: when True (default), the right pane's
+    Select/Clipboard groups and surrounding buttons mirror the left
+    pane's around the vertical center. When False, the right pane uses
+    the same left-to-right order as the left pane instead of mirroring
+    it. Toggling it rebuilds the whole central widget (see _rebuild_ui).
+Split across files -- all still reached as `self._...`, since
+UiBuilderMixin inherits the mixins below:
+  - settings_tab.py      Settings tab construction (SettingsTabMixin)
+  - theme_ops.py         color/theme handlers, palette, color sets (ThemeOpsMixin)
+  - pane_builder.py      one pane's widgets + Statistics panel (PaneBuilderMixin)
+  - responsive_layout.py wide/narrow layout switching (ResponsiveLayoutMixin)
+  - constants.py         layout/style constants shared by all of the above
+                         (last section; the date-column ones live in responsive_layout.py)
+What stays in this file: the window skeleton (_build_ui/_build_main_tab/
+_rebuild_ui, UI state capture/restore), button colors/sizes, the status
+line, the File Filter and Global Options groups, and the small
+filter/clear/select-directory actions.
+
+
+
+------------------------------------------------------------------
+
+
+
+
+
+
+

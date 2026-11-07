@@ -807,6 +807,11 @@ class ThemeOpsMixin:
         self._apply_theme_widget_values(self._color_sets[theme].get("widgets", {}))
 
     def _apply_theme_palette(self, theme: str):
+        from custom_widgets import set_disabled_fade_target
+        set_disabled_fade_target(self._effective_gui_colors(theme)[1])
+        self._apply_theme_palette_impl(theme)
+
+    def _apply_theme_palette_impl(self, theme: str):
         """The actual dark/light QPalette construction -- factored out
         of _on_theme_changed so load_settings/_reset_to_defaults can
         apply a theme without going through that method's early-return-

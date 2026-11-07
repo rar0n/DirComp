@@ -758,9 +758,9 @@ class SettingsTabMixin:
         default_colors_group = QGroupBox("")
         default_colors_group_outer = QVBoxLayout(default_colors_group)
         default_colors_group_outer.addWidget(default_colors_table)
+        # Level 2 blocks of Global Settings: Theme, Options, Misc Colors.
+        global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
-        # Last Level 2 block of Global Settings (swapped with Misc Colors above it).
-        global_settings_flow.addWidget(self._settings_subsection("Global Options", global_group))
 
         # ---- File List View (Settings-tab only -- no Main-tab copy,
         # unlike everything else in this section) ----

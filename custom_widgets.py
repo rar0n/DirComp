@@ -233,6 +233,16 @@ def _bevel_edge_colors(hex_color: str, delta: int = 60) -> tuple[str, str]:
 # light themes instead of a flat, theme-blind gray.
 
 
+# GUI background the disabled buttons fade toward; set by
+# ThemeOpsMixin._apply_theme_palette whenever the window colors change.
+_DISABLED_FADE_TARGET = "#2B2B2B"
+
+
+def set_disabled_fade_target(hex_color: str):
+    global _DISABLED_FADE_TARGET
+    _DISABLED_FADE_TARGET = hex_color
+
+
 def _bevel_button_stylesheet(bg: str, fg: str) -> str:
     """Shared 3D-bevel stylesheet for every QPushButton in the app, in
     that button's own base color. Originally only the checkable
@@ -263,6 +273,10 @@ def _bevel_button_stylesheet(bg: str, fg: str) -> str:
     own color) rather than falling back to a flat native gray."""
     pressed_bg = _darken_hex(bg)
     light_edge, dark_edge = _bevel_edge_colors(bg)
+    # Disabled: same button, faded toward the GUI background.
+    dis_bg = _press_blend(bg, _DISABLED_FADE_TARGET, 0.6).name()
+    dis_fg = _press_blend(fg, _DISABLED_FADE_TARGET, 0.6).name()
+    dis_light, dis_dark = _bevel_edge_colors(dis_bg, 30)
     return (
         f"QPushButton {{"
         f" background-color: {bg}; color: {fg};"
@@ -279,10 +293,10 @@ def _bevel_button_stylesheet(bg: str, fg: str) -> str:
         f" padding: 4px 8px;"
         f"}}"
         f"QPushButton:disabled {{"
-        f" background-color: {bg}; color: {fg};"
+        f" background-color: {dis_bg}; color: {dis_fg};"
         f" border-width: 2px; border-style: solid; border-radius: 3px;"
-        f" border-top-color: {light_edge}; border-left-color: {light_edge};"
-        f" border-bottom-color: {dark_edge}; border-right-color: {dark_edge};"
+        f" border-top-color: {dis_light}; border-left-color: {dis_light};"
+        f" border-bottom-color: {dis_dark}; border-right-color: {dis_dark};"
         f" padding: 4px 8px;"
         f"}}"
     )

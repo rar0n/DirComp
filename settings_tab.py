@@ -565,6 +565,11 @@ class SettingsTabMixin:
             "fingerprint_end_spin", "Fingerprint end chunk:", self._cmp_chunk_end_kb,
             "How much of the end of each file the Fingerprint type reads. "
             "A file smaller than both chunks together is read whole.")
+        # Same label width so both spin boxes and sliders line up.
+        _lw = max(self.fingerprint_start_label.sizeHint().width(),
+                  self.fingerprint_end_label.sizeHint().width())
+        self.fingerprint_start_label.setFixedWidth(_lw)
+        self.fingerprint_end_label.setFixedWidth(_lw)
         global_grid.addLayout(fp_start_row, 14, 0, 1, 7)
         global_grid.addLayout(fp_end_row, 15, 0, 1, 7)
 

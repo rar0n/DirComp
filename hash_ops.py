@@ -183,3 +183,7 @@ class HashOpsMixin:
             button = getattr(pane, "hash_button", None) if pane is not None else None
             if button is not None:
                 button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
+            # File Op (Rename / New Folder / Delete) can't act on a snapshot.
+            group = getattr(pane, "file_op_group", None) if pane is not None else None
+            if group is not None:
+                group.setEnabled(not getattr(pane, "snapshot_file", None))

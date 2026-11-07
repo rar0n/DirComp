@@ -733,6 +733,8 @@ class PaneBuilderMixin:
             fg, bg = self._select_colors[type_key]
             btn.setStyleSheet(_bevel_button_stylesheet(bg, fg))
             pane.select_toggle_buttons[type_key] = btn
+            if type_key in ("larger", "smaller", "newer", "older"):
+                btn.setEnabled(not self._hash_mode_active())
 
         diff_folders_button = QPushButton("Diff Items")
         diff_folders_button.setCheckable(True)

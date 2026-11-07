@@ -189,6 +189,16 @@ class HashOpsMixin:
             other = self.right if pane is self.left else self.left
             snap = bool(getattr(pane, "snapshot_file", None))
             pane.tree.items_not_draggable = snap
+            # Larger/Smaller/Newer/Older mean nothing when files are
+            # compared by content.
+            for key in ("larger", "smaller", "newer", "older"):
+                btn = (getattr(pane, "select_toggle_buttons", None) or {}).get(key)
+                if btn is not None:
+                    if self._hash_mode_active() and btn.isChecked():
+                        btn.blockSignals(True)
+                        btn.setChecked(False)
+                        btn.blockSignals(False)
+                    btn.setEnabled(not self._hash_mode_active())
             # Clipboard (incl. its Copy/Move across buttons) too.
             for attr in ("file_op_group", "clipboard_group"):
                 group = getattr(pane, attr, None)

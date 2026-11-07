@@ -569,7 +569,10 @@ class SettingsMixin:
             return
         self._cmp_applied_key = key
         self._invalidate_dir_rank_cache()
-        self.update_listings(rescan_disk=False)
+        # Nothing to re-tag until a folder has been loaded (settings are
+        # applied at startup, before any listing exists).
+        if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
+            self.update_listings(rescan_disk=False)
 
     def _set_settings_status(self, message: str):
         """Settings tab's own status line (see ui_builder._build_status_

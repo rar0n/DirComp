@@ -533,7 +533,7 @@ class ListingMixin:
         this folder have" needs the real count -- see update_listings'
         own result_count reporting, which used to be off by exactly
         this much."""
-        count = len(pane.snapshot_index)
+        count = len(pane.snapshot_index or ())
         return count - 1 if pane.snapshot_root is not None else count
 
     def _listing_filter_state(self) -> tuple:

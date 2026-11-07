@@ -656,6 +656,13 @@ class SettingsTabMixin:
              lambda: self._main_button_color_for("refresh")[0],
              lambda hexc: self._on_main_button_color_changed("refresh", False, hexc),
              lambda hexc: self._on_main_button_color_changed("refresh", True, hexc)),
+            # Text colors of the folder-history drop-downs (Fg only).
+            ("History: live folder",
+             lambda: self._history_live_color, None,
+             lambda hexc: self._on_history_color_changed(False, hexc), None),
+            ("History: snapshot file",
+             lambda: self._history_snapshot_color, None,
+             lambda hexc: self._on_history_color_changed(True, hexc), None),
         ]
         default_colors_table = QTableWidget(len(_DEFAULT_COLOR_ROWS), 3)
         self._style_table_widget(default_colors_table, ["Item", "Fg", "Bg"])
@@ -705,6 +712,12 @@ class SettingsTabMixin:
         default_colors_table.item(7, 0).setToolTip(
             "The Refresh button under Global Options on the Main tab. Uses the "
             "theme's default button colors until you pick one."
+        )
+        default_colors_table.item(8, 0).setToolTip(
+            "Text color of live-folder entries in each pane's folder-history drop-down."
+        )
+        default_colors_table.item(9, 0).setToolTip(
+            "Text color of folder-snapshot (.fss) entries in each pane's folder-history drop-down."
         )
         # (Default Folder/Default File and Scrollbar used to be rows here --
         # they moved to File List View -> File List View Colors below,
@@ -1264,7 +1277,7 @@ class SettingsTabMixin:
             "missing": "Missing", "matching": "Matching", "newer": "Newer", "older": "Older",
             "smaller": "Smaller", "larger": "Larger", "diff_folders": "Diff Folders",
         }
-        comparison_colors_table = QTableWidget(len(_SELECT_KEY_TO_TAG_COLOR_KEYS), 6)
+        comparison_colors_table = QTableWidget(len(_SELECT_KEY_TO_TAG_COLOR_KEYS) + 1, 6)
         self._style_table_widget(
             comparison_colors_table,
             ["Comparison type", "File Fg", "File Bg", "Folder Fg", "Folder Bg", "Comparison Type\nSummary Text Color"],
@@ -1289,6 +1302,26 @@ class SettingsTabMixin:
                 lambda k=key: self._summary_colors[k],
                 lambda hexc, k=key: self._on_summary_color_changed(k, hexc),
             )))
+        # Extra row: files/folders without a hash yet (hash comparison
+        # types only). Not a Select-button type, so no summary color.
+        unhashed_row = len(_SELECT_KEY_TO_TAG_COLOR_KEYS)
+        unhashed_label = self._table_item("Unhashed")
+        unhashed_label.setToolTip(
+            "Hash value / Fingerprint comparison only: files and folders that "
+            "have not been hashed yet."
+        )
+        comparison_colors_table.setItem(unhashed_row, 0, unhashed_label)
+        for col, (tag, is_fg) in enumerate(
+            (("unhashed_file", True), ("unhashed_file", False),
+             ("unhashed_dir", True), ("unhashed_dir", False)), start=1,
+        ):
+            comparison_colors_table.setCellWidget(unhashed_row, col, self._center_in_cell(self._make_color_swatch(
+                lambda t=tag, f=is_fg: self._tag_color_hex(t, f),
+                lambda hexc, t=tag, f=is_fg: self._on_comparison_color_changed(t, f, hexc),
+            )))
+        dash = self._table_item("\u2014")
+        dash.setTextAlignment(Qt.AlignCenter)
+        comparison_colors_table.setItem(unhashed_row, 5, dash)
         comparison_colors_table.horizontalHeaderItem(5).setToolTip(
             "Text color of this type's count in the summary line below each File List View "
             "(\"Missing: 3 · Matching: 12 ...\"). Independent of the Select button colors."

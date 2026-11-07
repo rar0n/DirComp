@@ -97,6 +97,7 @@ class PaneBuilderMixin:
         # already-persisted history -- pane.folder_history itself is
         # plain pane-level state that survives a _rebuild_ui, but each
         # rebuild hands this widget a brand new, empty-dropdown instance.
+        entry.set_history_colors(self._history_live_color, self._history_snapshot_color)
         entry.set_history(pane.folder_history)
         # Global File Filter is only available once at least one pane
         # has a folder set -- see _sync_global_filter_enabled.

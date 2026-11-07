@@ -61,6 +61,10 @@ TAG_COLORS = {
     "directory": ("#E0E090", "blue"),
     "file": (None, None),
     "error": ("#FFB6C1", "red"),
+    # Hash comparison types only: a file/folder that has no hash yet (see
+    # Settings -> Comparison Type Colors -> "Unhashed"). Neutral greys.
+    "unhashed_file": ("#C8C8C8", "black"),
+    "unhashed_dir": ("#B0B0B0", "blue"),
 }
 
 # Custom item-data roles (stored on column 0) that support the nested,

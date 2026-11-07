@@ -11,7 +11,7 @@ import math
 import os
 
 from PySide6.QtCore import Qt, QEvent, QUrl, Signal, QMimeData, QRect, QPointF
-from PySide6.QtGui import QCursor, QDrag, QPainter, QPalette, QPolygonF
+from PySide6.QtGui import QBrush, QColor, QCursor, QDrag, QPainter, QPalette, QPolygonF
 from PySide6.QtWidgets import (
     QComboBox, QLineEdit, QTreeWidget, QAbstractItemView, QStyle, QStyleOptionViewItem,
 )
@@ -411,6 +411,13 @@ class DirDropComboBox(QComboBox):
         self._current_valid_text = value or ""
         self.setEditText(self._current_valid_text)
 
+    def set_history_colors(self, live_color, snapshot_color):
+        """Text colors of the dropdown entries: `snapshot_color` for
+        folder-snapshot files (.fss), `live_color` for live folders.
+        Applied by the next set_history()."""
+        self._history_live_color = live_color
+        self._history_snapshot_color = snapshot_color
+
     def set_history(self, paths):
         """Repopulate the dropdown list from `paths` (most-recent-first),
         leaving the box's own displayed text untouched. Signals are
@@ -425,6 +432,12 @@ class DirDropComboBox(QComboBox):
         line_edit.blockSignals(True)
         self.clear()
         self.addItems(list(paths))
+        live = getattr(self, "_history_live_color", None)
+        snap = getattr(self, "_history_snapshot_color", None)
+        for i, path in enumerate(paths):
+            color = snap if path.lower().endswith(".fss") else live
+            if color:
+                self.setItemData(i, QBrush(QColor(color)), Qt.ForegroundRole)
         self.setEditText(current)
         line_edit.blockSignals(False)
         self.blockSignals(False)

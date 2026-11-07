@@ -352,6 +352,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._status_selected_color = "#F5D400"
         if not hasattr(self, "_status_unselected_color"):
             self._status_unselected_color = None
+        if not hasattr(self, "_history_live_color"):
+            # Misc Colors -> "History: live folder" / "History: snapshot
+            # file" (Fg only): drop-down text colors of the entry combos.
+            self._history_live_color = "#FFFFFF"
+            self._history_snapshot_color = "#C8C8C8"
         if not hasattr(self, "_color_sets"):
             # One full set of every color setting per theme (see
             # _builtin_color_set). Only the *inactive* theme's entry is

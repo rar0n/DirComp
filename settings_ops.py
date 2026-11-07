@@ -483,6 +483,7 @@ class SettingsMixin:
         current folder_history -- see DirDropComboBox.set_history, which
         leaves whatever path the box is currently displaying untouched."""
         if pane.entry is not None:
+            pane.entry.set_history_colors(self._history_live_color, self._history_snapshot_color)
             pane.entry.set_history(pane.folder_history)
 
     def _on_history_entry_deleted(self, pane, path: str):

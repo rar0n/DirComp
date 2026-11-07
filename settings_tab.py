@@ -540,7 +540,7 @@ class SettingsTabMixin:
         self.hash_algorithm_combo.setToolTip("The hash function used by the Hash value and Fingerprint types.")
         hash_row.addWidget(self.hash_algorithm_combo)
         hash_row.addStretch(1)
-        global_grid.addLayout(hash_row, 13, 0, 1, 7)
+        global_grid.addLayout(hash_row, 14, 0, 1, 7)
 
         def _chunk_row(attr, label_text, value, tip):
             row = QHBoxLayout()
@@ -570,8 +570,8 @@ class SettingsTabMixin:
                   self.fingerprint_end_label.sizeHint().width())
         self.fingerprint_start_label.setFixedWidth(_lw)
         self.fingerprint_end_label.setFixedWidth(_lw)
-        global_grid.addLayout(fp_start_row, 14, 0, 1, 7)
-        global_grid.addLayout(fp_end_row, 15, 0, 1, 7)
+        global_grid.addLayout(fp_start_row, 15, 0, 1, 7)
+        global_grid.addLayout(fp_end_row, 16, 0, 1, 7)
 
         ignore_ext_row = QHBoxLayout()
         ignore_ext_row.setContentsMargins(0, 0, 0, 0)
@@ -598,7 +598,7 @@ class SettingsTabMixin:
         )
         ignore_ext_row.addWidget(self.first_name_only_cb)
         ignore_ext_row.addStretch(1)
-        global_grid.addLayout(ignore_ext_row, 16, 0, 1, 7)
+        global_grid.addLayout(ignore_ext_row, 13, 0, 1, 7)
 
         multi_row = QHBoxLayout()
         multi_row.setContentsMargins(0, 0, 0, 0)

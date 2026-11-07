@@ -1,29 +1,32 @@
-State of DirComp app file structure (pr. 2026.09.21 at 07:00)
+State of DirComp app file structure (pr. 2026.11.07 at 12:40)
 
 File                   - Lines - Comment
 --------------------------------------------------------------------------------------
-binning.py             -   400 - Pluggable "nice" binning strategies for TimelineWidget.
-constants.py           -   200 - 
-custom_widgets.py      -   950 - now also holds the slider classes
-diff_engine.py         -   468
+binning.py             -   512 - Pluggable "nice" binning strategies for TimelineWidget.
+constants.py           -   226 - 
+context_menu_ops.py    -   419 - File List View right-click menu
+custom_widgets.py      - 2,140 - now also holds the slider classes
+diff_engine.py         -   867 - comparison types, hash pairing, diff tags
 dircomp_settings.json  -   505 - The stored settings file.
-dnd_widgets.py         -   622
-listing_ops.py         - 1,770
-main.py                -   140
-pane_builder.py        - 1,305 - one pane's widgets, Statistics panel, splitter
-panes.py               -   130 - a plain state holder for DirectoryPane
-progress.py            -   172
-responsive_layout.py   -   668 - wide/narrow layout switching
-selection_ops.py       - 1,904
-settings_ops.py        -   406
-settings_tab.py        - 1,536 - Settings tab construction and helpers
-statistics_ops.py      -   828
-statistics_widget.py   - 2,043
-sync_views.py          -   560
-theme_ops.py           -   949 - color/theme handlers, palette, color sets
-transfer_ops.py        - 1,098
+dnd_widgets.py         -   956
+hash_ops.py            -   225 - per-pane Hash button: hashing, cache, progress (HashOpsMixin)
+listing_ops.py         - 1,791
+main.py                -   153
+pane_builder.py        - 1,361 - one pane's widgets, Statistics panel, splitter
+panes.py               -   166 - a plain state holder for DirectoryPane
+progress.py            -   187
+responsive_layout.py   -   704 - wide/narrow layout switching
+selection_ops.py       - 2,090
+settings_ops.py        -   617
+settings_tab.py        - 2,343 - Settings tab construction and helpers
+snapshot_ops.py        -   420 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
+statistics_ops.py      -   858
+statistics_widget.py   - 2,394
+sync_views.py          -   704
+theme_ops.py           - 1,244 - color/theme handlers, palette, color sets
+transfer_ops.py        - 1,238
 trash_compat.py        -    15
-ui_builder.py          - 1,599 - window skeleton, status line, filter and global options
+ui_builder.py          - 1,806 - window skeleton, status line, filter and global options
 
 
 
@@ -125,6 +128,18 @@ library needed), a name column that resizes to fill leftover space, and a
 GNOME/Nemo/Nautilus/Dolphin-compatible drag source (see
 "x-special/gnome-copied-files" in constants.py).
 
+
+
+
+
+hash_ops.py
+----------------------
+HashOpsMixin: the per-pane Hash button. Enumerates the pane's files (busy bar),
+hashes them with progress by bytes (cancellable), stores digests on snapshot
+nodes as node["hash"] = (comparison_key, digest), and keeps a path+size+mtime
+cache (plus an inode fallback so a renamed file keeps its hash). Also decides
+which buttons are enabled: Hash, File Op / Clipboard groups, Select buttons
+that make no sense for the current comparison/snapshot state.
 
 
 
@@ -307,6 +322,18 @@ _on_timeline_mode_changed) -- the discrete file/folder selection
 itself is shared, persistent tree state instead, not tracked per mode
 at all
 
+
+
+
+
+snapshot_ops.py
+----------------------
+SnapshotOpsMixin: .fss folder snapshots (JSON, format "dircomp-snapshot" v1).
+Saving serializes a pane's in-memory snapshot (with hashes, if any); loading
+makes the .fss path a virtual root, so panes, history and Select-group code
+treat the stored tree like a folder (_isdir / _exists understand virtual paths).
+Handles the comparison-settings mismatch prompt and warning, the info label
+above the history combo, and the Select Directory dialog that accepts .fss files.
 
 
 

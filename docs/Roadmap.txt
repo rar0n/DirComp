@@ -95,4 +95,35 @@ Folder snapshot (.fss, JSON)
    a color setting too. A small label above the combo shows the stored original
    path + root name for snapshots (hidden for live folders).
 
+==============================================================================
+Status 2026-11-07: steps 1-5 implemented and merged. Where the result differs
+from / extends the plan above:
+==============================================================================
+ - Pairing is NOT one-to-one: every file whose content exists in the other
+   folder is "matching", however many duplicates either side has. A folder whose
+   same content occurs a different number of times on each side is "Content
+   differs". "Only first part of file name" added as a second name-matching
+   option (mutually exclusive with "Ignore file extensions").
+ - Synchronize Views mirrors file selection by the comparison: by content for hash
+   types, by name stem for the two name options; several matches are all selected.
+ - Settings > Options (was Global Options; block placed after Theme): "Multi Select
+   matching files in same pane" (hash types) selects identical files when a file
+   is selected by hand (click, Ctrl/Shift-click, drag); "Same folder only" limits
+   that to the file's folder, else pane-wide (and mirrored pane-wide in the other
+   pane). Both persisted, default on.
+ - Snapshot hashes made with other settings than the current ones (or no hashes
+   at all), with a hash type selected: NOTHING is compared (no fall-back to
+   name/size/date any more). Items show the "Hashed, not compared" colors (new
+   Comparison Type Colors row, also used for a hashed pane with nothing to
+   compare against / Dual Pane off), a warning shows in the status label, and the
+   comparison Select buttons are disabled.
+ - Larger/Smaller/Newer/Older Select buttons are disabled while files are
+   compared by content.
+ - "File Parent" renamed "Item Parent": adds the parent of every selected item
+   (files and folders), one level per press, additively.
+ - Disabled buttons (all bevel-styled ones) fade toward the GUI background.
+ - Select buttons read only the cached snapshot data (no disk access); snapshot
+   panes are read-only (File Op, Clipboard, Cut/Copy/Paste, Open/Properties and
+   drag-out disabled, also in the narrow layout).
+
 Later (phase 3 / loose ideas): see the original idea list kept outside this file.

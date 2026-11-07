@@ -149,10 +149,23 @@ class HashOpsMixin:
                     hashed += 1
         finally:
             self._finish_transfer_progress(result_count=hashed)
-        if failed:
-            self._set_transfer_label(f"{hashed} hashed, {failed} could not be read")
         self._invalidate_dir_rank_cache()
         self.update_listings(rescan_disk=False)
+        # Said after the re-tag (which overwrites the status text): files
+        # only compare once BOTH panes' files are hashed, so when the other
+        # pane still has unhashed files nothing changes color yet -- say so.
+        message = f"{hashed} hashed"
+        if failed:
+            message += f", {failed} could not be read"
+        other = self.right if pane is self.left else self.left
+        waiting = 0
+        if other.snapshot_index:
+            waiting = sum(1 for n in other.snapshot_index.values()
+                          if not n["is_dir"] and self._node_hash(n) is None)
+        if waiting and not progress.cancelled:
+            message += f". The other pane still has {waiting} unhashed file{'s' if waiting != 1 else ''}; " \
+                       "hash it too to compare."
+        self._set_transfer_label(message, pane)
 
     def _update_hash_buttons_enabled(self, operation_enabled: bool = True):
         """Hash buttons only work for the hash comparison types (and not

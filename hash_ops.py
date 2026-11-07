@@ -132,6 +132,7 @@ class HashOpsMixin:
                     return progress.advance(units) if units else progress.pump()
 
                 cache = self.__dict__.setdefault("_hash_cache", {})
+                by_inode = self.__dict__.setdefault("_hash_cache_by_inode", {})
                 for i, node in enumerate(todo, 1):
                     if label is not None and time.monotonic() - last_label > 0.25:
                         last_label = time.monotonic()
@@ -146,6 +147,11 @@ class HashOpsMixin:
                     node["hash"] = (key, digest)
                     cache[os.path.normpath(node["full_path"])] = (
                         node["size"], int(node["mtime"]), key, digest)
+                    try:
+                        st = os.stat(node["full_path"])
+                        by_inode[(st.st_dev, st.st_ino, st.st_size, int(st.st_mtime))] = (key, digest)
+                    except OSError:
+                        pass
                     hashed += 1
         finally:
             self._finish_transfer_progress(result_count=hashed)

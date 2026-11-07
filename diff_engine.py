@@ -82,7 +82,7 @@ class DiffEngineMixin:
         index[norm] = node
         if not is_dir:
             node["size"] = st.st_size
-            self._attach_cached_hash(node, norm)
+            self._attach_cached_hash(node, norm, st)
             return node
 
         try:
@@ -161,17 +161,25 @@ class DiffEngineMixin:
             return stored[1]
         return None
 
-    def _attach_cached_hash(self, node, norm_path):
+    def _attach_cached_hash(self, node, norm_path, st=None):
         """Called while a snapshot is built: give a file node back its
         hash from the app-wide cache, if the file's size and mtime are
         still what they were when it was hashed (and the settings match,
-        which _node_hash checks)."""
+        which _node_hash checks). Looked up by path first; failing that by
+        (device, inode, size, mtime), so a file that was only renamed or
+        moved within its filesystem keeps its hash."""
         cache = getattr(self, "_hash_cache", None)
         if not cache:
             return
         entry = cache.get(norm_path)
         if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
             node["hash"] = (entry[2], entry[3])
+            return
+        if st is not None:
+            entry = getattr(self, "_hash_cache_by_inode", {}).get(
+                (st.st_dev, st.st_ino, st.st_size, int(st.st_mtime)))
+            if entry:
+                node["hash"] = entry
 
     def _pair_dir_files(self, node_a, node_b):
         """Hash comparison: pair the FILES of two counterpart folders by
@@ -330,13 +338,9 @@ class DiffEngineMixin:
                     return "unhashed_file"
                 if state == "matched":
                     return "common_file"
-                size_direction, date_direction = self._diff_axes_vs_node(
-                    other_node, False, size_str, date_str, date_field)
-                if size_direction is None and date_direction is None:
-                    return "diff_content_file"
-                if date_direction is not None:
-                    return f"diff_date_{date_direction}_file"
-                return f"diff_size_{size_direction}_file"
+                # Same name, different content: always "Content differs",
+                # whatever the sizes and dates say.
+                return "diff_content_file"
         other_node = self._counterpart_node(other_full, is_dir)
         if other_node is None:
             return "missing_dir" if is_dir else "missing_file"
@@ -392,8 +396,7 @@ class DiffEngineMixin:
                     return AXES_UNHASHED
                 if state == "matched":
                     return (None, None)
-                axes = self._diff_axes_vs_node(other_node, False, size_str, date_str, date_field)
-                return AXES_CONTENT_DIFFERS if axes == (None, None) else axes
+                return AXES_CONTENT_DIFFERS
         other_node = self._counterpart_node(other_full, is_dir) if other_full else None
         if other_node is None:
             return None
@@ -638,10 +641,11 @@ class DiffEngineMixin:
                 if state == "missing":
                     saw_missing = True
                     continue
-                rank, direction = self._file_diff_rank(child_a, other, date_field)
-                if rank == 0:
-                    # Same size and date but different content.
-                    rank, direction = 1, "larger"
+                # Same name, different content: a difference whatever the
+                # sizes and dates say (the direction is only a placeholder;
+                # with Recursive Folder Contents on, every differing folder
+                # shows the Content differs color).
+                rank, direction = 1, "larger"
                 if rank > best_rank:
                     best_rank = rank
                     best_directions = {direction: 1}

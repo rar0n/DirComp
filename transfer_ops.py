@@ -434,6 +434,8 @@ class TransferMixin:
         self._do_copy_or_cut(pane, cut=True)
 
     def _do_copy_or_cut(self, pane: DirectoryPane, cut: bool):
+        if self._snapshot_blocks(pane, what="Cut/Copy"):
+            return
         selected_items = pane.tree.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "Selection Error", "No items selected.")
@@ -463,6 +465,8 @@ class TransferMixin:
                     item.setFont(col, font)
 
     def delete_selected(self, pane: DirectoryPane):
+        if self._snapshot_blocks(pane, what="Delete"):
+            return
         if not SEND2TRASH_AVAILABLE:
             QMessageBox.warning(
                 self, "Delete",
@@ -807,6 +811,8 @@ class TransferMixin:
         return errors, dest_paths
 
     def rename_selected(self, pane: DirectoryPane):
+        if self._snapshot_blocks(pane, what="Rename"):
+            return
         """Rename the single selected item. With Synchronize Views on,
         also renames its counterpart on the other pane -- found by the
         same relative path under that pane's own root, the same
@@ -870,6 +876,8 @@ class TransferMixin:
             QMessageBox.warning(self, "Rename completed with errors", "\n".join(errors))
 
     def create_new_folder(self, pane: DirectoryPane):
+        if self._snapshot_blocks(pane, what="New Folder"):
+            return
         """Create a new folder in `pane`'s current directory. With
         Synchronize Views on, also creates one of the same name in the
         other pane's current directory (if it has a valid one)."""
@@ -916,6 +924,8 @@ class TransferMixin:
             QMessageBox.warning(self, "New Folder", "\n".join(errors))
 
     def transfer_between_panes(self, source_pane: DirectoryPane, dest_pane: DirectoryPane, move: bool):
+        if self._snapshot_blocks(source_pane, dest_pane, what="Copy/Move"):
+            return
         selected_items = source_pane.tree.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "Selection Error", "No items selected.")
@@ -1018,6 +1028,8 @@ class TransferMixin:
             QMessageBox.warning(self, "Transfer completed with errors", "\n".join(errors))
 
     def paste_from_clipboard(self, pane: DirectoryPane, target_dir: "str | None" = None):
+        if self._snapshot_blocks(pane, what="Paste"):
+            return
         # target_dir: where to paste (the right-click menu passes the
         # clicked folder / the clicked file's parent); None = the pane's
         # own root folder, as the Clipboard group's Paste button does.
@@ -1092,6 +1104,8 @@ class TransferMixin:
             QMessageBox.warning(self, "Paste completed with errors", "\n".join(errors))
 
     def paste_folders_from_clipboard(self, pane: DirectoryPane, target_dirs: "list[str] | None" = None):
+        if self._snapshot_blocks(pane, what="Paste Folders"):
+            return
         """Paste Folders: like Paste, but recreates only the *directory*
         structure from whatever's cut/copied -- no files. With Recursive
         Folder Selections on, every subfolder at any depth under a

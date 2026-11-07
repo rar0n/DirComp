@@ -940,8 +940,8 @@ class DirDropTreeWidget(QTreeWidget):
 
     def startDrag(self, supportedActions):
         items = self.selectedItems()
-        if not items:
-            return
+        if not items or getattr(self, "items_not_draggable", False):
+            return  # (a snapshot's items don't exist on disk)
         urls = [QUrl.fromLocalFile(p) for p in
                 (item.data(0, PATH_ROLE) for item in items) if p]
         if not urls:

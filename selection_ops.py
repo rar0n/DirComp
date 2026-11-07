@@ -1343,7 +1343,7 @@ class SelectionMixin:
         # "0 items (duration)" (see _append_operation_duration).
         self._append_operation_duration()
 
-    def _select_ancestor_folders(self, pane: DirectoryPane, full_walk: bool):
+    def _select_ancestor_folders(self, pane: DirectoryPane, full_walk: bool, include_dirs: bool = False):
         """Shared engine behind File Parents and Folder Parents.
 
         With full_walk off, only selected FILES contribute, and only
@@ -1377,7 +1377,7 @@ class SelectionMixin:
         self._begin_timed_operation(pane)
         parent_paths = set()
         for item in pane.tree.selectedItems():
-            if not full_walk and item.data(0, IS_DIR_ROLE):
+            if not full_walk and not include_dirs and item.data(0, IS_DIR_ROLE):
                 continue
             parent = item.parent()
             while parent is not None:
@@ -1408,12 +1408,12 @@ class SelectionMixin:
             self._show_result_count(0)
 
     def select_file_parents(self, pane: DirectoryPane):
-        """File Parent: always one level up, files only -- regardless of
-        Recursive Folder Selections, same as All Parents always walks
-        the whole chain regardless of it (see _select_ancestor_folders).
-        A selected file's parent folder is what this button is named
-        for; it no longer changes behavior based on that checkbox."""
-        self._select_ancestor_folders(pane, full_walk=False)
+        """Item Parent (formerly File Parent): adds the parent folder of
+        every selected item -- files and folders alike -- one level up,
+        additively (the selection stays), regardless of Recursive Folder
+        Selections. Each press climbs one more level, since the parents
+        just added are selected items too."""
+        self._select_ancestor_folders(pane, full_walk=False, include_dirs=True)
 
     def select_folder_parents(self, pane: DirectoryPane):
         """Folder Parents: one-click version of what File Parents does

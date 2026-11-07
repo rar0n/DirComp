@@ -184,6 +184,17 @@ class HashOpsMixin:
             if button is not None:
                 button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
             # File Op (Rename / New Folder / Delete) can't act on a snapshot.
-            group = getattr(pane, "file_op_group", None) if pane is not None else None
-            if group is not None:
-                group.setEnabled(not getattr(pane, "snapshot_file", None))
+            if pane is None:
+                continue
+            other = self.right if pane is self.left else self.left
+            snap = bool(getattr(pane, "snapshot_file", None))
+            pane.tree.items_not_draggable = snap
+            # Clipboard (incl. its Copy/Move across buttons) too.
+            for attr in ("file_op_group", "clipboard_group"):
+                group = getattr(pane, attr, None)
+                if group is not None:
+                    group.setEnabled(not snap)
+            # A live pane can't copy/move INTO a snapshot pane either.
+            into_snap = bool(getattr(other, "snapshot_file", None))
+            for b in (getattr(pane, "_across_buttons", None) or {}).values():
+                b.setEnabled(not into_snap)

@@ -1876,7 +1876,7 @@ class SettingsTabMixin:
             "select_all": "Select All", "clear": "Clear", "missing": "Missing",
             "newer": "Newer", "smaller": "Smaller", "matching": "Matching",
             "older": "Older", "larger": "Larger", "diff_folders": "Diff Items",
-            "file_parent": "File Parent", "all_parents": "All Parents",
+            "file_parent": "Item Parent", "all_parents": "All Parents",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)
         self._style_table_widget(select_colors_table, ["Button", "Fg", "Bg"])

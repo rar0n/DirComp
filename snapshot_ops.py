@@ -91,6 +91,16 @@ class SnapshotOpsMixin:
             return node is not None
         return os.path.exists(path)
 
+    def _snapshot_blocks(self, *panes, what="This") -> bool:
+        """True (after telling the user) if any of `panes` shows a
+        snapshot: snapshots are read-only, so file operations on or into
+        them are refused."""
+        for pane in panes:
+            if pane is not None and getattr(pane, "snapshot_file", None):
+                self._show_warning_status(pane, f"{what} is not available for a snapshot (it is read-only).")
+                return True
+        return False
+
     def _snapshot_hashes_ok(self) -> bool:
         """False if a loaded snapshot cannot take part in a hash
         comparison under the current settings (saved without hashes, or

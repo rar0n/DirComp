@@ -900,7 +900,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
     def _uniform_button_size(self) -> tuple[int, int]:
         """(width, height) shared by essentially every button in the app
         -- sized to fit the longest label among the Select group's own
-        buttons ("Diff Folders"/"Select All"/"File Parent"), plus
+        buttons ("Diff Folders"/"Select All"/"Item Parent"), plus
         padding for the 3D bevel border and a bit of breathing room (one
         average character width extra, past the tightest fit, since
         "Diff Folders" was still clipping at the previous padding) --
@@ -911,7 +911,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if not hasattr(self, "_uniform_button_dims"):
             fm = QFontMetrics(self.font())
             longest = max(
-                fm.horizontalAdvance(s) for s in ("Diff Folders", "Select All", "File Parent", "All Parents")
+                fm.horizontalAdvance(s) for s in ("Diff Folders", "Select All", "Item Parent", "All Parents")
             )
             width = longest + 14 + fm.averageCharWidth()
             height = fm.height() + 10

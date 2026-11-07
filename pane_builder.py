@@ -322,6 +322,7 @@ class PaneBuilderMixin:
         pane.up_button = up_button
 
         select_button = QPushButton("Select Directory")
+        select_button.setToolTip("Also load snapshot\n(or drag and drop into views)")
         select_button.setFixedHeight(uniform_h)
         select_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("select_dir")))
         select_button.clicked.connect(lambda checked=False, p=pane: self.select_directory(p))
@@ -747,12 +748,12 @@ class PaneBuilderMixin:
         # central Transfer group instead of a per-pane bar (see
         # SelectionMixin._run_select) -- only one operation can ever be
         # running at once anyway, so one shared bar/Cancel does for both.
-        select_parents_button = QPushButton("File Parent")
+        select_parents_button = QPushButton("Item Parent")
         select_parents_button.setToolTip(
-            "Select the parent folder of every currently selected FILE "
-            "(folders in the current selection are ignored), one level "
-            "up -- always, regardless of the Recursive Folder Selections "
-            "setting."
+            "Add the parent folder of every currently selected item "
+            "(files and folders), one level up. The current selection "
+            "stays; press again to climb another level. Works regardless "
+            "of the Recursive Folder Selections setting."
         )
         select_parents_button.clicked.connect(lambda checked=False, p=pane: self.select_file_parents(p))
         select_parents_button.setFixedSize(_select_button_width, _select_button_height)

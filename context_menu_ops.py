@@ -221,8 +221,10 @@ class ContextMenuMixin:
         # and would leave any QTreeWidgetItem reference dangling.
         paths = [p for p in (it.data(0, PATH_ROLE) for it in selected) if p]
         targets = self._paste_targets_for_selection(pane, clicked, selected)
-        has_sel = bool(paths)
-        can_paste = self._clipboard_has_files()
+        # A snapshot's items don't exist on disk: no clipboard, open or
+        # properties actions for them.
+        has_sel = bool(paths) and not getattr(pane, "snapshot_file", None)
+        can_paste = self._clipboard_has_files() and not getattr(pane, "snapshot_file", None)
 
         handlers = {}
         menu = QMenu(tree)

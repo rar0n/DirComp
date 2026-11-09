@@ -4,6 +4,8 @@ Compare two folders side-by-side
 
 WIP! (Work in progress)
 
+<img width="1633" height="1239" alt="image" src="https://github.com/user-attachments/assets/e7980ea4-9a37-4a2b-9873-bce7c9a48825" />
+
 
 ### Features
 

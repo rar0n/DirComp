@@ -106,10 +106,10 @@ Basically, you set two "root" folders, one in each pane (left / right pane) view
  - Hash value (A few different to choose between)
  - Fingerprint
 
-Name, size and date is the most basic method. It might mis-take same-named files for the same file (but shows date or size difference). It might be sufficient, depending on use case.
+Name, size and date is the most basic method. It might mistake same-named files for the same file (but shows date or size difference). It might be sufficient, depending on use case.
 
 Hash value is the slowest by far, but also the most accurate.
 
-Fingerprint is a shortened hash value, only hashing a start and end hash of a file (conceivably it could be altered in the middle with the same size and fingerprint value).
+Fingerprint is a shortened hash value, only hashing a start and end chunk of a file (conceivably it could be altered in the middle with the same size and fingerprint value).
 
 

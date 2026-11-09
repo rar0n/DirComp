@@ -13,19 +13,19 @@ Basically
 
  - Compare two folders side-by-side / manually synchronize their contents
  - Color coded highlights
- - Statistics View of files or folders timeline or sizes
- - Select files based on comparison state, file name, date, size
- - Select files visually from Statistics View mode (file dates or sizes)
- - Paste files relative to their location from a root folder
- - Multi-select files in different folders and paste them in their respective folders in one go
+ - Statistics View timeline or size bar char overview of files or folders
+ - Select files based on time or size in Statistics View
+ - Synchronize selection of both panes (if the corresponding item (files or folders) exists in the other pane)
+ - Pastes multi-selected files from one pane automatically in their respective relative folders in the other pane
  - Symmetrical (ish) GUI, or not, depending on settings.
  - Color customization (theme colors, custom colors for most buttons etc.)
+ - Snapshop of folders (see what was there, can also be used for comparisons, selections)
 
 
 ### Road map / planned wish list / Maybe
 
  - Duplicate finder in same root folder (it kind of has currently if you select a hashing comparison)
-
+ - Use snapshots as nitial cached file hashes (to avoid re-hash files).
 
 ### Vibe coded
 
@@ -94,3 +94,22 @@ Requires Python 3.10 or newer (I think)
 For starters I suggest making 2 "dummy" folders with unimportant files and folders in them, and play with the software to see how it works.
 
 Basically, you set two "root" folders, one in each pane (left / right pane) view, and can compare their contents, copy / move files or folders between them, etc.
+
+### Settings tab
+
+#### Global Settings
+
+##### Options
+
+###### Comparison type
+ - Name, size and date
+ - Hash value (A few different to choose between)
+ - Fingerprint
+
+Name, size and date is the most basic method. It might mis-take same-named files for the same file (but shows date or size difference). It might be sufficient, depending on use case.
+
+Hash value is the slowest by far, but also the most accurate.
+
+Fingerprint is a shortened hash value, only hashing a start and end hash of a file (conceivably it could be altered in the middle with the same size and fingerprint value).
+
+

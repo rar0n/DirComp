@@ -89,13 +89,15 @@ Requires Python 3.10 or newer (I think)
 
 ## Usage:
 
-(To be written...)
+(To be written... but for now these short instructions will have to do)
 
-For starters I suggest making 2 "dummy" folders with unimportant files and folders in them, and play with the software to see how it works.
+For starters I suggest making 2 dummy test folders with unimportant files and folders in them, some of which are copies of each other's contents. Then just play with the software to see how it works.
 
 Basically, you set two "root" folders, one in each pane (left / right pane) view, and can compare their contents, copy / move files or folders between them, etc.
 
 ### Settings tab
+
+Sets Theme, lots of custom colors for highigths and other stuff.
 
 #### Global Settings
 
@@ -108,8 +110,8 @@ Basically, you set two "root" folders, one in each pane (left / right pane) view
 
 Name, size and date is the most basic method. It might mistake same-named files for the same file (but shows date or size difference). It might be sufficient, depending on use case.
 
-Hash value is the slowest by far, but also the most accurate.
+Hash value is the slowest by far initially as it needs to hash the complete files.
 
-Fingerprint is a shortened hash value, only hashing a start and end chunk of a file (conceivably it could be altered in the middle with the same size and fingerprint value).
+Fingerprint is a shortened hash value, very fast but it's only hashing the file size and start and end chunks of a file (conceivably it could be altered in the middle while still having the same file size and fingerprint value, and a difference will be unnoticed and ignored as such).
 
 

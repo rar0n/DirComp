@@ -753,10 +753,16 @@ class SelectionMixin:
             # "Total:", "items" and the parentheses are left uncolored so
             # they follow the theme's normal text color.
             noun = "item" if total_count == 1 else "items"
-            total_items_label.setText(
-                f"Total: {self._numeric_span(total_count)} {noun} "
-                f"({self._numeric_span(self.format_size(total_size))})"
-            )
+            nbsp = "\u00a0"
+            size_text = self.format_size(total_size).replace(" ", nbsp)
+            # Words that belong together stay together when the label wraps
+            # (see _render_toolbar_labels).
+            pane._total_atoms = [
+                ("Total:", "Total:"),
+                (f"{total_count}{nbsp}{noun}", f"{self._numeric_span(total_count)}{nbsp}{noun}"),
+                (f"({size_text})", f"({self._numeric_span(size_text)})"),
+            ]
+            self._render_toolbar_labels()
         if count_label:
             pane._last_type_counts = counts
             self._render_type_counts(pane)
@@ -783,13 +789,15 @@ class SelectionMixin:
             parts.append((plain, f'<span style="color:{color};">{plain}</span>'))
         return parts
 
-    def _type_count_split(self, widths: list, lines: int) -> list:
+    def _type_count_split(self, widths: list, lines: int, sep: int = None) -> list:
         """The consecutive split of the per-type counts into `lines` lines
         with the narrowest widest line: ([[part indexes] per line],
-        widest line px). `widths` are the parts' own widths."""
+        widest line px). `widths` are the parts' own widths; `sep` the
+        width of what goes between two parts on a line."""
         from itertools import combinations
         count = len(widths)
-        sep = self._type_count_separator_width
+        if sep is None:
+            sep = self._type_count_separator_width
         best = None
         for breaks in combinations(range(1, count), min(lines, count) - 1):
             bounds = (0, *breaks, count)
@@ -846,6 +854,79 @@ class SelectionMixin:
                     pane.count_label.setMinimumHeight(height)
         except RuntimeError:
             pass  # widgets from before a UI rebuild, already deleted
+
+    # ---------------------------------------------- Toolbar total/free labels
+
+    def _render_toolbar_labels(self):
+        """Lays out the "Total: N items (size)" and "Free: size" labels on
+        the toolbar row above each file list: on one line while they fit
+        between the buttons, otherwise on two or three lines. Words that
+        belong together stay together ("120 items", "(56.7 MB)"). Like the
+        per-type counts (_render_all_type_counts), both panes always get
+        the same number of lines so their layouts stay in step."""
+        left = getattr(self, "left", None)
+        if left is None or getattr(left, "total_items_label", None) is None:
+            return
+        panes = [left]
+        right = getattr(self, "right", None)
+        if self._dual_pane_enabled and right is not None and getattr(right, "total_items_label", None) is not None:
+            panes.append(right)
+        try:
+            from PySide6.QtGui import QFont, QFontMetrics
+            plans = []
+            for pane in panes:
+                total_atoms = getattr(pane, "_total_atoms", None) or []
+                free_atoms = getattr(pane, "_free_atoms", None) or []
+                font = QFont(pane.total_items_label.font())
+                font.setBold(True)
+                metrics = QFontMetrics(font)
+                space = metrics.horizontalAdvance(" ")
+                total_w = [metrics.horizontalAdvance(plain) for plain, _html in total_atoms]
+                free_w = [metrics.horizontalAdvance(plain) for plain, _html in free_atoms]
+                buttons = (
+                    pane.up_button, pane.select_button, pane.save_snapshot_button,
+                    pane.hash_button, pane.clear_view_button,
+                )
+                fixed = sum(b.sizeHint().width() for b in buttons) + 3 * 6 + 8
+                spacing = pane._toolbar_layout.spacing() if getattr(pane, "_toolbar_layout", None) else 6
+                fixed += 3 * max(0, spacing - 6)
+                avail = pane.tree.width()
+                longest = max(len(total_atoms), len(free_atoms), 1)
+                needed = longest
+                for lines in range(1, longest + 1):
+                    widest = 0
+                    for widths in (total_w, free_w):
+                        if widths:
+                            widest += self._type_count_split(widths, min(lines, len(widths)), space)[1]
+                    if fixed + widest <= avail:
+                        needed = lines
+                        break
+                plans.append((pane, total_atoms, free_atoms, total_w, free_w, space, needed, metrics.height()))
+            lines = max(plan[6] for plan in plans)
+            for pane, total_atoms, free_atoms, total_w, free_w, space, _needed, line_height in plans:
+                for label, atoms, widths in (
+                    (pane.total_items_label, total_atoms, total_w),
+                    (pane.free_space_label, free_atoms, free_w),
+                ):
+                    if widths:
+                        groups, _widest = self._type_count_split(widths, min(lines, len(widths)), space)
+                        text = "<br>".join(" ".join(atoms[i][1] for i in group) for group in groups)
+                    else:
+                        text = ""
+                    if label.text() != text:
+                        label.setText(text)
+                    label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+                    height = lines * line_height
+                    if label.minimumHeight() != height:
+                        label.setMinimumHeight(height)
+        except (RuntimeError, AttributeError):
+            pass  # widgets from before a UI rebuild, or not built yet
+
+    def _relayout_pane_labels(self):
+        """Re-wraps every label that wraps with its pane's width -- called
+        when a pane's file list widget is resized."""
+        self._render_all_type_counts()
+        self._render_toolbar_labels()
 
     # ------------------------------------------------------ Search engine
 

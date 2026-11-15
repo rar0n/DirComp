@@ -730,11 +730,13 @@ class ListingMixin:
         if path and not self._is_snapshot_path(path) and os.path.isdir(path):
             try:
                 free = shutil.disk_usage(path).free
-                pane.free_space_label.setText(f"Free: {self._numeric_span(self.format_size(free))}")
+                size_text = self.format_size(free).replace(" ", "\u00a0")
+                pane._free_atoms = [("Free:", "Free:"), (size_text, self._numeric_span(size_text))]
             except OSError:
-                pane.free_space_label.setText("")
+                pane._free_atoms = []
         else:
-            pane.free_space_label.setText("")
+            pane._free_atoms = []
+        self._render_toolbar_labels()
 
     @staticmethod
     def _detach_all_children(tree):

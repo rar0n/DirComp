@@ -387,6 +387,8 @@ class PaneBuilderMixin:
         total_items_label.setStyleSheet("font-weight: bold;")
         total_items_label.setTextFormat(Qt.TextFormat.RichText)
         pane.total_items_label = total_items_label
+        pane._total_atoms = [("Total:", "Total:"), ("0\u00a0items", "0\u00a0items")]
+        pane._free_atoms = []
 
         # Roughly a third/two-thirds of the way across the row between
         # Select Directory and Clear view -- three equal stretch spans
@@ -395,6 +397,7 @@ class PaneBuilderMixin:
         # actual pixel widths. Mirrored right pane (Symmetrical GUI on)
         # swaps which label comes first, so the two positions swap too.
         toolbar_layout = QHBoxLayout()
+        pane._toolbar_layout = toolbar_layout
         if layout_left:
             toolbar_layout.addWidget(up_button)
             toolbar_layout.addWidget(select_button)
@@ -584,8 +587,8 @@ class PaneBuilderMixin:
         # on either pane's splitter onto the other pane's splitter and
         # onto the Settings tab's file_list_ratio_spin, and vice versa.
         # Resizing it re-wraps the per-type counts under the tree (see
-        # SelectionMixin._render_all_type_counts).
-        file_list_widget = ResizeNotifyWidget(self._render_all_type_counts)
+        # SelectionMixin._relayout_pane_labels).
+        file_list_widget = ResizeNotifyWidget(self._relayout_pane_labels)
         file_list_widget.setLayout(file_list_layout)
         stats_widget = QWidget()
         stats_widget.setLayout(stats_layout)

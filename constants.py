@@ -163,6 +163,10 @@ _CLUSTER_V_GAP = 4
 # the groups sit as close together as they can (their own frames
 # touching); raise it for breathing room between them.
 _CLUSTER_GROUP_GAP = 0
+# Left/right padding between a button group's frame and its buttons (the
+# style's default is 9 px plus the frame) -- kept small so neighbouring
+# groups' buttons sit close together.
+_CLUSTER_GROUP_PAD = 3
 # Settings tab's small color-table column headers (Item/Fg/Bg/...) --
 # bold alone still read at the same point size as the rest of the row,
 # so a size bump goes here too, distinct from (and smaller than) the

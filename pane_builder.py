@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QHeaderView, QLabel, QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget,
 )
 
-from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_V_GAP, _DISABLED_CHECKBOX_STYLE
+from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_GROUP_PAD, _CLUSTER_V_GAP, _DISABLED_CHECKBOX_STYLE
 from custom_widgets import (
     InvertButton, ResizeNotifyWidget, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
     _ThemedScrollBar, _bevel_button_stylesheet,
@@ -949,6 +949,10 @@ class PaneBuilderMixin:
         pane.cluster_container = cluster_container
         for group in (select_group, file_op_group, clipboard_group):
             group.setParent(cluster_container)
+            margins = group.layout().contentsMargins()
+            group.layout().setContentsMargins(
+                _CLUSTER_GROUP_PAD, margins.top(), _CLUSTER_GROUP_PAD, margins.bottom()
+            )
         pane._cluster_applied = None
         pane._cluster_size_cache = {}
         pane._cluster_arrangement_cache = {}

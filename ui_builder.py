@@ -49,7 +49,7 @@ from dnd_widgets import DirDropLineEdit, DirDropTreeWidget
 from statistics_widget import TimelineWidget, DEFAULT_BIN_COUNT, DEFAULT_LABEL_FONT_PT, TICK_LABEL_ANGLE_DEG
 from listing_ops import COL_MODIFIED, COL_CHANGED, COL_ACCESSED
 from custom_widgets import (
-    SELECTION_HIGHLIGHT_COLOR, _INVERT_BUTTON_COLORS, _SELECT_KEY_TO_TAG_COLOR_KEYS,
+    SELECTION_HIGHLIGHT_COLOR, EqualSplitLayout, _INVERT_BUTTON_COLORS, _SELECT_KEY_TO_TAG_COLOR_KEYS,
     _DEFAULT_SELECT_COLORS, _SCROLLBAR_COLORS,
     _DEFAULT_MAIN_BUTTON_COLORS, _MAIN_BUTTON_ICON_KINDS,
     _STATS_BUTTON_KEYS, _THEME_DEFAULT_MAIN_BUTTON_KEYS,
@@ -412,13 +412,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # self.right.tree etc. are real, live widgets) -- just not shown,
         # so the left pane gets the freed width.
         panes_row = QWidget()
-        panes_layout = QHBoxLayout(panes_row)
-        panes_layout.setContentsMargins(0, 0, 0, 0)
-        panes_layout.setSpacing(_PANE_GAP)
+        panes_layout = EqualSplitLayout(panes_row, _PANE_GAP)
         left_widget = self._build_directory_widgets(self.left)
         right_widget = self._build_directory_widgets(self.right)
-        panes_layout.addWidget(left_widget, 1)
-        panes_layout.addWidget(right_widget, 1)
+        panes_layout.addWidget(left_widget)
+        panes_layout.addWidget(right_widget)
         right_widget.setVisible(self._dual_pane_enabled)
         self._panes_row = panes_row
         main_layout.addWidget(panes_row, stretch=1)
@@ -429,16 +427,21 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # pane's right edge and Global Options sits flush right in the
         # right half. Dual Pane off: the filter takes the width Global
         # Options (at its natural size, flush right) leaves over.
-        bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(_PANE_GAP)
-        bottom_row.addWidget(self._build_filter_frame(), 1)
+        if self._dual_pane_enabled:
+            bottom_row = EqualSplitLayout(None, _PANE_GAP)
+        else:
+            bottom_row = QHBoxLayout()
+            bottom_row.setSpacing(_PANE_GAP)
+        bottom_row.addWidget(self._build_filter_frame())
         options_holder = QWidget()
         holder_layout = QHBoxLayout(options_holder)
         holder_layout.setContentsMargins(0, 0, 0, 0)
         global_options = self._build_global_options_group()
         holder_layout.addWidget(global_options)
         holder_layout.setAlignment(global_options, Qt.AlignRight)
-        bottom_row.addWidget(options_holder, 1 if self._dual_pane_enabled else 0)
+        bottom_row.addWidget(options_holder)
+        if not self._dual_pane_enabled:
+            bottom_row.setStretch(0, 1)  # the filter takes what Global Options leaves
         main_layout.addLayout(bottom_row)
         self._bottom_row_layout = bottom_row
 

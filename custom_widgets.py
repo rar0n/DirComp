@@ -2156,3 +2156,75 @@ class ResizeNotifyWidget(QWidget):
                 self._on_resize()
             except RuntimeError:
                 pass  # a callback target from before a UI rebuild, already deleted
+
+
+class EqualSplitLayout(QLayout):
+    """Gives each of its visible items exactly the same width (and the full
+    height), whatever their own size hints or minimum widths are -- a plain
+    QHBoxLayout with equal stretch factors only splits evenly while every
+    item is above its own minimum, and starts shrinking one side first as
+    soon as the two differ. Any odd pixel goes into the gap, so the last
+    item always ends flush at the right edge. A hidden item takes no room
+    (the remaining ones share the width). Used for the two panes and for
+    the bottom row beneath them, so their halves line up."""
+
+    def __init__(self, parent=None, spacing: int = 6):
+        super().__init__(parent)
+        self._items = []
+        self._gap = spacing
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):
+        self._items.append(item)
+        self.invalidate()
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self._items):
+            item = self._items.pop(index)
+            self.invalidate()
+            return item
+        return None
+
+    def expandingDirections(self):
+        return Qt.Horizontal | Qt.Vertical
+
+    def _visible(self):
+        return [item for item in self._items if not item.isEmpty()]
+
+    def _combined(self, size_of) -> QSize:
+        visible = self._visible()
+        if not visible:
+            return QSize(0, 0)
+        sizes = [size_of(item) for item in visible]
+        width = max(s.width() for s in sizes) * len(visible) + self._gap * (len(visible) - 1)
+        height = max(s.height() for s in sizes)
+        margins = self.contentsMargins()
+        return QSize(width + margins.left() + margins.right(), height + margins.top() + margins.bottom())
+
+    def sizeHint(self):
+        return self._combined(lambda item: item.sizeHint().expandedTo(item.minimumSize()))
+
+    def minimumSize(self):
+        return self._combined(lambda item: item.minimumSize())
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        visible = self._visible()
+        if not visible:
+            return
+        margins = self.contentsMargins()
+        area = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
+        count = len(visible)
+        width = max(0, (area.width() - self._gap * (count - 1)) // count)
+        # Odd leftover pixels go into the last gap.
+        leftover = max(0, area.width() - self._gap * (count - 1) - width * count)
+        x = area.x()
+        for index, item in enumerate(visible):
+            item.setGeometry(QRect(x, area.y(), width, area.height()))
+            x += width + self._gap + (leftover if index == count - 2 else 0)

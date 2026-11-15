@@ -583,7 +583,9 @@ class PaneBuilderMixin:
         # this one pane -- see _set_file_list_ratio, which mirrors a drag
         # on either pane's splitter onto the other pane's splitter and
         # onto the Settings tab's file_list_ratio_spin, and vice versa.
-        file_list_widget = QWidget()
+        # Resizing it re-wraps the per-type counts under the tree (see
+        # SelectionMixin._render_all_type_counts).
+        file_list_widget = ResizeNotifyWidget(self._render_all_type_counts)
         file_list_widget.setLayout(file_list_layout)
         stats_widget = QWidget()
         stats_widget.setLayout(stats_layout)

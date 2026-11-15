@@ -761,23 +761,91 @@ class SelectionMixin:
             pane._last_type_counts = counts
             self._render_type_counts(pane)
 
-    def _render_type_counts(self, pane: DirectoryPane):
-        """Re-render pane.count_label (the colored per-type summary below the
-        tree) from the last counts update_type_counts computed, using the
-        Settings tab's Comparison Type Colors -> Summary Text Color. No
-        recount, so a color change is instant even with Recursive Folder
-        Selections on."""
-        count_label = getattr(pane, "count_label", None)
-        counts = getattr(pane, "_last_type_counts", None)
-        if not count_label or counts is None:
-            return
+    def _render_type_counts(self, pane: DirectoryPane = None):
+        """Re-render the colored per-type summary below the trees (both
+        panes' -- see _render_all_type_counts) from the last counts
+        update_type_counts computed, using the Settings tab's Comparison
+        Type Colors -> Summary Text Color. No recount, so a color change
+        is instant even with Recursive Folder Selections on."""
+        self._render_all_type_counts()
+
+    _TYPE_COUNT_SEPARATOR = "\u00a0\u00a0\u00b7\u00a0\u00a0"
+
+    def _type_count_parts(self, pane: DirectoryPane) -> list:
+        """[(plain text, html)] for each per-type count of `pane`."""
+        counts = getattr(pane, "_last_type_counts", None) or {}
         summary_colors = getattr(self, "_summary_colors", None) or {}
         parts = []
         for key in self._SELECT_TYPE_ORDER:
             label, default_color = self._SELECT_TYPE_COLORS[key]
             color = summary_colors.get(key, default_color)
-            parts.append(f'<span style="color:{color};">{label}: {counts.get(key, 0)}</span>')
-        count_label.setText("&nbsp;&nbsp;\u00b7&nbsp;&nbsp;".join(parts))
+            plain = f"{label}: {counts.get(key, 0)}".replace(" ", "\u00a0")
+            parts.append((plain, f'<span style="color:{color};">{plain}</span>'))
+        return parts
+
+    def _type_count_split(self, widths: list, lines: int) -> list:
+        """The consecutive split of the per-type counts into `lines` lines
+        with the narrowest widest line: ([[part indexes] per line],
+        widest line px). `widths` are the parts' own widths."""
+        from itertools import combinations
+        count = len(widths)
+        sep = self._type_count_separator_width
+        best = None
+        for breaks in combinations(range(1, count), min(lines, count) - 1):
+            bounds = (0, *breaks, count)
+            groups = [list(range(bounds[i], bounds[i + 1])) for i in range(len(bounds) - 1)]
+            widest = max(sum(widths[i] for i in g) + sep * (len(g) - 1) for g in groups)
+            if best is None or widest < best[1]:
+                best = (groups, widest)
+        return best
+
+    def _render_all_type_counts(self):
+        """Lays out the per-type summary under each file list: one line if
+        it fits, otherwise two, three... lines. Both panes always get the
+        same number of lines (the larger of what each needs), so their
+        layouts stay in step even though their counts differ. Called when
+        counts or colors change and whenever a pane's file list widget is
+        resized."""
+        left = getattr(self, "left", None)
+        if left is None or getattr(left, "count_label", None) is None:
+            return
+        panes = [left]
+        right = getattr(self, "right", None)
+        if self._dual_pane_enabled and right is not None and getattr(right, "count_label", None) is not None:
+            panes.append(right)
+        try:
+            plans = []
+            for pane in panes:
+                label = pane.count_label
+                metrics = label.fontMetrics()
+                parts = self._type_count_parts(pane)
+                widths = [metrics.horizontalAdvance(plain) for plain, _html in parts]
+                self._type_count_separator_width = metrics.horizontalAdvance(self._TYPE_COUNT_SEPARATOR)
+                # Room beside the Expand/Collapse buttons in the same row.
+                spacing = max(0, label.parentWidget().layout().spacing()) if label.parentWidget() and label.parentWidget().layout() else 6
+                avail = pane.tree.width() - 2 * 32 - 4 * spacing - 4
+                needed = len(parts)
+                for lines in range(1, len(parts) + 1):
+                    _groups, widest = self._type_count_split(widths, lines)
+                    if widest <= avail:
+                        needed = lines
+                        break
+                plans.append((pane, parts, widths, needed, metrics.height()))
+            lines = max(plan[3] for plan in plans)
+            for pane, parts, widths, _needed, line_height in plans:
+                groups, _widest = self._type_count_split(widths, lines)
+                html_lines = [
+                    "&nbsp;&nbsp;\u00b7&nbsp;&nbsp;".join(parts[i][1] for i in group) for group in groups
+                ]
+                text = "<br>".join(html_lines) if getattr(pane, "_last_type_counts", None) is not None else ""
+                if pane.count_label.text() != text:
+                    pane.count_label.setText(text)
+                pane.count_label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+                height = lines * line_height
+                if pane.count_label.minimumHeight() != height:
+                    pane.count_label.setMinimumHeight(height)
+        except RuntimeError:
+            pass  # widgets from before a UI rebuild, already deleted
 
     # ------------------------------------------------------ Search engine
 

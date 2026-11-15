@@ -72,7 +72,7 @@ class SettingsTabMixin:
 
     def _link_spinboxes(self, primary: QSpinBox, secondary: QSpinBox):
         """Same idea as _link_checkboxes, for a spinbox pair -- e.g. the
-        two width-threshold spinboxes' Main/Settings-tab copies."""
+        a spinbox pair's Main/Settings-tab copies."""
         def sync_to_secondary(value, secondary=secondary):
             if secondary.value() != value:
                 secondary.blockSignals(True)
@@ -378,51 +378,6 @@ class SettingsTabMixin:
         _add_synced(self.unnatural_scrolling_cb, "Unnatural scrolling", 3, 0)
         _add_synced(self.invert_statistics_zoom_cb, "Invert scrollwheel zoom direction", 3, 2)
 
-        # Row 5/6: the two width-threshold spinboxes, each on its own
-        # line now -- slider next to its spin box on both, and the two
-        # sliders line up with each other (see the aligned-rows pass
-        # near "outer.addStretch(1)", which also lines them up with
-        # Indentation/Line thickness/Nr. of Steps further down the tab).
-        dual_thresh_row = QHBoxLayout()
-        dual_thresh_row.setContentsMargins(0, 0, 0, 0)
-        # Sliders: 50 px per position (84 positions over the 800-5000 range)
-        # so no pixel precision is needed; the arrow buttons/spin box give the
-        # fine steps. Not live -- moving a threshold re-lays out the whole
-        # window, so it applies when the handle is released.
-        dual_thresh_secondary = SliderSpinBox()
-        dual_thresh_secondary.setRange(500, 2500)
-        dual_thresh_secondary.setToolTip(self.dual_pane_threshold_spin.toolTip())
-        self._link_spinboxes(self.dual_pane_threshold_spin, dual_thresh_secondary)
-        dual_thresh_label = QLabel("Dual Pane Threshold:")
-        dual_thresh_row.addWidget(spin_slider_inline(
-            dual_thresh_label, dual_thresh_secondary,
-            SpinSlider(dual_thresh_secondary, slider_step=50, live=False),
-        ), 0, Qt.AlignVCenter)
-        dual_thresh_row.addStretch(1)
-        self._aligned_option_rows.append((dual_thresh_label, dual_thresh_secondary))
-
-        single_thresh_row = QHBoxLayout()
-        single_thresh_row.setContentsMargins(0, 0, 0, 0)
-        single_thresh_secondary = SliderSpinBox()
-        single_thresh_secondary.setRange(500, 2500)
-        single_thresh_secondary.setToolTip(self.single_pane_threshold_spin.toolTip())
-        self._link_spinboxes(self.single_pane_threshold_spin, single_thresh_secondary)
-        single_thresh_label = QLabel("Single Pane Threshold:")
-        single_thresh_row.addWidget(spin_slider_inline(
-            single_thresh_label, single_thresh_secondary,
-            SpinSlider(single_thresh_secondary, slider_step=50, live=False),
-        ), 0, Qt.AlignVCenter)
-        single_thresh_row.addStretch(1)
-        self._aligned_option_rows.append((single_thresh_label, single_thresh_secondary))
-
-        # A blank line, as tall as 1/4 of a threshold line itself, + widget overhead(?),
-        # making a comfortable gap between the checkboxes above and it.
-        thresholds_gap = QWidget()
-        thresholds_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
-        global_grid.addWidget(thresholds_gap, 4, 0, 1, 7)
-        global_grid.addLayout(dual_thresh_row, 5, 0, 1, 7)
-        global_grid.addLayout(single_thresh_row, 6, 0, 1, 7)
-
         # Row 7: File List View folder-open history -- how many entries
         # each pane's entry combo box keeps (see panes.DirectoryPane.
         # folder_history / SettingsMixin._record_folder_history), plus a
@@ -434,7 +389,7 @@ class SettingsTabMixin:
         # enough now, after the "File List View History" rename, not to
         # blow that alignment out for every other row sharing it).
         history_gap = QWidget()
-        history_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        history_gap.setFixedHeight(6)
         global_grid.addWidget(history_gap, 7, 0, 1, 7)
 
         history_row = QHBoxLayout()
@@ -471,7 +426,7 @@ class SettingsTabMixin:
         # theme, same as the rest of Global Options. Like the history
         # row, no Main-tab primary -- this control only exists here.
         scrollbar_gap = QWidget()
-        scrollbar_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        scrollbar_gap.setFixedHeight(6)
         global_grid.addWidget(scrollbar_gap, 9, 0, 1, 7)
 
         scrollbar_style_row = QHBoxLayout()
@@ -508,7 +463,7 @@ class SettingsTabMixin:
         # survives a UI rebuild); these widgets are built from it and
         # write back through _on_comparison_setting_changed.
         comparison_gap = QWidget()
-        comparison_gap.setFixedHeight(dual_thresh_secondary.sizeHint().height() // 4)
+        comparison_gap.setFixedHeight(6)
         global_grid.addWidget(comparison_gap, 11, 0, 1, 7)
 
         comparison_type_row = QHBoxLayout()
@@ -825,8 +780,7 @@ class SettingsTabMixin:
         self.force_single_date_column_cb.setToolTip(
             "Always collapse the file list's 3 date columns down to just the one "
             "matching each pane's own Statistics-view Metric, regardless of window "
-            "width -- the same column collapse the narrow layout already does below "
-            "its threshold, just forced on unconditionally instead."
+            "width."
         )
         self.force_single_date_column_cb.setChecked(self._force_single_date_column)
         self.force_single_date_column_cb.toggled.connect(self._on_force_single_date_column_changed)

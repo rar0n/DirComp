@@ -38,8 +38,7 @@ from theme_ops import _THEMES
 _SETTINGS_FILENAME = "dircomp_settings.json"
 
 # The only widget settings NOT kept per theme: Global Options (the Main
-# tab's checkboxes and their Settings-tab copies, plus the two window-
-# width thresholds). Every other widget in _settings_widgets() is saved
+# tab's checkboxes and their Settings-tab copies). Every other widget in _settings_widgets() is saved
 # inside each theme's set instead of at the top level of the file -- see
 # _per_theme_widgets.
 #
@@ -53,7 +52,7 @@ _SETTINGS_FILENAME = "dircomp_settings.json"
 _SHARED_WIDGET_KEYS = frozenset({
     "recursive_folder_contents", "expand_matching", "list_directories", "list_files",
     "sort_directories_first", "symmetrical_buttons", "synchronize_views",
-    "dual_pane", "dual_pane_threshold", "single_pane_threshold", "unnatural_scrolling",
+    "dual_pane", "unnatural_scrolling",
     "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
@@ -97,8 +96,6 @@ class SettingsMixin:
             "symmetrical_buttons": getattr(self, "symmetrical_buttons_cb", None),
             "synchronize_views": getattr(self, "synchronize_views_cb", None),
             "dual_pane": getattr(self, "dual_pane_cb", None),
-            "dual_pane_threshold": getattr(self, "dual_pane_threshold_spin", None),
-            "single_pane_threshold": getattr(self, "single_pane_threshold_spin", None),
             "unnatural_scrolling": getattr(self, "unnatural_scrolling_cb", None),
             "invert_statistics_zoom": getattr(self, "invert_statistics_zoom_cb", None),
             "force_single_date_column": getattr(self, "force_single_date_column_cb", None),

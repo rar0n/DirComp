@@ -61,10 +61,9 @@ class DirectoryPane:
         self.save_snapshot_button = None
         self.select_group: QGroupBox | None = None
         # File Op / Clipboard groups, tracked the same way select_group
-        # already was -- needed now so UiBuilderMixin._layout_pane_cluster
-        # (responsive_layout.py) can reflow all three between the wide
-        # and narrow (<1930px) arrangements after construction, not just
-        # place them once. See constants.py's DUAL_PANE_NARROW_THRESHOLD.
+        # already was -- needed so ResponsiveLayoutMixin
+        # (responsive_layout.py) can re-arrange all three to the pane's
+        # width after construction, not just place them once.
         self.file_op_group: QGroupBox | None = None
         self.clipboard_group: QGroupBox | None = None
         # This pane's own copy of the Invert button -- tracked so a
@@ -72,16 +71,14 @@ class DirectoryPane:
         # & Theme) can repaint both panes' copies without a full rebuild.
         self.invert_button = None  # InvertButton | None
         # The QWidget (VBoxLayout) that holds the Select/File Op/
-        # Clipboard row(s) -- _layout_pane_cluster tears down and
-        # rebuilds its rows in place on every narrow/wide crossing,
-        # rather than rebuilding the whole pane.
+        # Clipboard groups -- _apply_cluster_arrangement tears down and
+        # rebuilds its rows in place whenever the arrangement for the
+        # pane's width changes, rather than rebuilding the whole pane.
         self.cluster_container = None  # QWidget | None
         # The six Clipboard-group buttons themselves (Copy/Cut/Paste/
         # Paste Folders/Move -->/Copy -->), keyed by name -- built once,
-        # then re-laid-out (grid vs. single row) by
-        # UiBuilderMixin._layout_clipboard_group (responsive_layout.py)
-        # on every narrow/wide crossing, same as cluster_container's own
-        # rows are.
+        # then re-wrapped into however many columns the pane's width
+        # allows by ResponsiveLayoutMixin._fill_group (responsive_layout.py).
         self._clipboard_buttons: dict = {}
         self.free_space_label: QLabel | None = None
 

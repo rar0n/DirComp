@@ -2138,3 +2138,21 @@ class FlowLayout(QLayout):
                     QRect(QPoint(area.x() + x, area.y() + y), QSize(width, item_h))
                 )
         return height + margins.top() + margins.bottom()
+
+
+class ResizeNotifyWidget(QWidget):
+    """A plain QWidget that calls `on_resize()` every time it is resized --
+    used for each pane's button-group cluster (see responsive_layout.py),
+    which re-arranges its groups to whatever width it ends up with."""
+
+    def __init__(self, on_resize=None, parent=None):
+        super().__init__(parent)
+        self._on_resize = on_resize
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._on_resize is not None:
+            try:
+                self._on_resize()
+            except RuntimeError:
+                pass  # a callback target from before a UI rebuild, already deleted

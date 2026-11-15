@@ -21,7 +21,7 @@ UiBuilderMixin inherits the mixins below:
   - settings_tab.py      Settings tab construction (SettingsTabMixin)
   - theme_ops.py         color/theme handlers, palette, color sets (ThemeOpsMixin)
   - pane_builder.py      one pane's widgets + Statistics panel (PaneBuilderMixin)
-  - responsive_layout.py wide/narrow layout switching (ResponsiveLayoutMixin)
+  - responsive_layout.py dynamic button-group layout (ResponsiveLayoutMixin)
   - constants.py         layout/style constants shared by all of the above
                          (last section; the date-column ones live in responsive_layout.py)
 What stays in this file: the window skeleton (_build_ui/_build_main_tab/
@@ -62,7 +62,7 @@ from custom_widgets import (
 # re-imported here so `from ui_builder import X` keeps working elsewhere. The two
 # date-column ones moved into responsive_layout.py, their only user.
 from constants import (  # noqa: F401
-    PANE_TIMELINE_HEIGHT, DUAL_PANE_NARROW_THRESHOLD, MINIMUM_WINDOW_WIDTH,
+    PANE_TIMELINE_HEIGHT, MINIMUM_WINDOW_WIDTH, _PANE_GAP, _CLUSTER_V_GAP,
     _DISABLED_CHECKBOX_STYLE, _CLUSTER_GROUP_GAP, _TABLE_HEADER_STYLE, _SECTION_HEADER_PT,
     _SECTION_HEADER_STYLE, _SUBTITLE_PT, _SUBTITLE_STYLE, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE,
     _SUBSECTION_GAP, _DISABLED_SPINBOX_STYLE, _DEFAULT_TREE_INDENTATION, _MIN_TREE_INDENTATION,
@@ -188,10 +188,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._symmetrical_buttons = True
         if not hasattr(self, "_dual_pane_enabled"):
             self._dual_pane_enabled = True
-        if not hasattr(self, "_dual_pane_threshold"):
-            self._dual_pane_threshold = DUAL_PANE_NARROW_THRESHOLD
-        if not hasattr(self, "_single_pane_threshold"):
-            self._single_pane_threshold = DUAL_PANE_NARROW_THRESHOLD // 2
         if not hasattr(self, "_force_single_date_column"):
             self._force_single_date_column = False
         if not hasattr(self, "_selection_tint_color"):
@@ -377,32 +373,15 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 "light": self._builtin_color_set("light"),
             }
 
-        # Was implicitly floored well above this by the old fixed-width
-        # button clusters (see PANE_TIMELINE_HEIGHT above); the narrow
-        # layout's own group minimums still apply underneath this, so
-        # treat 800 as a test value, not a guarantee the window will
-        # actually get that small in practice.
         self.setMinimumWidth(MINIMUM_WINDOW_WIDTH)
-
-        # See _layout_pane_cluster/_layout_controls_group: on a rebuild
-        # (Symmetrical Buttons/Dual Pane toggle, ...) this might still
-        # be True from before, which would make _build_directory_widgets'
-        # own premature in-construction call to _layout_pane_cluster
-        # (before bottom_row/filter_frame_group/global_options_group
-        # exist for *this* build pass) try to embed last build's
-        # about-to-be-discarded copies of those. Forced False here so
-        # that call always takes the safe wide-mode path instead --
-        # _update_responsive_layout(force=True) below corrects this to
-        # the real value once everything actually exists.
-        self._narrow_layout = False
 
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
 
-        # Apply the correct wide/narrow cluster arrangement and date-
-        # column visibility for the window's actual current width --
+        # Apply the right button-group arrangement and date-column
+        # visibility for the window's actual current width --
         # resizeEvent/showEvent keep this current from here on, but
         # neither is guaranteed to fire before the first paint.
         self._update_responsive_layout(force=True)
@@ -424,51 +403,43 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         central = QWidget()
         main_layout = QVBoxLayout(central)
         main_layout.setContentsMargins(10, 10, 10, 10)
-        # Kept around so _update_responsive_layout can tighten this
-        # layout's own spacing (the gap above/below bottom_row below --
-        # i.e. between the panes' button-group clusters and Global
-        # Options/Global File Filter, and between those and the status
-        # line) to match the narrow layout's already-collapsed
-        # QGroupBox title margins -- see there.
         self._main_layout = main_layout
 
-        self.splitter = QSplitter(Qt.Horizontal)
-        # Deliberately left at its normal (thin) handle width: the tree/
-        # toolbar/count-row all extend to each pane's true inner edge
-        # this way, right up to the splitter, with no dead strip at the
-        # center. The room the Transfer group floats in comes from the
-        # button row's own trailing/leading stretch (see
-        # _build_directory_widgets) plus the thin handle gap -- which is
-        # why the window/splitter starts a bit wider than the bare
-        # minimum, so that stretch space is actually there to use.
-        self.splitter.addWidget(self._build_directory_widgets(self.left))
-        self.splitter.addWidget(self._build_directory_widgets(self.right))
-        self.splitter.setSizes([650, 650])
-        # Dual Pane off: the right pane's widgets still exist underneath
-        # (every other mixin can keep assuming self.right.tree etc. are
-        # real, live widgets) -- just not shown. QSplitter collapses a
-        # hidden child's space away entirely rather than leaving a blank
-        # gap, so the left pane gets the freed width instead.
-        self.splitter.widget(1).setVisible(self._dual_pane_enabled)
-        main_layout.addWidget(self.splitter, stretch=1)
+        # The two panes sit in a plain row with equal stretch factors, so
+        # they always split the width exactly in the center (no draggable
+        # divider any more). Dual Pane off: the right pane's widgets still
+        # exist underneath (every other mixin can keep assuming
+        # self.right.tree etc. are real, live widgets) -- just not shown,
+        # so the left pane gets the freed width.
+        panes_row = QWidget()
+        panes_layout = QHBoxLayout(panes_row)
+        panes_layout.setContentsMargins(0, 0, 0, 0)
+        panes_layout.setSpacing(_PANE_GAP)
+        left_widget = self._build_directory_widgets(self.left)
+        right_widget = self._build_directory_widgets(self.right)
+        panes_layout.addWidget(left_widget, 1)
+        panes_layout.addWidget(right_widget, 1)
+        right_widget.setVisible(self._dual_pane_enabled)
+        self._panes_row = panes_row
+        main_layout.addWidget(panes_row, stretch=1)
 
+        # Bottom row: Global File Filter and Global Options. Dual Pane on:
+        # the two halves of the row mirror the two panes above (same
+        # equal stretch, same gap), so the filter ends exactly at the left
+        # pane's right edge and Global Options sits flush right in the
+        # right half. Dual Pane off: the filter takes the width Global
+        # Options (at its natural size, flush right) leaves over.
         bottom_row = QHBoxLayout()
-        # filter_frame_group gets the row's own stretch factor here
-        # (rather than a separate spacer widget between it and Global
-        # Options) so it's the group that grows into any extra width --
-        # and since its own text entry already has its column's stretch
-        # set (see _build_filter_frame), the entry is what actually
-        # widens inside it, with Clear/dropdown/Invert/Apply keeping
-        # their natural sizes around it. Global Options keeps its
-        # natural width and stays flush against the row's right edge,
-        # same as the old spacer-based layout. Mirrored on the way back
-        # to wide in _relayout_shared_controls.
+        bottom_row.setSpacing(_PANE_GAP)
         bottom_row.addWidget(self._build_filter_frame(), 1)
-        bottom_row.addWidget(self._build_global_options_group())
+        options_holder = QWidget()
+        holder_layout = QHBoxLayout(options_holder)
+        holder_layout.setContentsMargins(0, 0, 0, 0)
+        global_options = self._build_global_options_group()
+        holder_layout.addWidget(global_options)
+        holder_layout.setAlignment(global_options, Qt.AlignRight)
+        bottom_row.addWidget(options_holder, 1 if self._dual_pane_enabled else 0)
         main_layout.addLayout(bottom_row)
-        # Kept around so the narrow-layout "Controls" group can pull
-        # Global File Filter/Global Options out of here (and put them
-        # back on returning to wide) -- see _relayout_shared_controls.
         self._bottom_row_layout = bottom_row
 
         # Bottom status line: two directional progress bars flanking a
@@ -486,7 +457,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         """Full teardown/rebuild of the central widget -- used when a
         setting that affects layout construction (Symmetrical Buttons,
         Dual Pane, a color/theme change, ...) is toggled at runtime.
-        Preserves pane paths, splitter sizes, and the other option
+        Preserves pane paths and the other option
         checkboxes' states across the rebuild -- and which tab
         (Main/Settings) was active, since _build_ui creates a brand new
         QTabWidget each time, which would otherwise always default back
@@ -507,7 +478,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         return {
             "left_path": self.left.entry.text() if getattr(self.left, "entry", None) else "",
             "right_path": self.right.entry.text() if getattr(self.right, "entry", None) else "",
-            "splitter_sizes": self.splitter.sizes() if getattr(self, "splitter", None) else None,
             "filter_text": self.file_filter_entry.text() if hasattr(self, "file_filter_entry") else "",
             "invert_filter": self.invert_filter_cb.isChecked() if hasattr(self, "invert_filter_cb") else False,
             "synchronize_views": self.synchronize_views_cb.isChecked() if hasattr(self, "synchronize_views_cb") else False,
@@ -620,9 +590,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                     scroll.verticalScrollBar().setValue(pos)
             QTimer.singleShot(0, _restore_scroll)
 
-        if state["splitter_sizes"]:
-            self.splitter.setSizes(state["splitter_sizes"])
-
         if state["left_path"]:
             self._navigate_pane(self.left, state["left_path"], refresh=False, record_history=False)
         if state["right_path"]:
@@ -684,16 +651,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.resize(max(new_width, MINIMUM_WINDOW_WIDTH), self.height())
 
         state = self._capture_ui_state()
-        # The splitter sizes just captured came from the OLD splitter,
-        # sized for the OLD Dual Pane state -- turning Dual Pane back on
-        # here would otherwise capture the collapsed [full-width, 0] the
-        # right pane was left at while hidden, and _restore_ui_state
-        # would immediately re-collapse the freshly-shown right pane
-        # right back down to nothing. _build_ui's own [650, 650] default
-        # is the right starting point for a state crossing this
-        # particular toggle, not whatever the old splitter happened to
-        # be sized at a moment ago.
-        state["splitter_sizes"] = None
         current_tab = self.tabs.currentIndex() if getattr(self, "tabs", None) else 0
         self._build_ui()
         self._restore_ui_state(state)
@@ -703,14 +660,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # freshly repopulated -- _restore_ui_state's own navigate call
         # doesn't know about this override on its own.
         self._recolor_all_items()
-
-    def _on_dual_pane_threshold_changed(self, value):
-        self._dual_pane_threshold = value
-        self._update_responsive_layout(force=True)
-
-    def _on_single_pane_threshold_changed(self, value):
-        self._single_pane_threshold = value
-        self._update_responsive_layout(force=True)
 
     def _on_force_single_date_column_changed(self, checked):
         self._force_single_date_column = bool(checked)
@@ -1137,12 +1086,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         container = QWidget()
         outer = QVBoxLayout(container)
         outer.setContentsMargins(0, 0, 0, 0)
-        # Kept narrow-aware (see _update_responsive_layout, which
-        # updates this alongside _main_layout's own spacing) rather than
-        # left at Qt's default ~6px -- otherwise this was the one row
-        # left still carrying wide-mode spacing around the progress
-        # bars/Cancel button regardless of narrow/wide.
-        outer.setSpacing(2 if getattr(self, "_narrow_layout", False) else 6)
+        outer.setSpacing(6)
         self._status_line_layout = outer
         outer.addWidget(self._status_bars_row)
         outer.addLayout(transfer_row)
@@ -1205,9 +1149,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         """File Filter group: just the filter controls themselves plus
         Invert (Invert applies to the filter, so it stays here rather
         than moving to Global Options with the other checkboxes) --
-        row 1 is Clear/dropdown/entry/Apply; row 2 is just Invert,
-        aligned directly below the text entry via a QGridLayout column,
-        rather than sharing row 1's height."""
+        row 1 is Clear/dropdown/entry; row 2 is Invert (left) and Apply
+        (right), aligned directly below the text entry via a QGridLayout
+        column."""
         frame = QGroupBox("Global File Filter")
         self.filter_frame_group = frame
         grid = QGridLayout(frame)
@@ -1233,16 +1177,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         grid.addWidget(self.file_type_dropdown, 0, 1)
 
         self.file_filter_entry = QLineEdit()
-        # No longer a hard setFixedWidth(220): at narrow widths the
-        # frame doesn't have room for Clear + dropdown + a fixed-220
-        # entry + Invert/Apply (both of which move into this same row
-        # at narrow widths -- see _relayout_filter_frame) side by side,
-        # and a genuinely fixed-width widget can't shrink to make room,
-        # so the grid overflowed the frame and Invert/Apply ended up
-        # drawn on top of the entry's tail end. A minimum width (so it
-        # never collapses to nothing) plus the column stretch below
-        # (so *this* column is the one that gives, not Clear/dropdown/
-        # Invert/Apply) makes the entry the one that narrows instead.
+        # Not a fixed width: a minimum width (so it never collapses to
+        # nothing) plus the column stretch below makes the entry the one
+        # that grows/narrows with the window.
         self.file_filter_entry.setMinimumWidth(40)
         self.file_filter_entry.returnPressed.connect(self.apply_filter)
         grid.addWidget(self.file_filter_entry, 0, 2)
@@ -1252,15 +1189,18 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.apply_filter_button.setFixedSize(uniform_w, uniform_h)
         self.apply_filter_button.setStyleSheet(_bevel_button_stylesheet(default_bg, default_fg))
         self.apply_filter_button.clicked.connect(self.apply_filter)
-        grid.addWidget(self.apply_filter_button, 0, 3)
 
+        # Row 2, directly below the text entry: Invert on the left, Apply
+        # right-aligned at the entry's right edge.
         self.invert_filter_cb = QCheckBox("Invert")
         self.invert_filter_cb.stateChanged.connect(self.apply_filter)
-        grid.addWidget(self.invert_filter_cb, 1, 2)
+        invert_apply_row = QHBoxLayout()
+        invert_apply_row.setContentsMargins(0, 0, 0, 0)
+        invert_apply_row.addWidget(self.invert_filter_cb)
+        invert_apply_row.addStretch(1)
+        invert_apply_row.addWidget(self.apply_filter_button)
+        grid.addLayout(invert_apply_row, 1, 2)
 
-        # Also travels between narrow/wide via _relayout_filter_frame,
-        # which repositions Invert (and, in narrow mode, Apply too) --
-        # this initial placement is just the wide-layout starting point.
         self._sync_global_filter_enabled()
         return frame
 
@@ -1296,32 +1236,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             frame.setToolTip("" if enabled else "Available once a folder is loaded.")
         except RuntimeError:
             pass  # the frame from before a UI rebuild, already deleted
-
-    def _relayout_filter_frame(self, narrow: bool):
-        """(Re)position Global File Filter's own Invert checkbox for the
-        current narrow/wide state. Wide: centered directly below the
-        filter text entry (row 1, col 2), same as _build_filter_frame's
-        own initial placement. Narrow: moved into row 0 itself, between
-        the filter entry and the Apply button -- the whole frame gets
-        folded wholesale into a pane's Controls group at narrow widths
-        (see _layout_controls_group), and Invert reads better sitting
-        right next to the field it actually applies to there than it
-        did stacked below it in a group that's lost its own title and
-        borders. Apply shifts from col 3 to col 4 to make room for it.
-
-        Called from _relayout_shared_controls, before Filter itself
-        gets embedded anywhere -- so this only ever rearranges Filter's
-        own internal grid, never touches where the frame as a whole
-        sits."""
-        grid = self.filter_frame_group.layout()
-        grid.removeWidget(self.invert_filter_cb)
-        grid.removeWidget(self.apply_filter_button)
-        if narrow:
-            grid.addWidget(self.invert_filter_cb, 0, 3)
-            grid.addWidget(self.apply_filter_button, 0, 4)
-        else:
-            grid.addWidget(self.invert_filter_cb, 1, 2)
-            grid.addWidget(self.apply_filter_button, 0, 3)
 
     def _global_options_row_indents(self, row1: QHBoxLayout, row2: QHBoxLayout) -> tuple[int, int]:
         """Computed leading-space amounts for Global Options' two-row
@@ -1370,7 +1284,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         group is noticeably wider than its four checkboxes' own text
         would otherwise need. Everything else that used to live in this
         row (List Directories/List Files/Sort Directories First, the two
-        width-threshold spinboxes) still exists as real, live widgets --
+        unnatural-scrolling/zoom checkboxes) still exists as real, live widgets --
         just parented here without being added to the visible row, so
         they stay valid primaries for _link_checkboxes/_link_spinboxes'
         Settings-tab copies (and for settings_ops.py's persistence) --
@@ -1580,25 +1494,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.invert_statistics_zoom_cb.stateChanged.connect(self._on_invert_statistics_zoom_changed)
         self.invert_statistics_zoom_cb.hide()
 
-        self.dual_pane_threshold_spin = QSpinBox(group)
-        self.dual_pane_threshold_spin.setRange(MINIMUM_WINDOW_WIDTH, 5000)
-        self.dual_pane_threshold_spin.setValue(self._dual_pane_threshold)
-        self.dual_pane_threshold_spin.setToolTip(
-            "Window width (px), in Dual Pane mode, below which button groups/date "
-            "columns rearrange into the narrow layout."
-        )
-        self.dual_pane_threshold_spin.valueChanged.connect(self._on_dual_pane_threshold_changed)
-        self.dual_pane_threshold_spin.hide()
-
-        self.single_pane_threshold_spin = QSpinBox(group)
-        self.single_pane_threshold_spin.setRange(MINIMUM_WINDOW_WIDTH, 5000)
-        self.single_pane_threshold_spin.setValue(self._single_pane_threshold)
-        self.single_pane_threshold_spin.setToolTip(
-            "Same as Dual Pane Threshold, but the one that applies with Dual Pane off."
-        )
-        self.single_pane_threshold_spin.valueChanged.connect(self._on_single_pane_threshold_changed)
-        self.single_pane_threshold_spin.hide()
-
         # Save/Load Settings moved to the Settings tab (bottom, same
         # height as Cancel on the Main tab's status line) -- see
         # _build_settings_tab. Everything they need to save/load now
@@ -1612,81 +1507,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.expand_matching_cb.setEnabled(self.recursive_folder_contents_cb.isChecked())
 
         return group
-
-    def _relayout_global_options_group(self, collapse: bool):
-        """(Re)builds Global Options' own internal row(s). `collapse`
-        is the resolved "does this group actually read as embedded"
-        state -- narrow *and* Dual Pane on -- not the raw narrow flag;
-        see _update_responsive_layout's own global_options_narrow,
-        computed once there and passed straight through, so this can't
-        drift out of sync with that title/border decision. In
-        particular narrow + single pane passes collapse=False here: the
-        group isn't embedded into anything in that case (see
-        _relayout_shared_controls), so it keeps its normal wide-layout
-        two rows and full labels even though the overall GUI is narrow.
-        collapse=False keeps the original two rows built by
-        _build_global_options_group, full labels and all. collapse=True
-        collapses everything relevant into a single line -- Dual Pane,
-        Synchronize, Recursive Selections, Expand, Refresh -- with
-        shortened labels so the line still fits at narrow widths.
-        Symmetrical GUI is dropped from the collapsed line entirely
-        (just hidden, not destroyed -- it's back, and re-labeled, the
-        moment this next runs with collapse=False; still reachable from
-        the Settings tab regardless).
-
-        Same detach-then-rebuild approach as _layout_controls_group and
-        friends: the group's own outer QVBoxLayout is persistent, but
-        _detach_layout_widgets recurses into row1/row2 as sub-layouts
-        and discards them -- the checkboxes/button themselves are
-        untouched, just re-parented into whichever fresh row(s) this
-        call builds."""
-        outer = self.global_options_group.layout()
-        self._detach_layout_widgets(outer)
-
-        if collapse:
-            self.synchronize_views_cb.setText("Synchronize")
-            self.recursive_folder_contents_cb.setText("Recursive Sel.")
-            self.expand_matching_cb.setText("Expand Sel.")
-            self.symmetrical_buttons_cb.setVisible(False)
-
-            row = QHBoxLayout()
-            row.addWidget(self.dual_pane_cb)
-            row.addWidget(self.synchronize_views_cb)
-            row.addWidget(self.recursive_folder_contents_cb)
-            row.addWidget(self.expand_matching_cb)
-            row.addStretch(1)
-            row.addWidget(self.refresh_button)
-            outer.addLayout(row)
-        else:
-            self.synchronize_views_cb.setText("Synchronize Views")
-            self.recursive_folder_contents_cb.setText("Recursive Folder Selections")
-            self.expand_matching_cb.setText("Expand To Selection")
-            self.symmetrical_buttons_cb.setVisible(True)
-
-            row1 = QHBoxLayout()
-            row1.addWidget(self.dual_pane_cb)
-
-            row2 = QHBoxLayout()
-            row2.addSpacing(20)
-            row2.addWidget(self.synchronize_views_cb)
-            row2.addWidget(self.symmetrical_buttons_cb)
-
-            # Same computed indents _build_global_options_group's own
-            # wide layout uses -- see _global_options_row_indents --
-            # so this rebuild-on-resize path can't drift out of step
-            # with the initial build.
-            recursive_indent, expand_extra_indent = self._global_options_row_indents(row1, row2)
-            row2.addSpacing(expand_extra_indent)
-            row2.addWidget(self.expand_matching_cb)
-            row2.addStretch(1)
-
-            row1.addSpacing(recursive_indent)
-            row1.addWidget(self.recursive_folder_contents_cb)
-            row1.addStretch(1)
-            row1.addWidget(self.refresh_button)
-
-            outer.addLayout(row1)
-            outer.addLayout(row2)
 
     def clear_filter(self):
         """Clears the filter text and turns off Invert, then applies

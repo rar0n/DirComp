@@ -13,12 +13,12 @@ from PySide6.QtCore import QPointF, QRectF, QSize, QTimer, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QBoxLayout, QButtonGroup, QCheckBox, QComboBox, QGridLayout, QGroupBox,
-    QHBoxLayout, QHeaderView, QLabel, QPushButton, QSplitter, QVBoxLayout, QWidget,
+    QHBoxLayout, QHeaderView, QLabel, QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget,
 )
 
-from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _DISABLED_CHECKBOX_STYLE
+from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_V_GAP, _DISABLED_CHECKBOX_STYLE
 from custom_widgets import (
-    InvertButton, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
+    InvertButton, ResizeNotifyWidget, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
     _ThemedScrollBar, _bevel_button_stylesheet,
 )
 from dnd_widgets import DirDropComboBox, DirDropTreeWidget
@@ -621,7 +621,7 @@ class PaneBuilderMixin:
 
         # Stashed on self (older references; recoloring now goes through
         # pane._across_buttons in _apply_main_button_colors)
-        # and on the pane (for the Clipboard group/narrow Controls group
+        # and on the pane (for the Clipboard group
         # layouts, see _layout_clipboard_group/_layout_controls_group).
         if is_left:
             self.copy_left_to_right_button = copy_across_button
@@ -789,14 +789,13 @@ class PaneBuilderMixin:
         # a later narrow-to-wide crossing calls back into, since Select
         # group buttons may have been folded into the narrow "Controls"
         # group (see _layout_controls_group) in between.
-        self._layout_select_group(pane, layout_left)
 
         # --------------------------------------------------- File Op group
         # Rename, New Folder, and Delete -- same vertical order for both
         # panes (there's no meaningful "mirror" for a single stacked
         # column), unaffected by Symmetrical Buttons.
         file_op_group = QGroupBox("File Op")
-        file_op_layout = QVBoxLayout(file_op_group)
+        file_op_layout = QGridLayout(file_op_group)
 
         rename_button = QPushButton("Rename")
         rename_button.setToolTip(
@@ -845,7 +844,6 @@ class PaneBuilderMixin:
         # Places Rename/New Folder/Delete into file_op_layout, aligned
         # for mirrored_right -- see _layout_file_op_group. Also the
         # entry point a later narrow-to-wide crossing calls back into.
-        self._layout_file_op_group(pane, mirrored_right)
 
         # ------------------------------------------------- Clipboard group
         clipboard_group = QGroupBox("Clipboard")
@@ -856,7 +854,7 @@ class PaneBuilderMixin:
         # _layout_pane_cluster uses for cluster_container. Needed because
         # Qt won't let a widget's top-level layout just be replaced with
         # a different one later.
-        QVBoxLayout(clipboard_group)
+        QGridLayout(clipboard_group)
         # The plain same-pane Cut/Copy/Paste/Paste Folders actions, plus --
         # placed by _layout_clipboard_group as its top row -- the
         # across-pane Move/Copy buttons built earlier in this method
@@ -925,84 +923,26 @@ class PaneBuilderMixin:
         else:
             self.right_clipboard_group = clipboard_group
 
-        # Select/File Op/Clipboard/Controls live in their own container (a plain
-        # QVBoxLayout so it can hold either one wide row or two narrow
-        # rows) instead of being placed straight into a QHBoxLayout here,
-        # so _layout_pane_cluster can reflow them later -- at construction
-        # time via the _update_responsive_layout(force=True) call at the
-        # end of _build_ui, and again on every wide/narrow crossing after
-        # that. See DUAL_PANE_NARROW_THRESHOLD.
-        cluster_container = QWidget()
+        # Select/File Op/Clipboard live in their own container, whose
+        # content (which groups sit where, and how many columns each
+        # group's buttons wrap into) is re-arranged to the pane's width
+        # whenever it resizes -- see responsive_layout.py. The groups are
+        # parented to it right away; the first arrangement happens at the
+        # end of _build_ui (_update_responsive_layout(force=True)).
+        # Horizontal size policy Ignored: its own minimum width must not
+        # become the window's minimum (the groups wrap instead).
+        cluster_container = ResizeNotifyWidget(lambda p=pane: self._relayout_pane_cluster(p))
+        cluster_container.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         QVBoxLayout(cluster_container)
+        cluster_container.layout().setContentsMargins(0, 0, 0, 0)
+        cluster_container.layout().setSpacing(_CLUSTER_V_GAP)
         pane.cluster_container = cluster_container
-
-        # --------------------------------------------------- Controls group
-        # Only actually shown/populated while narrow -- see
-        # _layout_controls_group -- but built here (once, alongside its
-        # siblings) so it's a normal persistent child of cluster_container
-        # like Select/File Op/Clipboard, ready for _layout_pane_cluster to
-        # show/hide and populate/empty. Always titleless/flat (unlike
-        # those three, whose titles only get dropped while narrow -- see
-        # _NARROW_HIDDEN_TITLES) since it never exists in a state where a
-        # title would help -- Ragnar's call, matching how the groups it
-        # replaces read once title-collapsed anyway.
-        #
-        # Explicitly parented to cluster_container right away (rather
-        # than left to pick one up implicitly the first time it's added
-        # to a row layout, like everything else here does) -- unlike
-        # Select/File Op/Clipboard, which all get parented into
-        # cluster_container for real during the premature
-        # _layout_pane_cluster call just below (always takes the wide
-        # branch at this point -- see _build_ui's _narrow_layout reset),
-        # Controls stays untouched by that call (wide mode never adds it
-        # to anything), so without this it would otherwise still be a
-        # genuine orphaned top-level widget the first time a real narrow
-        # pass tries to embed Filter/Global Options (each with their own
-        # live child widgets) into its grid -- reparenting into an
-        # orphan like that is a known PySide6/shiboken crash trap.
-        controls_group = QGroupBox()
-        controls_group.setParent(cluster_container)
-        controls_group.setFlat(True)
-        controls_group.setStyleSheet("QGroupBox { margin-top: 2px; border: none; }")
-        # Only ever shown in narrow mode (wide mode hides it entirely
-        # and uses the separate Select/File Op/Clipboard groups instead
-        # -- see _layout_pane_cluster), so its margins/spacing can just
-        # stay permanently tight rather than carrying Qt's default
-        # (wide-sized) ~9px margins/~6px spacing into a mode that's
-        # supposed to be compact -- that default gap multiplied across
-        # several rows x however many columns was a noticeable chunk of
-        # the leftover vertical space in narrow layout.
-        #
-        # The group's own layout is a plain QVBoxLayout, not the button
-        # grid directly -- _layout_controls_group builds a fresh
-        # QGridLayout for the Select/File Op/Clipboard button rows each
-        # time and adds it as a sub-layout here, then adds Filter/Global
-        # Options as actual widgets straight onto this outer layout,
-        # below it. That split matters: a widget added directly to a
-        # QVBoxLayout gets the group's full actual width regardless of
-        # what the button grid's own (many Fixed-size buttons) column
-        # math settles on, which is what lets Filter's text entry
-        # actually stretch at narrow widths instead of being capped by
-        # the button grid. A single shared grid (colspan-ing the filter
-        # row across all 5 button columns, like this used to work) left
-        # that row's width hostage to whatever leftover space Qt's
-        # column-stretch heuristics decided to give a column full of
-        # Fixed-size widgets -- which in practice was often none.
-        controls_outer = QVBoxLayout(controls_group)
-        controls_outer.setSpacing(3)
-        controls_outer.setContentsMargins(4, 2, 4, 2)
-        controls_group.setVisible(False)
-        pane.controls_group = controls_group
-
-        self._layout_pane_cluster(pane, is_left, layout_left)
+        for group in (select_group, file_op_group, clipboard_group):
+            group.setParent(cluster_container)
+        pane._cluster_applied = None
+        pane._cluster_size_cache = {}
+        pane._cluster_arrangement_cache = {}
         layout.addWidget(cluster_container)
-        # This pane's own outer layout and the cluster's inner one still
-        # carry Qt's default margins/spacing -- the wide-layout values,
-        # remembered here so _apply_narrow_pane_gaps can zero them while
-        # narrow and put them back afterwards.
-        pane._pane_layout = layout
-        pane._pane_layout_wide = (layout.contentsMargins(), layout.spacing())
-        pane._cluster_layout_wide_margins = cluster_container.layout().contentsMargins()
 
         tree.itemSelectionChanged.connect(
             lambda t=tree, p=pane: self.update_selection_count(t, p)

@@ -135,21 +135,10 @@ _DIFF_RANK = {
 # to it.
 PANE_TIMELINE_HEIGHT = 220
 
-# Window width (px) below which dual-pane mode switches to the "narrow"
-# layout: Clipboard drops to its own row above Select, File Op stays put
-# next to Select on the row underneath, and each pane's file list
-# collapses its three date columns down to just the one matching that
-# pane's Statistics-view Metric. A single-pane mode's own threshold
-# (roadmap item, not built yet) is meant to be half this. Plain module
-# constant for now -- move into settings_ops.py once layout thresholds
-# become user-configurable, per the roadmap.
-DUAL_PANE_NARROW_THRESHOLD = 1650
-
-# Test value while dual-pane mode is the only one that exists -- how far
-# the window is allowed to shrink. Below this the narrow-layout button
-# clusters/groups still have their own minimum size hints, so the window
-# itself won't visually shrink all the way to 800 on a wide monitor;
-# this just removes the artificial floor that used to sit above it.
+# How far the window is allowed to shrink. The button groups' own
+# dynamic wrapping (see responsive_layout.py) keeps working all the way
+# down to this width; the other widgets' own minimum size hints can still
+# keep the window from actually getting this small.
 MINIMUM_WINDOW_WIDTH = 800
 
 # Explicit disabled-state color for the Global Options dependent
@@ -160,8 +149,14 @@ MINIMUM_WINDOW_WIDTH = 800
 # enabled one without this. Applied directly rather than fixed at the
 # palette level, since that palette isn't built in this file.
 _DISABLED_CHECKBOX_STYLE = "QCheckBox:disabled { color: #7A7A7A; }"
+# Gap (px) between the two panes (and, to keep Global File Filter's right
+# edge on the left pane's right edge, between the bottom row's two halves).
+_PANE_GAP = 6
+# Vertical gap (px) between button groups stacked on top of each other
+# inside a pane's cluster (see responsive_layout._apply_cluster_arrangement).
+_CLUSTER_V_GAP = 4
 # Fixed gap (px) between the Select/File Op/Clipboard groups inside a
-# pane's cluster row (see _layout_pane_cluster). Fixed rather than
+# pane's cluster row (see responsive_layout._apply_cluster_arrangement). Fixed rather than
 # stretchy so both panes always show identical gaps regardless of how
 # wide each pane currently is -- the leftover width goes to one edge
 # stretch instead, on whichever side the row is aligned away from. 0:

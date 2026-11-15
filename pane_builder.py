@@ -560,6 +560,8 @@ class PaneBuilderMixin:
         timeline_totals_label.setTextFormat(Qt.TextFormat.RichText)
         pane.tl_totals_label = timeline_totals_label
         timeline_title_row.addWidget(timeline_totals_label)
+        pane._stats_atoms = []
+        pane._stats_title_row = timeline_title_row
         timeline_title_row.addStretch(1)
         timeline_title_row.addWidget(zoom_sel_button)
         timeline_title_row.addWidget(reset_button)
@@ -590,8 +592,11 @@ class PaneBuilderMixin:
         # SelectionMixin._relayout_pane_labels).
         file_list_widget = ResizeNotifyWidget(self._relayout_pane_labels)
         file_list_widget.setLayout(file_list_layout)
-        stats_widget = QWidget()
+        # Resizing it re-wraps the "Files: X - Folders: Y" count above the
+        # chart (see SelectionMixin._render_stats_totals).
+        stats_widget = ResizeNotifyWidget(self._relayout_pane_labels)
         stats_widget.setLayout(stats_layout)
+        pane._stats_widget = stats_widget
 
         pane_splitter = QSplitter(Qt.Vertical)
         # Neither side should be draggable down to nothing -- both views

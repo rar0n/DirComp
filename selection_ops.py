@@ -27,6 +27,7 @@ from PySide6.QtWidgets import QApplication
 
 from PySide6.QtCore import QItemSelection, QItemSelectionModel
 
+from constants import _PANE_GAP
 from constants import PATH_ROLE, IS_DIR_ROLE, POPULATED_ROLE, _DIFF_RANK, GNOME_COPIED_FILES_MIME
 from listing_ops import _DATE_FIELD_TO_ENTRY_KEY, _DATE_FIELD_TO_COLUMN, COL_SIZE
 from panes import DirectoryPane
@@ -831,7 +832,7 @@ class SelectionMixin:
                 self._type_count_separator_width = metrics.horizontalAdvance(self._TYPE_COUNT_SEPARATOR)
                 # Room beside the Expand/Collapse buttons in the same row.
                 spacing = max(0, label.parentWidget().layout().spacing()) if label.parentWidget() and label.parentWidget().layout() else 6
-                avail = pane.tree.width() - 2 * 32 - 4 * spacing - 4
+                avail = self._shared_width_for(pane, pane.tree) - 2 * 32 - 4 * spacing - 4
                 needed = len(parts)
                 for lines in range(1, len(parts) + 1):
                     _groups, widest = self._type_count_split(widths, lines)
@@ -890,7 +891,7 @@ class SelectionMixin:
                 fixed = sum(b.sizeHint().width() for b in buttons) + 3 * 6 + 8
                 spacing = pane._toolbar_layout.spacing() if getattr(pane, "_toolbar_layout", None) else 6
                 fixed += 3 * max(0, spacing - 6)
-                avail = pane.tree.width()
+                avail = self._shared_width_for(pane, pane.tree)
                 longest = max(len(total_atoms), len(free_atoms), 1)
                 needed = longest
                 for lines in range(1, longest + 1):
@@ -927,6 +928,74 @@ class SelectionMixin:
         when a pane's file list widget is resized."""
         self._render_all_type_counts()
         self._render_toolbar_labels()
+        self._render_stats_totals()
+
+    def _shared_width_for(self, pane: DirectoryPane, widget) -> int:
+        """The width `widget` (inside `pane`) will have once both panes
+        have settled: half of the shared panes row minus this widget's own
+        offset inside its pane. Used instead of widget.width() so both
+        panes get identical results in the same pass, even while one of
+        them has not received its own resize event yet."""
+        row = getattr(self, "_panes_row", None)
+        root = widget
+        while root is not None and root.parentWidget() is not row:
+            root = root.parentWidget()
+        if row is None or root is None or row.width() < 300:
+            return widget.width()
+        half = (row.width() - _PANE_GAP) // 2 if self._dual_pane_enabled else row.width()
+        return half - max(0, root.width() - widget.width())
+
+    def _render_stats_totals(self):
+        """Lays out the "Files: X - Folders: Y" count above each
+        Statistics View: one line if it fits beside the title and buttons,
+        otherwise "Files: X" and "Folders: Y" on two lines (never split
+        inside either). Both panes always get the same number of lines."""
+        left = getattr(self, "left", None)
+        if left is None or getattr(left, "tl_totals_label", None) is None:
+            return
+        panes = [left]
+        right = getattr(self, "right", None)
+        if self._dual_pane_enabled and right is not None and getattr(right, "tl_totals_label", None) is not None:
+            panes.append(right)
+        try:
+            plans = []
+            for pane in panes:
+                label = pane.tl_totals_label
+                atoms = getattr(pane, "_stats_atoms", None) or []
+                metrics = label.fontMetrics()
+                sep = metrics.horizontalAdvance(" - ")
+                widths = [metrics.horizontalAdvance(plain) for plain, _html in atoms]
+                row = pane._stats_title_row
+                others = 0
+                count = row.count()
+                for i in range(count):
+                    item = row.itemAt(i)
+                    if item.widget() is label:
+                        continue
+                    others += item.sizeHint().width()
+                others += max(0, row.spacing()) * (count - 1)
+                avail = self._shared_width_for(pane, pane._stats_widget)
+                margins = pane._stats_widget.layout().contentsMargins()
+                avail -= margins.left() + margins.right() + others
+                one_line = sum(widths) + sep * max(0, len(widths) - 1)
+                needed = 1 if (not widths or one_line <= avail) else len(widths)
+                plans.append((pane, atoms, needed, metrics.height()))
+            lines = max(plan[2] for plan in plans)
+            for pane, atoms, _needed, line_height in plans:
+                if not atoms:
+                    text = ""
+                elif lines == 1:
+                    text = " - ".join(html for _plain, html in atoms)
+                else:
+                    text = "<br>".join(html for _plain, html in atoms)
+                label = pane.tl_totals_label
+                if label.text() != text:
+                    label.setText(text)
+                height = lines * line_height
+                if label.minimumHeight() != height:
+                    label.setMinimumHeight(height)
+        except (RuntimeError, AttributeError):
+            pass  # widgets from before a UI rebuild, or not built yet
 
     # ------------------------------------------------------ Search engine
 

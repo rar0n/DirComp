@@ -276,9 +276,14 @@ class TimelineOpsMixin:
         # ui_builder._numeric_span's docstring; the surrounding "Files:"/
         # "Folders:" text is left with no color of its own so it always
         # follows the theme's normal text color.
-        label.setText(
-            f"Files: {self._numeric_span(file_count)} - Folders: {self._numeric_span(folder_count)}"
-        )
+        # "Files: X" and "Folders: Y" are the two units the label can
+        # wrap between (see SelectionMixin._render_stats_totals).
+        nbsp = "\u00a0"
+        pane._stats_atoms = [
+            (f"Files:{nbsp}{file_count}", f"Files:{nbsp}{self._numeric_span(file_count)}"),
+            (f"Folders:{nbsp}{folder_count}", f"Folders:{nbsp}{self._numeric_span(folder_count)}"),
+        ]
+        self._render_stats_totals()
 
     def _refresh_pane_timeline(self, pane: DirectoryPane):
         """(Re)load `pane`'s timeline from its current snapshot, in

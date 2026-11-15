@@ -41,7 +41,7 @@ _group_buttons -- the wrapping takes care of the rest.
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout
 
-from constants import _CLUSTER_GROUP_GAP, _CLUSTER_V_GAP
+from constants import _CLUSTER_GROUP_GAP, _CLUSTER_V_GAP, _PANE_GAP
 from listing_ops import COL_ACCESSED, COL_CHANGED, COL_MODIFIED
 from panes import DirectoryPane
 
@@ -157,17 +157,25 @@ class ResponsiveLayoutMixin:
     def _cell_positions(key: str, count: int, cols: int, mirrored: bool) -> list:
         """[(button index, row, column)] for `count` buttons wrapped into
         `cols` columns. Select keeps its semantic columns (button i belongs
-        to column i % 4) together and wraps whole columns: with 3 columns
-        the 4th drops below the others as a block of its own. File Op and
-        Clipboard simply wrap row by row. `mirrored` flips every row, so
+        to column i % 4) together: with 2 or 1 columns whole semantic
+        columns wrap below each other; with 3 the first semantic column
+        becomes the top row above the other three (a compact 3 x 4). File
+        Op and Clipboard simply wrap row by row. `mirrored` flips every row, so
         the first button of a row sits at the right edge."""
         if key == "select":
             units = _NATURAL_COLS["select"]
             cols = max(1, min(cols, units))
             cells = []
             for i in range(count):
-                block, col = divmod(i % units, cols)
-                cells.append((i, block * _SELECT_COLUMN_HEIGHT + i // units, col))
+                unit, level = i % units, i // units
+                if cols == 3:
+                    # 3 columns x 4 rows, compact: the first semantic
+                    # column (Select All/Invert/Clear) lies down as the
+                    # top row and the other three keep their rows below it.
+                    cells.append((i, 0, level) if unit == 0 else (i, 1 + level, unit - 1))
+                else:
+                    block, col = divmod(unit, cols)
+                    cells.append((i, block * _SELECT_COLUMN_HEIGHT + level, col))
         else:
             cols = max(1, min(cols, count))
             cells = [(i, i // cols, i % cols) for i in range(count)]
@@ -271,12 +279,38 @@ class ResponsiveLayoutMixin:
         _w, _h, cols = evaluate(_ALL_STACKED, 1)
         return _ALL_STACKED, cols
 
+    def _cluster_available_width(self) -> int:
+        """The width each pane's button cluster gets, computed from the
+        panes' shared row (not from either container's own current
+        width) so both panes always get the same value and re-arrange in
+        the same pass, even when one of them is a pixel wider or has not
+        received its own resize event yet."""
+        row = getattr(self, "_panes_row", None)
+        total = row.width() if row is not None else 0
+        if total < 300:
+            total = self.width() - 20
+        half = (total - _PANE_GAP) // 2 if self._dual_pane_enabled else total
+        container = self.left.cluster_container.parentWidget()
+        margins = container.layout().contentsMargins() if container is not None else None
+        inner = (margins.left() + margins.right()) if margins is not None else 22
+        return max(150, half - inner)
+
+    def _relayout_all_clusters(self, force: bool = False):
+        """Re-arranges every visible pane's cluster in one go -- called
+        from either pane's cluster container whenever it is resized."""
+        if not getattr(self, "left", None) or getattr(self.left, "cluster_container", None) is None:
+            return
+        panes = (self.left,) if not self._dual_pane_enabled else (self.left, self.right)
+        for pane in panes:
+            self._relayout_pane_cluster(pane, force)
+
     def _relayout_pane_cluster(self, pane: DirectoryPane, force: bool = False):
         """Picks and (if it changed) applies the arrangement of one pane's
         button groups for the width its cluster container has right now.
         Cheap enough to run on every resize: the arrangement is cached per
         width, and nothing is rebuilt unless it differs from what's
-        showing."""
+        showing. Both panes use the same width (_cluster_available_width),
+        so they change together."""
         container = getattr(pane, "cluster_container", None)
         if container is None or getattr(pane, "select_group", None) is None:
             return
@@ -287,13 +321,7 @@ class ResponsiveLayoutMixin:
         is_left = pane is self.left
         mirrored = (not is_left) and self._symmetrical_buttons
 
-        avail = container.width()
-        if avail < 150:
-            # Not laid out yet (first pass during construction): estimate
-            # from the window instead -- the real width arrives with the
-            # container's first resize.
-            panes = 2 if self._dual_pane_enabled else 1
-            avail = max(150, (self.width() - 20 - 6) // panes - 22)
+        avail = self._cluster_available_width()
 
         pane._cluster_busy = True
         try:

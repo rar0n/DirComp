@@ -931,7 +931,7 @@ class PaneBuilderMixin:
         # end of _build_ui (_update_responsive_layout(force=True)).
         # Horizontal size policy Ignored: its own minimum width must not
         # become the window's minimum (the groups wrap instead).
-        cluster_container = ResizeNotifyWidget(lambda p=pane: self._relayout_pane_cluster(p))
+        cluster_container = ResizeNotifyWidget(self._relayout_all_clusters)
         cluster_container.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         QVBoxLayout(cluster_container)
         cluster_container.layout().setContentsMargins(0, 0, 0, 0)

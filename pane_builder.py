@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QHeaderView, QLabel, QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget,
 )
 
-from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_GROUP_PAD, _CLUSTER_V_GAP, _DISABLED_CHECKBOX_STYLE
+from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_GROUP_PAD, _CLUSTER_V_GAP, _PANE_SIDE_MARGIN, _DISABLED_CHECKBOX_STYLE
 from custom_widgets import (
     InvertButton, ResizeNotifyWidget, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
     _ThemedScrollBar, _bevel_button_stylesheet,
@@ -69,6 +69,8 @@ class PaneBuilderMixin:
     def _build_directory_widgets(self, pane: DirectoryPane) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
+        margins = layout.contentsMargins()
+        layout.setContentsMargins(_PANE_SIDE_MARGIN, margins.top(), _PANE_SIDE_MARGIN, margins.bottom())
 
         # File List view (entry field, toolbar, tree, count row) and
         # Statistics view (title row + _build_statistics_panel) each get

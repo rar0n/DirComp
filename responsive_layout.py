@@ -41,8 +41,6 @@ _group_buttons -- the wrapping takes care of the rest.
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout
 
-import os
-
 from constants import _CLUSTER_GROUP_GAP, _CLUSTER_V_GAP, _PANE_GAP
 from listing_ops import COL_ACCESSED, COL_CHANGED, COL_MODIFIED
 from panes import DirectoryPane
@@ -334,39 +332,12 @@ class ResponsiveLayoutMixin:
                 pane._cluster_arrangement_cache[avail] = arrangement
             index, cols = arrangement
             applied_key = (index, tuple(sorted(cols.items())), mirrored)
-            if os.environ.get("DIRCOMP_DEBUG_LAYOUT"):
-                self._debug_cluster(pane, avail, index, cols, measured)
             if not force and not measured and pane._cluster_applied == applied_key:
                 return
             self._apply_cluster_arrangement(pane, index, cols, mirrored)
             pane._cluster_applied = applied_key
         finally:
             pane._cluster_busy = False
-
-    def _debug_cluster(self, pane: DirectoryPane, avail: int, index: int, cols: dict, measured: bool):
-        """Temporary diagnostics (set DIRCOMP_DEBUG_LAYOUT=1): what the
-        arrangement search believes vs what is actually on screen."""
-        import sys
-        side = "L" if pane is self.left else "R"
-        parts = []
-        for key in _GROUP_KEYS:
-            group = self._group_widget(pane, key)
-            cached = pane._cluster_size_cache.get((key, cols[key]), (None, None))[0]
-            live_hint = group.sizeHint().width()
-            live_min = group.minimumSizeHint().width()
-            shown = group.width() if group.isVisible() else None
-            parts.append(f"{key}[{cols[key]}c] cached={cached} hint={live_hint} min={live_min} shown={shown}")
-        container = pane.cluster_container
-        row = getattr(self, "_panes_row", None)
-        parent = container.parentWidget()
-        pm = parent.layout().contentsMargins() if parent is not None and parent.layout() else None
-        print(
-            f"[layout {side}] win={self.width()} avail={avail} container={container.width()} "
-            f"parent={parent.width() if parent else None} parentMargins={(pm.left(), pm.right()) if pm else None} "
-            f"panesRow={row.width() if row is not None else None} topo={index} measured={measured}\n    "
-            + "\n    ".join(parts),
-            file=sys.stderr,
-        )
 
     def _apply_cluster_arrangement(self, pane: DirectoryPane, index: int, cols: dict, mirrored: bool):
         """Builds the container's row/stack layouts for arrangement

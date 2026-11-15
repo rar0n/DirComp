@@ -167,6 +167,9 @@ _CLUSTER_GROUP_GAP = 0
 # style's default is 9 px plus the frame) -- kept small so neighbouring
 # groups' buttons sit close together.
 _CLUSTER_GROUP_PAD = 3
+# Left/right margin inside each pane (the style's default is 9 px); together
+# with _PANE_GAP it sets how far apart the two panes' contents sit.
+_PANE_SIDE_MARGIN = 3
 # Settings tab's small color-table column headers (Item/Fg/Bg/...) --
 # bold alone still read at the same point size as the rest of the row,
 # so a size bump goes here too, distinct from (and smaller than) the

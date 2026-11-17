@@ -87,9 +87,29 @@ Requires Python 3.10 or newer (I think)
 (The venv prompt shows `(venv)` when it's active. Activate it again in each new terminal.)
 
 
-## Usage:
+## Run program
 
-(To be written... but for now these short instructions will have to do)
+Run it by starting `main.py` from its folder, in a terminal.
+You must activate the virtual environment (venv) first:
+
+Linux:
+```bash
+source venv/bin/activate
+python3 main.py
+```
+Windows (Command Prompt):
+```bat
+venv\Scripts\activate
+python main.py
+```
+Windows (PowerShell):
+```powershell
+.\venv\Scripts\Activate.ps1
+python main.py
+```
+
+## Usage
+(Most remains to be written as of now. Atm these short instructions will have to do)
 
 For starters I suggest making 2 dummy test folders with unimportant files and folders in them, some of which are copies of each other's contents. Then just play with the software to see how it works.
 

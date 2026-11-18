@@ -412,8 +412,10 @@ class DiffEngineMixin:
 
     def _lone_tag(self, full_path, is_dir):
         """Tag for an item with nothing to compare against: plain, except
-        under a hash comparison type where a hashed file (or a folder whose
-        files are all hashed) gets the "Hashed, but not compared" look."""
+        under a hash comparison type, where a file without a hash is
+        "unhashed", a hashed file "hashed, but not compared", and a folder
+        takes "hashed" if every file below it is hashed, "unhashed" if any
+        is not (a folder without files stays plain)."""
         plain = "directory" if is_dir else "file"
         if not full_path or not self._hash_type_selected():
             return plain
@@ -425,7 +427,7 @@ class DiffEngineMixin:
         blocked = self._hash_comparison_blocked()
         has_hash = (lambda n: n.get("hash") is not None) if blocked else (lambda n: self._node_hash(n) is not None)
         if not is_dir:
-            return "hashed_file" if has_hash(node) else plain
+            return "hashed_file" if has_hash(node) else "unhashed_file"
         cache = getattr(self, "_dir_rank_cache", None)
         if cache is None:
             cache = self._dir_rank_cache = {}
@@ -433,20 +435,21 @@ class DiffEngineMixin:
         state = cache.get(key)
         if state is None:
             files = 0
-            state = True
+            state = "hashed"
             stack = [node]
-            while stack and state:
+            while stack and state == "hashed":
                 for child in (stack.pop()["children"] or {}).values():
                     if child["is_dir"]:
                         stack.append(child)
                     else:
                         files += 1
                         if not has_hash(child):
-                            state = False
+                            state = "unhashed"
                             break
-            state = bool(state and files)
+            if not files:
+                state = "plain"
             cache[key] = state
-        return "hashed_dir" if state else plain
+        return {"hashed": "hashed_dir", "unhashed": "unhashed_dir"}.get(state, plain)
 
     def _diff_axes(self, is_dir, size_str, date_str, other_full, date_field="mtime", own_full=None):
         """Both ways an entry differs from its counterpart at `other_full`

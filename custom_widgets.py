@@ -26,7 +26,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QAbstractItemView, QPushButton, QScrollBar, QStyle, QProxyStyle,
     QStyledItemDelegate, QStyleOptionViewItem, QStyleOptionSlider, QStylePainter, QToolTip, QWidget,
-    QDoubleSpinBox, QHBoxLayout, QLayout, QSizePolicy, QSlider, QSpinBox, QToolButton, QVBoxLayout,
+    QDoubleSpinBox, QHBoxLayout, QLabel, QLayout, QSizePolicy, QSlider, QSpinBox, QToolButton, QVBoxLayout,
 )
 
 from constants import IS_DIR_ROLE
@@ -181,7 +181,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "past
 # Colors).
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
-    "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "save_snapshot",
+    "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "rehash", "save_snapshot",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->
@@ -190,6 +190,35 @@ _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
 # they moved to _THEME_DEFAULT_MAIN_BUTTON_KEYS along with the buttons
 # themselves (into the Clipboard group).
 _STATS_BUTTON_KEYS = ("files", "folders", "zoom_to", "reset", "fit_range", "zoom_in", "zoom_out")
+
+class ElidedLabel(QLabel):
+    """A one-line QLabel that never forces its parent wider: text that does
+    not fit is cut with "..." (the full text stays in the tooltip, set by
+    the caller). Used for each pane's upper status line."""
+
+    def __init__(self, text="", parent=None):
+        super().__init__("", parent)
+        self._full_text = ""
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.setText(text)
+
+    def setText(self, text):
+        self._full_text = text or ""
+        self._apply_elide()
+
+    def minimumSizeHint(self):
+        return QSize(0, super().minimumSizeHint().height())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_elide()
+
+    def _apply_elide(self):
+        shown = self.fontMetrics().elidedText(self._full_text, Qt.ElideRight, max(0, self.width()))
+        if self.width() <= 1:
+            shown = self._full_text
+        super().setText(shown)
+
 
 def _darken_hex(hex_color: str, factor: float = 0.82) -> str:
     """Darken a '#RRGGBB' color by `factor` (0-1), for a pressed-looking

@@ -25,7 +25,7 @@ import hashlib
 import os
 import time
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from constants import CMP_FINGERPRINT, HASH_ALGORITHMS
 from hash_cache_store import HashCacheStore
@@ -113,11 +113,15 @@ class HashOpsMixin:
                     nodes.append(node)
         return nodes
 
-    def _hash_pane(self, pane):
+    def _hash_pane(self, pane, rehash: bool = False):
         """The pane's "Hash" button: hash its not-yet-hashed files under
         the current comparison type. Enumerates first (busy bar), then
         shows progress by bytes; the pane's Cancel button stops it and
-        keeps what was done. Afterwards both panes are re-tagged."""
+        keeps what was done. Afterwards both panes are re-tagged.
+        `rehash` (the Rehash button): hash every file in scope, not just the
+        unhashed ones, and replace ALL stored digests of each file (every
+        key) with the new one; counts files whose digest changed although
+        size and date did not."""
         if (not self._hash_type_selected() or pane.snapshot_root is None
                 or getattr(pane, "snapshot_file", None)):
             return False
@@ -126,9 +130,21 @@ class HashOpsMixin:
         hashed = failed = 0
         pending = []  # rows not yet written to the persistent cache
         cache_failed = False
+        saved = compared = differed = 0
+
+        def flush():
+            nonlocal saved, cache_failed
+            count = len(pending)
+            if not count:
+                return
+            if self._flush_hash_rows(pending, exclusive=rehash):
+                if self._hash_cache_enabled():
+                    saved += count
+            else:
+                cache_failed = True
         try:
             nodes = self._files_to_hash(pane, progress)
-            todo = [n for n in nodes if self._node_hash(n) is None]
+            todo = list(nodes) if rehash else [n for n in nodes if self._node_hash(n) is None]
             if not progress.cancelled and todo:
                 total_units = sum(self._hash_cost(n["size"]) for n in todo) // _UNIT + 1
                 progress.start_phase(total_units)
@@ -147,27 +163,28 @@ class HashOpsMixin:
                 for i, node in enumerate(todo, 1):
                     if label is not None and time.monotonic() - last_label > 0.25:
                         last_label = time.monotonic()
-                        label.setText(f"Hashing {i}/{len(todo)}")
+                        label.setText(f"{'Rehashing' if rehash else 'Hashing'} {i}/{len(todo)}")
                         QApplication.processEvents()
+                    previous = self._node_hash(node)
                     digest = self._compute_file_hash(node["full_path"], node["size"], on_bytes)
                     if progress.cancelled:
                         break
                     if digest is None:
                         failed += 1
                         continue
-                    self._remember_hash(node, key, digest)
+                    if rehash and previous is not None:
+                        compared += 1
+                        differed += previous != digest
+                    self._remember_hash(node, key, digest, replace=rehash)
                     pending.append((os.path.normpath(node["full_path"]), key,
                                     node["size"], int(node["mtime"]), digest))
                     hashed += 1
                     if time.monotonic() - last_flush >= _FLUSH_SECONDS:
                         last_flush = time.monotonic()
-                        if not self._flush_hash_rows(pending):
-                            cache_failed = True
+                        flush()
         finally:
-            if not self._flush_hash_rows(pending):
-                cache_failed = True
-            if hashed:
-                self._prune_hash_cache(pane)
+            flush()
+            removed = self._prune_hash_cache(pane) if hashed else 0
             self._finish_transfer_progress(result_count=hashed)
         # The other pane may show the same folder (or files with the same
         # content-hash source): hand it what is in the RAM cache now.
@@ -177,7 +194,10 @@ class HashOpsMixin:
         # Said after the re-tag (which overwrites the status text): files
         # only compare once BOTH panes' files are hashed, so when the other
         # pane still has unhashed files nothing changes color yet -- say so.
-        message = f"{hashed} hashed"
+        message = f"{hashed} {'rehashed' if rehash else 'hashed'}"
+        if rehash and compared:
+            message += (f", {differed} hashed differently although size and date were unchanged"
+                        if differed else ", all matched their earlier hashes")
         if failed:
             message += f", {failed} could not be read"
         if cache_failed:
@@ -191,11 +211,12 @@ class HashOpsMixin:
             message += f". The other pane still has {waiting} unhashed file{'s' if waiting != 1 else ''}; " \
                        "hash it too to compare."
         self._set_transfer_label(message, pane)
+        self._report_cache_written(pane, saved, removed, cache_failed)
         return not progress.cancelled
 
     # ------------------------------------------------- Persistent hash cache
 
-    def _remember_hash(self, node, key, digest):
+    def _remember_hash(self, node, key, digest, replace: bool = False):
         """Put a freshly computed digest on its node and into the RAM
         caches (by path, and by inode so a renamed file keeps it)."""
         node["hash"] = (key, digest)
@@ -206,12 +227,17 @@ class HashOpsMixin:
         entry = cache.get(norm)
         if entry is None or (entry[0], entry[1]) != (size, mtime):
             entry = cache[norm] = (size, mtime, {})
+        if replace:
+            entry[2].clear()
         entry[2][key] = digest
         try:
             st = os.stat(node["full_path"])
         except OSError:
             return
-        by_inode.setdefault((st.st_dev, st.st_ino, st.st_size, int(st.st_mtime)), {})[key] = digest
+        slot = by_inode.setdefault((st.st_dev, st.st_ino, st.st_size, int(st.st_mtime)), {})
+        if replace:
+            slot.clear()
+        slot[key] = digest
 
     def _hash_store(self) -> HashCacheStore:
         store = self.__dict__.get("_hash_store_obj")
@@ -225,7 +251,7 @@ class HashOpsMixin:
         touches it)."""
         return bool(getattr(self, "_cache_hashed_folders", False)) and self._hash_type_selected()
 
-    def _flush_hash_rows(self, pending) -> bool:
+    def _flush_hash_rows(self, pending, exclusive: bool = False) -> bool:
         """Write `pending` rows (and empty the list) to the persistent
         cache. True if nothing needed writing or the write worked."""
         if not pending:
@@ -234,18 +260,19 @@ class HashOpsMixin:
         pending.clear()
         if not self._hash_cache_enabled():
             return True
-        return self._hash_store().put_many(rows)
+        return self._hash_store().put_many(rows, exclusive=exclusive)
 
-    def _prune_hash_cache(self, pane):
+    def _prune_hash_cache(self, pane) -> int:
         """After hashing: drop cache rows below this pane's root whose
         files are gone. Only for a scan that really saw the folder: files
         below an unreadable folder are kept, and a path missing from the
-        snapshot is only dropped if it is also missing on disk now."""
+        snapshot is only dropped if it is also missing on disk now.
+        Returns how many files' rows were removed."""
         if not self._hash_cache_enabled():
-            return
+            return 0
         root_node, index = pane.snapshot_root, pane.snapshot_index
         if root_node is None or not index:
-            return
+            return 0
         store = self._hash_store()
         root = os.path.normpath(root_node["full_path"])
         failed = [p for p, n in index.items() if n.get("scan_failed")]
@@ -263,6 +290,8 @@ class HashOpsMixin:
             cache = self.__dict__.get("_hash_cache", {})
             for path in gone:
                 cache.pop(path, None)
+            return len(gone)
+        return 0
 
     def _load_hash_cache_for(self, directory) -> int:
         """Read the persistent cache rows below `directory` into the RAM
@@ -328,12 +357,16 @@ class HashOpsMixin:
         reading and writing (the file is left alone)."""
         self._cache_hashed_folders = bool(checked)
         if not checked or not self._hash_type_selected():
+            for pane in (self.left, self.right):
+                self._set_upper_status(pane, "")
             return
         self._ensure_hash_cache_loaded()
         if self._reattach_cached_hashes() and any(
                 getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
             self._invalidate_dir_rank_cache()
             self.update_listings(rescan_disk=False)
+        for pane in (self.left, self.right):
+            self._report_cache_read(pane)
 
     def _on_clear_hash_cache(self):
         """Settings > Options > "Clear cache": wipe the persistent file and
@@ -350,16 +383,62 @@ class HashOpsMixin:
         self._invalidate_dir_rank_cache()
         if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
             self.update_listings(rescan_disk=False)
+        for pane in (self.left, self.right):
+            self._set_upper_status(pane, "Hash cache cleared" if pane.snapshot_root is not None else "")
         self._set_settings_status(f"Hash cache cleared ({removed} file{'s' if removed != 1 else ''} had entries).")
+
+    def _rehash_pane(self, pane):
+        """The pane's "Rehash" button: after a confirmation, hash every file
+        in the Hash button's scope again, discarding all stored hashes."""
+        if (not self._hash_type_selected() or pane.snapshot_root is None
+                or getattr(pane, "snapshot_file", None)):
+            return False
+        scope = ("every file in this pane" if self._recursive_folder_contents_enabled()
+                 else "the files currently visible in this pane")
+        answer = QMessageBox.question(
+            self, "Rehash",
+            f"Discard the stored hashes (every algorithm) of {scope} and hash them again?\n\n"
+            "Files that now hash differently although their size and date are unchanged "
+            "are reported afterwards.",
+            QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
+        if answer != QMessageBox.Yes:
+            return False
+        return self._hash_pane(pane, rehash=True)
+
+    def _report_cache_read(self, pane):
+        """Upper status line after a folder was loaded (or the cache was
+        switched on / the key changed): what the hash cache supplied.
+        Nothing is written by this. Blank when the cache is not in use."""
+        if not self._hash_cache_enabled() or pane.snapshot_root is None or getattr(pane, "snapshot_file", None):
+            self._set_upper_status(pane, "")
+            return
+        files = hashed = 0
+        for node in (pane.snapshot_index or {}).values():
+            if not node["is_dir"]:
+                files += 1
+                hashed += self._node_hash(node) is not None
+        self._set_upper_status(
+            pane, f"Hash cache read, nothing written: {hashed} of {files} file{'s' if files != 1 else ''} already hashed")
+
+    def _report_cache_written(self, pane, saved, removed, failed):
+        """Upper status line after hashing wrote to the cache."""
+        if failed:
+            self._set_upper_status(pane, "Could not write the hash cache")
+        elif self._hash_cache_enabled() and (saved or removed):
+            text = f"Hash cache updated {time.strftime('%H:%M:%S')}: {saved} hash{'es' if saved != 1 else ''} saved"
+            if removed:
+                text += f", {removed} stale entr{'ies' if removed != 1 else 'y'} removed"
+            self._set_upper_status(pane, text)
 
     def _update_hash_buttons_enabled(self, operation_enabled: bool = True):
         """Hash buttons only work for the hash comparison types (and not
         while another operation runs)."""
         enabled = operation_enabled and self._hash_type_selected()
         for pane in (getattr(self, "left", None), getattr(self, "right", None)):
-            button = getattr(pane, "hash_button", None) if pane is not None else None
-            if button is not None:
-                button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
+            for attr in ("hash_button", "rehash_button"):
+                button = getattr(pane, attr, None) if pane is not None else None
+                if button is not None:
+                    button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
             # File Op (Rename / New Folder / Delete) can't act on a snapshot.
             if pane is None:
                 continue

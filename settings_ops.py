@@ -598,6 +598,8 @@ class SettingsMixin:
         if self._hash_type_selected():
             self._ensure_hash_cache_loaded()
             self._reattach_cached_hashes()
+        for pane in (self.left, self.right):
+            self._report_cache_read(pane)
         # Nothing to re-tag until a folder has been loaded (settings are
         # applied at startup, before any listing exists).
         if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):

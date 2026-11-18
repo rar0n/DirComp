@@ -10,7 +10,7 @@ diff_engine.py         -   867 - comparison types, hash pairing, diff tags
 dircomp_settings.json  -   505 - The stored settings file.
 dnd_widgets.py         -   956
 hash_cache_store.py    -   327 - persistent hash cache: one SQLite file (HashCacheStore), no Qt
-hash_ops.py            -   402 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
+hash_ops.py            -   481 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
 listing_ops.py         - 1,791
 main.py                -   153
 pane_builder.py        - 1,361 - one pane's widgets, Statistics panel, splitter

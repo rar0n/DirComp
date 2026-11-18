@@ -144,8 +144,9 @@ class SnapshotOpsMixin:
             label.setText(message)
 
     def _update_snapshot_label(self, pane):
-        """The small line above the entry combo: where a loaded snapshot
-        came from. Hidden for live folders."""
+        """The pane's permanent upper status line (above the entry combo):
+        where a loaded snapshot came from, else the last hash cache message
+        (see _set_upper_status). Empty text when there is nothing to say."""
         label = getattr(pane, "snapshot_info_label", None)
         if label is None:
             return
@@ -154,10 +155,17 @@ class SnapshotOpsMixin:
             label.setText(f"Snapshot of {meta.get('root_path', '?')} "
                           f"(root: {meta.get('root_name', '?')}, saved {meta.get('created', '?')})")
             label.setToolTip(pane.snapshot_file)
-            label.setVisible(True)
         else:
-            label.setText("")
-            label.setVisible(False)
+            text, tip = getattr(pane, "upper_status", ("", ""))
+            label.setText(text)
+            label.setToolTip(tip or text)
+
+    def _set_upper_status(self, pane, text, tip=None):
+        """Show `text` on the pane's upper status line (kept in the pane so
+        it survives a UI rebuild; a loaded snapshot's own line wins while
+        one is shown)."""
+        pane.upper_status = (text, tip or text)
+        self._update_snapshot_label(pane)
 
     # ------------------------------------------------------------- Saving
 

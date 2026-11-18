@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_GROUP_PAD, _CLUSTER_V_GAP, _PANE_SIDE_MARGIN, _DISABLED_CHECKBOX_STYLE
 from custom_widgets import (
-    InvertButton, ResizeNotifyWidget, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
+    ElidedLabel, InvertButton, ResizeNotifyWidget, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
     _ThemedScrollBar, _bevel_button_stylesheet,
 )
 from dnd_widgets import DirDropComboBox, DirDropTreeWidget
@@ -95,11 +95,15 @@ class PaneBuilderMixin:
         entry.historyEntryDeleted.connect(lambda path, p=pane: self._on_history_entry_deleted(p, path))
         # Where a loaded snapshot came from (original path, root name); hidden
         # for live folders -- see SnapshotOpsMixin._update_snapshot_label.
-        snapshot_info_label = QLabel("")
-        snapshot_info_label.setVisible(False)
+        # Now a permanent upper status line (filled below, once the Hash /
+        # Rehash buttons exist): snapshot origin while a snapshot is loaded,
+        # else hash cache read/write messages.
+        snapshot_info_label = ElidedLabel("")
         pane.snapshot_info_label = snapshot_info_label
         self._update_snapshot_label(pane)
-        file_list_layout.addWidget(snapshot_info_label)
+        upper_row = QHBoxLayout()
+        upper_row.setContentsMargins(0, 0, 0, 0)
+        file_list_layout.addLayout(upper_row)
         file_list_layout.addWidget(entry)
         pane.entry = entry
         # Repopulate the freshly built combo's dropdown from this pane's
@@ -368,6 +372,31 @@ class PaneBuilderMixin:
         hash_button.setEnabled(self._hash_type_selected())
         pane.hash_button = hash_button
 
+        # Same scope as Hash, but throws away every stored hash of those
+        # files and computes them again -- see HashOpsMixin._rehash_pane.
+        rehash_button = QPushButton("Rehash")
+        rehash_button.setToolTip(
+            "Discard the stored hashes (every algorithm) of this pane's files and hash them "
+            "again. Same files as Hash: with Recursive Folder Selections on, every file; "
+            "otherwise only the visible ones. Reports files whose hash changed although "
+            "their size and date did not."
+        )
+        rehash_button.setFixedHeight(uniform_h)
+        rehash_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("rehash")))
+        rehash_button.clicked.connect(lambda checked=False, p=pane: self._rehash_pane(p))
+        rehash_button.setEnabled(self._hash_type_selected())
+        pane.rehash_button = rehash_button
+
+        # Upper status line: text first, buttons at the end (mirrored with
+        # the pane's button order, like the toolbar below).
+        upper_row.addWidget(snapshot_info_label, 1)
+        if layout_left:
+            upper_row.addWidget(rehash_button)
+            upper_row.addWidget(hash_button)
+        else:
+            upper_row.insertWidget(0, rehash_button)
+            upper_row.insertWidget(0, hash_button)
+
         free_space_label = QLabel("")
         free_space_label.setStyleSheet("font-weight: bold;")
         # Rich text so the size figure can carry the Title Numeric color
@@ -409,11 +438,9 @@ class PaneBuilderMixin:
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)
-            toolbar_layout.addWidget(hash_button)
             toolbar_layout.addWidget(clear_view_button)
         else:
             toolbar_layout.addWidget(clear_view_button)
-            toolbar_layout.addWidget(hash_button)
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)

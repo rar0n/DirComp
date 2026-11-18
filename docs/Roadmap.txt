@@ -205,3 +205,12 @@ are implemented; 3-5 are not.
    missing on disk).
  - Not done yet: "Changed since cached" state/colors (step 3), DirComp
    move/rename/delete/copy hooks (step 4), Rehash button (step 5).
+
+Update 2026-11-18 (same branch): each pane has a permanent upper status line above the
+path combo (ElidedLabel): snapshot origin while a snapshot is loaded, else hash cache
+messages ("Hash cache read, nothing written: N of M files already hashed", "Hash cache
+updated HH:MM:SS: N hashes saved, M stale entries removed", "Hash cache cleared"). The
+Hash button moved there from the toolbar, with the new Rehash button (step 5 done:
+confirmation, same scope as Hash, replaces all keys of each file, bottom status line
+reports files that hashed differently with unchanged size/date). Rehash has its own
+row in Settings > File List View Colors > Button Colors. Still open: steps 3 and 4.

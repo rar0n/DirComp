@@ -245,11 +245,12 @@ class HashCacheStore:
 
     # --------------------------------------------------------------- writing
 
-    def put_many(self, rows) -> bool:
+    def put_many(self, rows, exclusive: bool = False) -> bool:
         """Store (path, key, size, mtime, digest) rows in one transaction.
         For each path, digests stored for another size/mtime are dropped
         (that file changed) and only the MAX_KEYS_PER_FILE most recent
-        keys are kept. Returns False if nothing could be written."""
+        keys are kept. `exclusive` (Rehash) also drops every other key of
+        those paths. Returns False if nothing could be written."""
         rows = list(rows)
         if not rows:
             return True
@@ -265,10 +266,12 @@ class HashCacheStore:
                     "INSERT OR REPLACE INTO hashes (path, key, size, mtime, digest, stamp)"
                     " VALUES (?, ?, ?, ?, ?, ?)",
                     (path, _key_text(key), int(size), int(mtime), digest, now + i * 1e-6))
-                paths[path] = (int(size), int(mtime))
-            for path, (size, mtime) in paths.items():
+                paths[path] = (int(size), int(mtime), _key_text(key))
+            for path, (size, mtime, key_text) in paths.items():
                 conn.execute("DELETE FROM hashes WHERE path = ? AND (size <> ? OR mtime <> ?)",
                              (path, size, mtime))
+                if exclusive:
+                    conn.execute("DELETE FROM hashes WHERE path = ? AND key <> ?", (path, key_text))
                 conn.execute(
                     "DELETE FROM hashes WHERE path = ? AND key NOT IN"
                     " (SELECT key FROM hashes WHERE path = ? ORDER BY stamp DESC LIMIT ?)",

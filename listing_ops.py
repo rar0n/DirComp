@@ -582,6 +582,7 @@ class ListingMixin:
         self._invalidate_dir_rank_cache()
         if directory is None:
             pane.snapshot_root, pane.snapshot_index = None, {}
+            self._set_upper_status(pane, "")
         elif self._in_pane_snapshot(pane, directory):
             # A loaded snapshot: nothing to scan, just show the part of it
             # that `directory` names.
@@ -595,6 +596,7 @@ class ListingMixin:
             pane.snapshot_root, pane.snapshot_index = self._build_snapshot(directory, progress=progress)
             if pane.snapshot_root is None:
                 pane.snapshot_index = {}
+            self._report_cache_read(pane)
         # Feed this pane's embedded timeline from the same snapshot --
         # see TimelineOpsMixin._refresh_pane_timeline. Cheap either way
         # (a flatten of an already-built in-memory tree, no disk I/O),

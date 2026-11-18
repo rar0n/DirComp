@@ -57,7 +57,12 @@ class DirectoryPane:
         self.snapshot_full_root = None
         self.snapshot_full_index = None
         self.snapshot_hash_key = None
-        self.snapshot_info_label: QLabel | None = None
+        self.snapshot_info_label: QLabel | None = None  # the pane's upper status line
+        # (text, tooltip) shown there while no snapshot is loaded: hash cache
+        # read/write messages -- see SnapshotOpsMixin._set_upper_status.
+        self.upper_status = ("", "")
+        self.hash_button = None
+        self.rehash_button = None
         self.save_snapshot_button = None
         self.select_group: QGroupBox | None = None
         # File Op / Clipboard groups, tracked the same way select_group

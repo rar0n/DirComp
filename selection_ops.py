@@ -886,7 +886,7 @@ class SelectionMixin:
                 free_w = [metrics.horizontalAdvance(plain) for plain, _html in free_atoms]
                 buttons = (
                     pane.up_button, pane.select_button, pane.save_snapshot_button,
-                    pane.hash_button, pane.clear_view_button,
+                    pane.clear_view_button,
                 )
                 fixed = sum(b.sizeHint().width() for b in buttons) + 3 * 6 + 8
                 spacing = pane._toolbar_layout.spacing() if getattr(pane, "_toolbar_layout", None) else 6

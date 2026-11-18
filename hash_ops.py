@@ -6,10 +6,17 @@ Hashes live on the in-memory snapshot's file nodes as node["hash"] =
 (comparison_key, hex digest) -- see DiffEngineMixin._node_hash, which only
 honors one made under the comparison settings in effect now. Because a
 snapshot is rebuilt from scratch on every Refresh, every digest is also
-kept in self._hash_cache {normalized path: (size, int mtime, key, digest)},
-and DiffEngineMixin._snapshot_node re-attaches it while rebuilding, as long
-as the file's size and mtime still match. Pairing files by hash (the actual
-comparison) is in diff_engine.py.
+kept in self._hash_cache {normalized path: (size, int mtime, {key: digest})}
+(several comparison keys per file), and DiffEngineMixin._snapshot_node
+re-attaches it while rebuilding, as long as the file's size and mtime still
+match. Pairing files by hash (the actual comparison) is in diff_engine.py.
+
+With Settings > Options > "Cache hashed folders" on (and a hash type
+selected) that RAM cache is backed by hash_cache_store.HashCacheStore, a
+SQLite file: read once per folder root when a folder loads (or when the
+setting / comparison type is switched on), written when hashes are made
+(about every _FLUSH_SECONDS while hashing and at the end). Opening a folder
+writes nothing. See "Plan: persistent hash cache" in docs/Roadmap.txt.
 """
 
 from __future__ import annotations
@@ -21,9 +28,11 @@ import time
 from PySide6.QtWidgets import QApplication
 
 from constants import CMP_FINGERPRINT, HASH_ALGORITHMS
+from hash_cache_store import HashCacheStore
 
 _CHUNK = 1024 * 1024
 _UNIT = 4096  # progress bar unit (bytes): keeps the bar's int range safe for huge totals
+_FLUSH_SECONDS = 30  # how often hashes made so far are written to the persistent cache
 
 _ALGORITHM_FACTORIES = {
     "MD5": hashlib.md5, "SHA-1": hashlib.sha1, "SHA-256": hashlib.sha256,
@@ -115,6 +124,8 @@ class HashOpsMixin:
         key = self._comparison_key()
         progress = self._start_transfer_progress(total=None, label="Enumerating...", pane=pane)
         hashed = failed = 0
+        pending = []  # rows not yet written to the persistent cache
+        cache_failed = False
         try:
             nodes = self._files_to_hash(pane, progress)
             todo = [n for n in nodes if self._node_hash(n) is None]
@@ -132,8 +143,7 @@ class HashOpsMixin:
                     units, carry = divmod(carry, _UNIT)
                     return progress.advance(units) if units else progress.pump()
 
-                cache = self.__dict__.setdefault("_hash_cache", {})
-                by_inode = self.__dict__.setdefault("_hash_cache_by_inode", {})
+                last_flush = time.monotonic()
                 for i, node in enumerate(todo, 1):
                     if label is not None and time.monotonic() - last_label > 0.25:
                         last_label = time.monotonic()
@@ -145,17 +155,23 @@ class HashOpsMixin:
                     if digest is None:
                         failed += 1
                         continue
-                    node["hash"] = (key, digest)
-                    cache[os.path.normpath(node["full_path"])] = (
-                        node["size"], int(node["mtime"]), key, digest)
-                    try:
-                        st = os.stat(node["full_path"])
-                        by_inode[(st.st_dev, st.st_ino, st.st_size, int(st.st_mtime))] = (key, digest)
-                    except OSError:
-                        pass
+                    self._remember_hash(node, key, digest)
+                    pending.append((os.path.normpath(node["full_path"]), key,
+                                    node["size"], int(node["mtime"]), digest))
                     hashed += 1
+                    if time.monotonic() - last_flush >= _FLUSH_SECONDS:
+                        last_flush = time.monotonic()
+                        if not self._flush_hash_rows(pending):
+                            cache_failed = True
         finally:
+            if not self._flush_hash_rows(pending):
+                cache_failed = True
+            if hashed:
+                self._prune_hash_cache(pane)
             self._finish_transfer_progress(result_count=hashed)
+        # The other pane may show the same folder (or files with the same
+        # content-hash source): hand it what is in the RAM cache now.
+        self._reattach_cached_hashes()
         self._invalidate_dir_rank_cache()
         self.update_listings(rescan_disk=False)
         # Said after the re-tag (which overwrites the status text): files
@@ -164,6 +180,8 @@ class HashOpsMixin:
         message = f"{hashed} hashed"
         if failed:
             message += f", {failed} could not be read"
+        if cache_failed:
+            message += " (could not write the hash cache)"
         other = self.right if pane is self.left else self.left
         waiting = 0
         if other.snapshot_index:
@@ -174,6 +192,165 @@ class HashOpsMixin:
                        "hash it too to compare."
         self._set_transfer_label(message, pane)
         return not progress.cancelled
+
+    # ------------------------------------------------- Persistent hash cache
+
+    def _remember_hash(self, node, key, digest):
+        """Put a freshly computed digest on its node and into the RAM
+        caches (by path, and by inode so a renamed file keeps it)."""
+        node["hash"] = (key, digest)
+        cache = self.__dict__.setdefault("_hash_cache", {})
+        by_inode = self.__dict__.setdefault("_hash_cache_by_inode", {})
+        norm = os.path.normpath(node["full_path"])
+        size, mtime = node["size"], int(node["mtime"])
+        entry = cache.get(norm)
+        if entry is None or (entry[0], entry[1]) != (size, mtime):
+            entry = cache[norm] = (size, mtime, {})
+        entry[2][key] = digest
+        try:
+            st = os.stat(node["full_path"])
+        except OSError:
+            return
+        by_inode.setdefault((st.st_dev, st.st_ino, st.st_size, int(st.st_mtime)), {})[key] = digest
+
+    def _hash_store(self) -> HashCacheStore:
+        store = self.__dict__.get("_hash_store_obj")
+        if store is None:
+            store = self._hash_store_obj = HashCacheStore()
+        return store
+
+    def _hash_cache_enabled(self) -> bool:
+        """The persistent cache is read and written: "Cache hashed folders"
+        is on and a hash type is selected (Name, size and date never
+        touches it)."""
+        return bool(getattr(self, "_cache_hashed_folders", False)) and self._hash_type_selected()
+
+    def _flush_hash_rows(self, pending) -> bool:
+        """Write `pending` rows (and empty the list) to the persistent
+        cache. True if nothing needed writing or the write worked."""
+        if not pending:
+            return True
+        rows = list(pending)
+        pending.clear()
+        if not self._hash_cache_enabled():
+            return True
+        return self._hash_store().put_many(rows)
+
+    def _prune_hash_cache(self, pane):
+        """After hashing: drop cache rows below this pane's root whose
+        files are gone. Only for a scan that really saw the folder: files
+        below an unreadable folder are kept, and a path missing from the
+        snapshot is only dropped if it is also missing on disk now."""
+        if not self._hash_cache_enabled():
+            return
+        root_node, index = pane.snapshot_root, pane.snapshot_index
+        if root_node is None or not index:
+            return
+        store = self._hash_store()
+        root = os.path.normpath(root_node["full_path"])
+        failed = [p for p, n in index.items() if n.get("scan_failed")]
+        sep = os.sep
+        gone = []
+        for path in store.paths_under(root):
+            if path in index:
+                continue
+            if any(path.startswith(f.rstrip(sep) + sep) for f in failed):
+                continue
+            if os.path.lexists(path):
+                continue
+            gone.append(path)
+        if gone and store.delete_paths(gone):
+            cache = self.__dict__.get("_hash_cache", {})
+            for path in gone:
+                cache.pop(path, None)
+
+    def _load_hash_cache_for(self, directory) -> int:
+        """Read the persistent cache rows below `directory` into the RAM
+        cache, once per folder root (a folder inside an already loaded
+        root is covered). Returns how many files were added. Reads only;
+        nothing is created or written."""
+        if not directory or not self._hash_cache_enabled():
+            return 0
+        root = os.path.normpath(directory)
+        loaded = self.__dict__.setdefault("_hash_cache_roots", set())
+        for done in loaded:
+            if root == done or root.startswith(done.rstrip(os.sep) + os.sep):
+                return 0
+        rows = self._hash_store().load_prefix(root)
+        loaded.add(root)
+        cache = self.__dict__.setdefault("_hash_cache", {})
+        added = 0
+        for path, (size, mtime, keys) in rows.items():
+            mem = cache.get(path)
+            if mem is None:
+                cache[path] = (size, mtime, dict(keys))
+                added += 1
+            elif (mem[0], mem[1]) == (size, mtime):
+                for k, d in keys.items():
+                    mem[2].setdefault(k, d)
+        return added
+
+    def _ensure_hash_cache_loaded(self):
+        """Load the cache for both panes' folders (e.g. right after the
+        setting or the comparison type was switched on)."""
+        for pane in (getattr(self, "left", None), getattr(self, "right", None)):
+            if pane is None or getattr(pane, "snapshot_file", None) or pane.snapshot_root is None:
+                continue
+            self._load_hash_cache_for(pane.snapshot_root["full_path"])
+
+    def _reattach_cached_hashes(self) -> int:
+        """Give the already built snapshots' files the cached digest for
+        the comparison key in effect now (RAM only, no disk access):
+        after the key changed, or after the cache was loaded for them."""
+        cache = self.__dict__.get("_hash_cache")
+        if not cache:
+            return 0
+        key = self._comparison_key()
+        attached = 0
+        for pane in (getattr(self, "left", None), getattr(self, "right", None)):
+            if pane is None or getattr(pane, "snapshot_file", None):
+                continue
+            for norm, node in (pane.snapshot_index or {}).items():
+                if node["is_dir"] or self._node_hash(node) is not None:
+                    continue
+                entry = cache.get(norm)
+                if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
+                    digest = entry[2].get(key)
+                    if digest is not None:
+                        node["hash"] = (key, digest)
+                        attached += 1
+        return attached
+
+    def _on_cache_hashed_folders_toggled(self, checked):
+        """Settings > Options > "Cache hashed folders". Switching it on
+        (with a hash type selected) reads the cache for the folders
+        already open and re-tags from it; switching it off just stops
+        reading and writing (the file is left alone)."""
+        self._cache_hashed_folders = bool(checked)
+        if not checked or not self._hash_type_selected():
+            return
+        self._ensure_hash_cache_loaded()
+        if self._reattach_cached_hashes() and any(
+                getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
+            self._invalidate_dir_rank_cache()
+            self.update_listings(rescan_disk=False)
+
+    def _on_clear_hash_cache(self):
+        """Settings > Options > "Clear cache": wipe the persistent file and
+        every hash held in RAM, so open folders show as unhashed."""
+        removed = self._hash_store().clear()
+        self.__dict__["_hash_cache"] = {}
+        self.__dict__["_hash_cache_by_inode"] = {}
+        self.__dict__["_hash_cache_roots"] = set()
+        for pane in (getattr(self, "left", None), getattr(self, "right", None)):
+            if pane is None or getattr(pane, "snapshot_file", None):
+                continue
+            for node in (pane.snapshot_index or {}).values():
+                node.pop("hash", None)
+        self._invalidate_dir_rank_cache()
+        if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
+            self.update_listings(rescan_disk=False)
+        self._set_settings_status(f"Hash cache cleared ({removed} file{'s' if removed != 1 else ''} had entries).")
 
     def _update_hash_buttons_enabled(self, operation_enabled: bool = True):
         """Hash buttons only work for the hash comparison types (and not

@@ -56,7 +56,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
-    "multi_select_matching", "multi_select_same_folder",
+    "multi_select_matching", "multi_select_same_folder", "cache_hashed_folders",
 })
 
 
@@ -115,6 +115,7 @@ class SettingsMixin:
             "first_name_only": getattr(self, "first_name_only_cb", None),
             "multi_select_matching": getattr(self, "multi_select_matching_cb", None),
             "multi_select_same_folder": getattr(self, "multi_select_same_folder_cb", None),
+            "cache_hashed_folders": getattr(self, "cache_hashed_folders_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)
@@ -591,6 +592,12 @@ class SettingsMixin:
             return
         self._cmp_applied_key = key
         self._invalidate_dir_rank_cache()
+        # Persistent hash cache: with a hash type now selected, read the
+        # rows for the open folders (once per root) and give the snapshots
+        # whatever the RAM cache holds for the new key -- no disk rescan.
+        if self._hash_type_selected():
+            self._ensure_hash_cache_loaded()
+            self._reattach_cached_hashes()
         # Nothing to re-tag until a folder has been loaded (settings are
         # applied at startup, before any listing exists).
         if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):

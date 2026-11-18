@@ -587,6 +587,11 @@ class ListingMixin:
             # that `directory` names.
             pane.snapshot_root, pane.snapshot_index = self._select_snapshot_subtree(pane, directory)
         else:
+            # Persistent hash cache: read the rows for this folder into RAM
+            # first, so _build_snapshot re-attaches them (a read only; opening
+            # a folder never writes). No-op unless "Cache hashed folders" is
+            # on and a hash type is selected.
+            self._load_hash_cache_for(directory)
             pane.snapshot_root, pane.snapshot_index = self._build_snapshot(directory, progress=progress)
             if pane.snapshot_root is None:
                 pane.snapshot_index = {}

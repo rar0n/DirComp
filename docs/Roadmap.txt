@@ -127,7 +127,7 @@ from / extends the plan above:
    drag-out disabled, also in the narrow layout).
 
 ==============================================================================
-Plan: persistent hash cache (decided 2026-11-18, not implemented)
+Plan: persistent hash cache (decided 2026-11-18, steps 1-2 implemented, see status below)
 ==============================================================================
 
 Idea: make the existing in-memory hash cache (diff_engine._attach_cached_hash,
@@ -190,3 +190,18 @@ Explicitly NOT doing: ghost rows, size-based pre-filtering of what to hash, a
 "Verify" button (Rehash covers it).
 
 Later (phase 3 / loose ideas): see the original idea list kept outside this file.
+
+Status 2026-11-18 (branch feature/hash-cache): steps 1 and 2 of the suggested order
+are implemented; 3-5 are not.
+ - Done: hash_cache_store.py (SQLite, version, corrupt = rebuilt, atomic
+   transactions, 3 keys per file); Settings > Options "Cache hashed folders"
+   (default off, saved with the shared settings) + "Clear cache" button (wipes the
+   file AND the RAM hashes, so open folders show as unhashed); the RAM cache now
+   holds several keys per file ({key: digest}); rows are read once per folder
+   root when a folder loads / the setting or hash type is switched on; switching
+   the comparison key re-attaches hashes from RAM without a rescan; Hash writes
+   about every 30 s and at the end (also after Cancel) and prunes rows of files
+   that are gone (never below an unreadable folder, and only if the file is also
+   missing on disk).
+ - Not done yet: "Changed since cached" state/colors (step 3), DirComp
+   move/rename/delete/copy hooks (step 4), Rehash button (step 5).

@@ -89,7 +89,10 @@ class DiffEngineMixin:
             with os.scandir(path) as it:
                 raw_entries = list(it)
         except OSError:
+            # Unreadable folder: its (unknown) contents must not be taken
+            # for "deleted" when the persistent hash cache is pruned.
             node["children"] = {}
+            node["scan_failed"] = True
             return node
 
         children = {}
@@ -196,23 +199,30 @@ class DiffEngineMixin:
 
     def _attach_cached_hash(self, node, norm_path, st=None):
         """Called while a snapshot is built: give a file node back its
-        hash from the app-wide cache, if the file's size and mtime are
-        still what they were when it was hashed (and the settings match,
-        which _node_hash checks). Looked up by path first; failing that by
-        (device, inode, size, mtime), so a file that was only renamed or
-        moved within its filesystem keeps its hash."""
+        hash for the comparison key in effect now from the app-wide cache
+        (self._hash_cache {normpath: (size, int mtime, {key: digest})},
+        see HashOpsMixin), if the file's size and mtime are still what
+        they were when it was hashed. Looked up by path first; failing
+        that by (device, inode, size, mtime), so a file that was only
+        renamed or moved within its filesystem keeps its hash. Switching
+        the comparison key later re-attaches without a rescan:
+        HashOpsMixin._reattach_cached_hashes."""
         cache = getattr(self, "_hash_cache", None)
         if not cache:
             return
+        key = self._comparison_key()
         entry = cache.get(norm_path)
         if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
-            node["hash"] = (entry[2], entry[3])
-            return
+            digest = entry[2].get(key)
+            if digest is not None:
+                node["hash"] = (key, digest)
+                return
         if st is not None:
-            entry = getattr(self, "_hash_cache_by_inode", {}).get(
+            keys = getattr(self, "_hash_cache_by_inode", {}).get(
                 (st.st_dev, st.st_ino, st.st_size, int(st.st_mtime)))
-            if entry:
-                node["hash"] = entry
+            digest = keys.get(key) if keys else None
+            if digest is not None:
+                node["hash"] = (key, digest)
 
     def _pair_dir_files(self, node_a, node_b):
         """Hash comparison: pair the FILES of two counterpart folders by

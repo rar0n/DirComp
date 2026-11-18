@@ -253,6 +253,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._multi_select_matching = True
             self._multi_select_same_folder = True
             self._cmp_applied_key = None
+            # Settings tab -> Options -> "Cache hashed folders" (see
+            # HashOpsMixin._hash_cache_enabled): off by default.
+            self._cache_hashed_folders = False
         if not hasattr(self, "_select_colors"):
             self._select_colors = dict(_DEFAULT_SELECT_COLORS)
         if not hasattr(self, "_summary_colors"):

@@ -9,7 +9,8 @@ custom_widgets.py      - 2,140 - now also holds the slider classes
 diff_engine.py         -   867 - comparison types, hash pairing, diff tags
 dircomp_settings.json  -   505 - The stored settings file.
 dnd_widgets.py         -   956
-hash_ops.py            -   225 - per-pane Hash button: hashing, cache, progress (HashOpsMixin)
+hash_cache_store.py    -   327 - persistent hash cache: one SQLite file (HashCacheStore), no Qt
+hash_ops.py            -   402 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
 listing_ops.py         - 1,791
 main.py                -   153
 pane_builder.py        - 1,361 - one pane's widgets, Statistics panel, splitter
@@ -137,9 +138,21 @@ hash_ops.py
 HashOpsMixin: the per-pane Hash button. Enumerates the pane's files (busy bar),
 hashes them with progress by bytes (cancellable), stores digests on snapshot
 nodes as node["hash"] = (comparison_key, digest), and keeps a path+size+mtime
-cache (plus an inode fallback so a renamed file keeps its hash). Also decides
-which buttons are enabled: Hash, File Op / Clipboard groups, Select buttons
-that make no sense for the current comparison/snapshot state.
+cache {normpath: (size, mtime, {key: digest})} (plus an inode fallback so a
+renamed file keeps its hash). With Settings > Options > "Cache hashed folders"
+on, that cache is read from / flushed to hash_cache_store (see below): load per
+folder root when a folder loads, write about every 30 s while hashing and at
+the end, prune rows of files that are gone. Also decides which buttons are
+enabled: Hash, File Op / Clipboard groups, Select buttons that make no sense
+for the current comparison/snapshot state.
+
+hash_cache_store.py
+----------------------
+HashCacheStore: the SQLite file behind the persistent hash cache
+(Cache/hashes.sqlite in the program folder, else the user cache folder).
+Rows (path, key, size, mtime, digest); at most 3 keys per file; a changed
+file's older digests are dropped; a corrupt/foreign file is rebuilt; reads
+never create the file. No Qt and no pane knowledge.
 
 
 

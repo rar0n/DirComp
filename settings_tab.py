@@ -582,6 +582,34 @@ class SettingsTabMixin:
         self.multi_select_matching_cb.toggled.connect(self._on_multi_select_setting_changed)
         self.multi_select_same_folder_cb.toggled.connect(self._on_multi_select_setting_changed)
 
+        # Row 18: the persistent hash cache (HashOpsMixin / hash_cache_store).
+        cache_row = QHBoxLayout()
+        cache_row.setContentsMargins(0, 0, 0, 0)
+        cache_row.addSpacing(20)
+        self.cache_hashed_folders_cb = QCheckBox("Cache hashed folders")
+        self.cache_hashed_folders_cb.setChecked(self._cache_hashed_folders)
+        self.cache_hashed_folders_cb.setToolTip(
+            "Hash value / Fingerprint only: remember computed hashes between "
+            "sessions, so files that are unchanged (same size and date) need "
+            "not be hashed again. Only hashed and fingerprinted files are "
+            "cached; with Name, size and date nothing is read or written.\n"
+            "The cache is one database file holding the file names and hashes "
+            "of the folders you hashed (Cache/hashes.sqlite in the program "
+            "folder, else your user cache folder). Opening a folder never "
+            "writes to it."
+        )
+        cache_row.addWidget(self.cache_hashed_folders_cb)
+        cache_row.addSpacing(20)
+        clear_cache_button = QPushButton("Clear cache")
+        clear_cache_button.setToolTip(
+            "Deletes every stored hash (the cache file's contents) and the "
+            "hashes held in memory, so open folders show as unhashed.")
+        clear_cache_button.clicked.connect(self._on_clear_hash_cache)
+        cache_row.addWidget(clear_cache_button)
+        cache_row.addStretch(1)
+        global_grid.addLayout(cache_row, 18, 0, 1, 7)
+        self.cache_hashed_folders_cb.toggled.connect(self._on_cache_hashed_folders_toggled)
+
         self._update_comparison_controls_enabled()
         self._cmp_applied_key = self._comparison_key()
         self.comparison_type_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)

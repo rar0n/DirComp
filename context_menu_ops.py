@@ -25,6 +25,7 @@ import configparser
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -174,11 +175,44 @@ def _expand_exec(exec_line: str, paths):
     return [one([conv(p)]) for p in paths]
 
 
+def _clean_env() -> dict:
+    """The environment for programs started from here, without the Python
+    virtual environment DirComp itself runs in: an editor or viewer that has
+    its own Python plugins (xed, for one) would otherwise pick up the venv's
+    interpreter, which lacks system modules such as `gi`, and warn that its
+    plugins failed to load."""
+    env = dict(os.environ)
+    venv = env.pop("VIRTUAL_ENV", None)
+    env.pop("VIRTUAL_ENV_PROMPT", None)
+    env.pop("PYTHONHOME", None)
+    if venv:
+        prefix = os.path.normpath(venv)
+        parts = [p for p in env.get("PATH", "").split(os.pathsep)
+                 if p and not os.path.normpath(p).startswith(prefix)]
+        env["PATH"] = os.pathsep.join(parts)
+    return env
+
+
 def _spawn(argv):
     subprocess.Popen(
         argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, start_new_session=True,
+        stderr=subprocess.DEVNULL, start_new_session=True, env=_clean_env(),
     )
+
+
+def _open_default(path: str) -> bool:
+    """Open `path` with its default program. On Linux through xdg-open in a
+    clean environment (see _clean_env); elsewhere, or if xdg-open is missing,
+    through Qt."""
+    if sys.platform.startswith("linux"):
+        opener = shutil.which("xdg-open", path=_clean_env().get("PATH"))
+        if opener:
+            try:
+                _spawn([opener, path])
+                return True
+            except OSError:
+                pass
+    return QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
 
 class ContextMenuMixin:
@@ -274,7 +308,7 @@ class ContextMenuMixin:
             )
             if answer != QMessageBox.Open:
                 return
-        failed = [p for p in paths if not QDesktopServices.openUrl(QUrl.fromLocalFile(p))]
+        failed = [p for p in paths if not _open_default(p)]
         if failed:
             QMessageBox.warning(self, "Open", "Could not open:\n" + "\n".join(failed))
 

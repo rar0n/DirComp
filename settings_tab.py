@@ -680,7 +680,7 @@ class SettingsTabMixin:
              self._on_status_unselected_color_changed, None),
             # Main tab -> Global Options' Refresh button. The theme's
             # default button colors until one is picked.
-            ("Refresh button",
+            ("Refresh (global)",
              lambda: self._main_button_color_for("refresh")[1],
              lambda: self._main_button_color_for("refresh")[0],
              lambda hexc: self._on_main_button_color_changed("refresh", False, hexc),

@@ -489,23 +489,49 @@ class HashOpsMixin:
             if gone:
                 self._note_cache_change(self._plural(len(gone), "hash removed", "hashes removed"))
 
-    def _rehash_pane(self, pane):
-        """The pane's "Rehash" button: after a confirmation, hash every file
-        in the Hash button's scope again, discarding all stored hashes."""
-        if (not self._hash_type_selected() or pane.snapshot_root is None
-                or getattr(pane, "snapshot_file", None)):
+    def _refresh_pane(self, pane):
+        """The pane's "Refresh" button: re-read this pane's folder from disk
+        (the other pane is not rescanned, only re-tagged against it). With a
+        hash comparison type it also rehashes: after a confirmation, every
+        file in the Hash button's scope is hashed again and ALL its stored
+        hashes are discarded."""
+        if getattr(pane, "snapshot_file", None) or not pane.entry.text():
             return False
-        scope = ("every file in this pane" if self._recursive_folder_contents_enabled()
-                 else "the files currently visible in this pane")
-        answer = QMessageBox.question(
-            self, "Rehash",
-            f"Discard the stored hashes (every algorithm) of {scope} and hash them again?\n\n"
-            "Files that now hash differently although their size and date are unchanged "
-            "are reported afterwards.",
-            QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
-        if answer != QMessageBox.Yes:
-            return False
-        return self._hash_pane(pane, rehash=True)
+        rehash = self._hash_type_selected()
+        if rehash:
+            scope = ("every file in this pane" if self._recursive_folder_contents_enabled()
+                     else "the files currently visible in this pane")
+            answer = QMessageBox.question(
+                self, "Refresh and rehash",
+                f"Re-read this pane's folder, discard the stored hashes (every algorithm) of "
+                f"{scope} and hash them again?\n\n"
+                "Files that now hash differently although their size and date are unchanged "
+                "are reported afterwards.",
+                QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
+            if answer != QMessageBox.Yes:
+                return False
+        self.update_listings(initiating_pane=pane, rescan_panes=(pane,))
+        self._recount_pane_items_with_indicator(pane)
+        if rehash and pane.snapshot_root is not None:
+            return self._hash_pane(pane, rehash=True)
+        return True
+
+    def _on_pane_comparison_type_activated(self, index):
+        """A pane's comparison type drop-down was used: hand the choice to the
+        Settings tab's combo, whose change handler does everything."""
+        if self.comparison_type_combo.currentIndex() != index:
+            self.comparison_type_combo.setCurrentIndex(index)
+
+    def _sync_pane_comparison_combos(self):
+        """Settings tab's comparison type changed (or was loaded): show it in
+        both panes' copies, without triggering them."""
+        index = self.comparison_type_combo.currentIndex()
+        for pane in (getattr(self, "left", None), getattr(self, "right", None)):
+            combo = getattr(pane, "comparison_type_combo", None) if pane is not None else None
+            if combo is not None and combo.currentIndex() != index:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(index)
+                combo.blockSignals(False)
 
     def _report_cache_read(self, pane):
         """Upper status line after a folder was loaded (or the cache was
@@ -543,10 +569,18 @@ class HashOpsMixin:
         while another operation runs)."""
         enabled = operation_enabled and self._hash_type_selected()
         for pane in (getattr(self, "left", None), getattr(self, "right", None)):
-            for attr in ("hash_button", "rehash_button"):
-                button = getattr(pane, attr, None) if pane is not None else None
-                if button is not None:
-                    button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
+            button = getattr(pane, "hash_button", None) if pane is not None else None
+            if button is not None:
+                button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
+            # Refresh works in every comparison mode (not on a snapshot);
+            # the comparison type copy is locked like the other controls
+            # while an operation runs.
+            refresh = getattr(pane, "pane_refresh_button", None) if pane is not None else None
+            if refresh is not None:
+                refresh.setEnabled(operation_enabled and not getattr(pane, "snapshot_file", None))
+            combo = getattr(pane, "comparison_type_combo", None) if pane is not None else None
+            if combo is not None:
+                combo.setEnabled(operation_enabled)
             # File Op (Rename / New Folder / Delete) can't act on a snapshot.
             if pane is None:
                 continue

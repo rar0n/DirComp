@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QHeaderView, QLabel, QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget,
 )
 
-from constants import CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_GROUP_PAD, _CLUSTER_V_GAP, _PANE_SIDE_MARGIN, _DISABLED_CHECKBOX_STYLE
+from constants import CHANGED_FIELD_LABEL, COMPARISON_TYPES, TIMELINE_SCROLLBAR_RANGE, _CLUSTER_GROUP_PAD, _CLUSTER_V_GAP, _PANE_SIDE_MARGIN, _DISABLED_CHECKBOX_STYLE
 from custom_widgets import (
     ElidedLabel, InvertButton, ResizeNotifyWidget, _MAIN_BUTTON_ICON_KINDS, _SelectionColorDelegate, _SelectionMarkerScrollBar,
     _ThemedScrollBar, _bevel_button_stylesheet,
@@ -372,29 +372,45 @@ class PaneBuilderMixin:
         hash_button.setEnabled(self._hash_type_selected())
         pane.hash_button = hash_button
 
-        # Same scope as Hash, but throws away every stored hash of those
-        # files and computes them again -- see HashOpsMixin._rehash_pane.
-        rehash_button = QPushButton("Rehash")
-        rehash_button.setToolTip(
-            "Discard the stored hashes (every algorithm) of this pane's files and hash them "
-            "again. Same files as Hash: with Recursive Folder Selections on, every file; "
-            "otherwise only the visible ones. Reports files whose hash changed although "
-            "their size and date did not."
+        # This pane's own Refresh (next to Clear view): re-reads this pane's
+        # folder from disk; with a hash comparison type it also rehashes --
+        # see HashOpsMixin._refresh_pane.
+        pane_refresh_button = QPushButton("Refresh")
+        pane_refresh_button.setToolTip(
+            "Re-read this pane's folder from disk (the other pane is left alone).\n"
+            "With Hash value / Fingerprint selected it also discards the stored hashes "
+            "(every algorithm) of this pane's files and hashes them again, after a "
+            "confirmation: every file with Recursive Folder Selections on, otherwise only "
+            "the visible ones. Files whose hash changed although size and date did not "
+            "are reported."
         )
-        rehash_button.setFixedHeight(uniform_h)
-        rehash_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("rehash")))
-        rehash_button.clicked.connect(lambda checked=False, p=pane: self._rehash_pane(p))
-        rehash_button.setEnabled(self._hash_type_selected())
-        pane.rehash_button = rehash_button
+        pane_refresh_button.setFixedHeight(uniform_h)
+        pane_refresh_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("pane_refresh")))
+        pane_refresh_button.clicked.connect(lambda checked=False, p=pane: self._refresh_pane(p))
+        pane.pane_refresh_button = pane_refresh_button
 
-        # Upper status line: text first, buttons at the end (mirrored with
-        # the pane's button order, like the toolbar below).
+        # A copy of the Settings tab's "Comparison type" drop-down (the two
+        # stay in step; algorithm and chunk sizes stay in the Settings tab).
+        cmp_combo = QComboBox()
+        cmp_combo.addItems(COMPARISON_TYPES)
+        cmp_combo.setCurrentIndex(getattr(self, "_cmp_type", 0))
+        cmp_combo.setFixedHeight(uniform_h)
+        cmp_combo.setToolTip(
+            "How a file is judged to match its counterpart in the other pane "
+            "(same setting as Settings > Options > Comparison type, where the "
+            "hash algorithm and fingerprint chunk sizes are also set)."
+        )
+        cmp_combo.activated.connect(self._on_pane_comparison_type_activated)
+        pane.comparison_type_combo = cmp_combo
+
+        # Upper status line: text, then the comparison type and Hash at the
+        # end (mirrored with the pane's button order, like the toolbar below).
         upper_row.addWidget(snapshot_info_label, 1)
         if layout_left:
-            upper_row.addWidget(rehash_button)
+            upper_row.addWidget(cmp_combo)
             upper_row.addWidget(hash_button)
         else:
-            upper_row.insertWidget(0, rehash_button)
+            upper_row.insertWidget(0, cmp_combo)
             upper_row.insertWidget(0, hash_button)
 
         free_space_label = QLabel("")
@@ -438,9 +454,11 @@ class PaneBuilderMixin:
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)
+            toolbar_layout.addWidget(pane_refresh_button)
             toolbar_layout.addWidget(clear_view_button)
         else:
             toolbar_layout.addWidget(clear_view_button)
+            toolbar_layout.addWidget(pane_refresh_button)
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)

@@ -580,6 +580,7 @@ class SettingsMixin:
         the snapshots already in memory (no disk rescan: nothing on disk
         changed, and update_listings' retag_only path just recolors)."""
         self._cmp_type = self.comparison_type_combo.currentIndex()
+        self._sync_pane_comparison_combos()
         self._cmp_algorithm = self.hash_algorithm_combo.currentIndex()
         self._cmp_chunk_start_kb = self.fingerprint_start_spin.value()
         self._cmp_chunk_end_kb = self.fingerprint_end_spin.value()

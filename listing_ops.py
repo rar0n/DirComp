@@ -203,7 +203,8 @@ class ListingMixin:
         if not self._recursive_folder_contents_enabled():
             self.update_type_counts(pane)
 
-    def update_listings(self, initiating_pane: "DirectoryPane | None" = None, rescan_disk: bool = True):
+    def update_listings(self, initiating_pane: "DirectoryPane | None" = None, rescan_disk: bool = True,
+                        rescan_panes=None):
         """Refresh both views. If both directories are set, each listing is
         diff-colored against its counterpart on the other side -- and that
         now applies recursively as subfolders get expanded too -- so there's
@@ -225,6 +226,10 @@ class ListingMixin:
         left_valid/right_valid checks below still do a cheap os.path.isdir
         stat either way -- that's just confirming the path itself still
         resolves to a directory at all, not a re-read of its contents.
+
+        `rescan_panes`, when given (with rescan_disk True), limits the disk
+        re-read to those panes -- a pane's own Refresh: the other pane keeps
+        its snapshot and is only re-tagged against the new one.
 
         `initiating_pane`, when given, is purely cosmetic -- which of the
         two status-line bars shows the "Loading..." busy indicator for
@@ -288,11 +293,11 @@ class ListingMixin:
             return
         self._update_listings_pending = True
         try:
-            self._update_listings_impl(initiating_pane, rescan_disk)
+            self._update_listings_impl(initiating_pane, rescan_disk, rescan_panes)
         finally:
             self._update_listings_pending = False
 
-    def _update_listings_impl(self, initiating_pane: "DirectoryPane | None", rescan_disk: bool):
+    def _update_listings_impl(self, initiating_pane: "DirectoryPane | None", rescan_disk: bool, rescan_panes=None):
         self._update_free_space_label(self.left)
         self._update_free_space_label(self.right)
 
@@ -338,8 +343,9 @@ class ListingMixin:
             if rescan_disk:
                 if owns_progress:
                     progress.start_phase(None)
-                self._refresh_pane_snapshot(self.left, left_dir if left_valid else None, progress)
-                if not progress.cancelled:
+                if rescan_panes is None or self.left in rescan_panes:
+                    self._refresh_pane_snapshot(self.left, left_dir if left_valid else None, progress)
+                if not progress.cancelled and (rescan_panes is None or self.right in rescan_panes):
                     if owns_progress:
                         progress.start_phase(None)
                     self._refresh_pane_snapshot(self.right, right_dir if right_valid else None, progress)

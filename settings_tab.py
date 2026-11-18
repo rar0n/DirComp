@@ -1409,7 +1409,7 @@ class SettingsTabMixin:
         flv_buttons_group = self._main_button_color_table([
             ("up", "Up one folder"), ("select_dir", "Select Directory"),
             ("save_snapshot", "Save Snapshot"),
-            ("hash", "Hash"), ("rehash", "Rehash"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
+            ("hash", "Hash"), ("pane_refresh", "Refresh"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
             ("collapse_all", "Collapse (-)"),
         ])
         flv_buttons_block = self._settings_subsubsection("Button Colors", flv_buttons_group)

@@ -229,3 +229,11 @@ Update 2026-11-18 (steps 3 and 4 done, same branch):
    size and date equal the source's. Hooks: transfer_ops._transfer_paths,
    rename_selected, delete_selected -> HashOpsMixin._cache_files_moved/_copied,
    _cache_path_renamed/_deleted. The upper status line reports it.
+
+Update 2026-11-18 (layout/function tweak): the per-pane "Rehash" button became "Refresh"
+and moved next to (before) Clear view. It re-reads only its own pane's folder
+(update_listings(rescan_panes=...)); with Hash value / Fingerprint selected it then
+rehashes as before (confirmation first). The Global Options Refresh (both panes) stays.
+Its old place in the upper status line, before Hash, now holds a copy of the Settings
+tab's "Comparison type" drop-down (kept in step both ways; algorithm and chunk sizes
+stay in Settings). Button Colors key: "pane_refresh".

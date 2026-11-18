@@ -126,4 +126,67 @@ from / extends the plan above:
    panes are read-only (File Op, Clipboard, Cut/Copy/Paste, Open/Properties and
    drag-out disabled, also in the narrow layout).
 
+==============================================================================
+Plan: persistent hash cache (decided 2026-11-18, not implemented)
+==============================================================================
+
+Idea: make the existing in-memory hash cache (diff_engine._attach_cached_hash,
+hash_ops._hash_cache / _hash_cache_by_inode) survive restarts, so hashes are not
+recomputed. It is NOT a snapshot view: the pane always shows the live folder.
+
+Setting (Settings > Options, global, shared by both panes)
+ - "Cache hashed folders". Tooltip: only hashed and fingerprinted items are cached.
+ - Name, size and date never reads or writes the cache; it behaves as today.
+ - Default off. Turning it off leaves the cache file untouched.
+
+What is stored / used
+ - Only hashed and fingerprinted files, keyed by path, with size, mtime and the
+   digest per comparison key (type, algorithm, chunk sizes). Several keys per file
+   are kept (most recent 3); Rehash / Clear cache reset them.
+ - Entries are valid only while size and mtime still match (as the in-memory cache).
+ - NO ghosts: cached files that no longer exist live are ignored and dropped
+   when the cache is next written for that folder (only folders actually scanned,
+   never after a failed scan). No cache-as-offline-view; offline folders are
+   covered by explicit .fss snapshots.
+ - Read once into RAM when a folder loads; switching comparison type re-attaches
+   hashes from RAM without a disk rescan.
+
+Colors (Comparison Type Colors table, hash modes only)
+ - New row "Changed since cached" (File/Folder, Fg/Bg): a cached path whose size
+   or mtime differs. Wins over "Unhashed".
+ - "Unhashed": no usable entry for the current key (new file, or cached only
+   under another key).
+ - Folders: derived from contents like Unhashed (any changed file inside = Changed,
+   Changed > Unhashed); the folder's own mtime is ignored.
+
+When the cache is written (opening a folder writes nothing)
+ - Hash / Rehash: flushed about every 30 s while hashing and at the end, so Cancel
+   or a crash keeps the work. Progress by bytes already exists.
+ - DirComp move, rename, delete: move/rename carry the hash to the new path
+   (folders re-key everything below), delete removes entries. Copy: the new file
+   gets the source hash if destination size and mtime equal the source's.
+ - Pruning of missing files happens on these writes (see above).
+
+Buttons
+ - Hash: unchanged, hashes only the delta (unhashed or changed files).
+ - Rehash (new, per pane next to Hash, own row in Button Colors): same scope as
+   Hash (Recursive Folder Selections on = all files, off = visible only). Discards
+   ALL stored digests (every key) for those files and recomputes under the current
+   key only. Confirmation dialog first. Reports how many files hashed differently
+   although size and date were unchanged.
+ - Settings: "Clear cache" button (wipe everything).
+
+Storage
+ - One SQLite file (stdlib sqlite3) rather than one file per folder: Cache/hashes.sqlite
+   in the program folder, falling back to the user cache dir (XDG cache /
+   %LOCALAPPDATA%) if not writable. Add Cache/ to .gitignore.
+ - Atomic/WAL writes, format version, corrupt file = rebuild, single writer
+   (both panes may show the same folder). The cache holds file names and hashes
+   of browsed folders; mention in the tooltip.
+ - Paths normalized (case on Windows). Moving a folder outside DirComp loses its
+   entries (renames within a session still match by inode).
+
+Explicitly NOT doing: ghost rows, size-based pre-filtering of what to hash, a
+"Verify" button (Rehash covers it).
+
 Later (phase 3 / loose ideas): see the original idea list kept outside this file.

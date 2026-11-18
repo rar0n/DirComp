@@ -510,6 +510,7 @@ class TransferMixin:
             try:
                 send2trash(path)
                 deleted_count += 1
+                self._cache_path_deleted(path)
             except Exception as e:
                 errors.append(f"{os.path.basename(path)}: {e}")
 
@@ -728,6 +729,7 @@ class TransferMixin:
         overwrite_policy = None
 
         moved_files = []
+        transferred = []  # (src, dest) pairs, for the hash cache
         for src in files:
             if progress is not None and not progress.tick():
                 break
@@ -786,6 +788,15 @@ class TransferMixin:
                 errors.append(f"{src}: {e}")
                 continue
             moved_files.append(src)
+            transferred.append((src, dest))
+
+        # Keep the hash cache right: moved files take their hashes along,
+        # copies inherit them when size and date are equal.
+        if transferred:
+            if move:
+                self._cache_files_moved(transferred)
+            else:
+                self._cache_files_copied(transferred)
 
         if move:
             # The directories themselves were recreated at the
@@ -862,6 +873,7 @@ class TransferMixin:
             try:
                 os.rename(src, dest)
                 renamed.append((p, dest))
+                self._cache_path_renamed(src, dest)
             except OSError as e:
                 errors.append(f"{src}: {e}")
 

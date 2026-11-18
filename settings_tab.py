@@ -1312,7 +1312,7 @@ class SettingsTabMixin:
             "missing": "Missing", "matching": "Matching", "newer": "Newer", "older": "Older",
             "smaller": "Smaller", "larger": "Larger", "diff_folders": "Content differs",
         }
-        comparison_colors_table = QTableWidget(len(_SELECT_KEY_TO_TAG_COLOR_KEYS) + 2, 6)
+        comparison_colors_table = QTableWidget(len(_SELECT_KEY_TO_TAG_COLOR_KEYS) + 3, 6)
         self._style_table_widget(
             comparison_colors_table,
             ["Comparison type", "File Fg", "File Bg", "Folder Fg", "Folder Bg", "Comparison Type\nSummary Text Color"],
@@ -1357,7 +1357,26 @@ class SettingsTabMixin:
         dash = self._table_item("\u2014")
         dash.setTextAlignment(Qt.AlignCenter)
         comparison_colors_table.setItem(unhashed_row, 5, dash)
-        hashed_row = unhashed_row + 1
+        changed_row = unhashed_row + 1
+        changed_label = self._table_item("Changed since cached")
+        changed_label.setToolTip(
+            "Hash value / Fingerprint comparison only: files whose cached hash is "
+            "out of date because their size or date changed since they were hashed, "
+            "and folders holding such files. Takes priority over Unhashed."
+        )
+        comparison_colors_table.setItem(changed_row, 0, changed_label)
+        for col, (tag, is_fg) in enumerate(
+            (("changed_file", True), ("changed_file", False),
+             ("changed_dir", True), ("changed_dir", False)), start=1,
+        ):
+            comparison_colors_table.setCellWidget(changed_row, col, self._center_in_cell(self._make_color_swatch(
+                lambda t=tag, f=is_fg: self._tag_color_hex(t, f),
+                lambda hexc, t=tag, f=is_fg: self._on_comparison_color_changed(t, f, hexc),
+            )))
+        dash3 = self._table_item("\u2014")
+        dash3.setTextAlignment(Qt.AlignCenter)
+        comparison_colors_table.setItem(changed_row, 5, dash3)
+        hashed_row = changed_row + 1
         hashed_label = self._table_item("Hashed, not compared")
         hashed_label.setToolTip(
             "Hash value / Fingerprint comparison only: files and folders that "

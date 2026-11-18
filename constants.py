@@ -68,6 +68,10 @@ TAG_COLORS = {
     # Settings -> Comparison Type Colors -> "Unhashed"). Neutral greys.
     "unhashed_file": ("#C8C8C8", "black"),
     "unhashed_dir": ("#B0B0B0", "blue"),
+    # Hash comparison types: a file whose cached hash is out of date (the
+    # size or date changed since it was hashed) and folders holding one.
+    "changed_file": ("#E8C888", "black"),
+    "changed_dir": ("#D4A85C", "blue"),
     # Hash comparison types: hashed, but with nothing to compare against
     # (the other pane is empty, or Dual Pane is off).
     "hashed_file": ("#B8E0E8", "black"),

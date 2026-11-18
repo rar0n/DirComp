@@ -299,6 +299,60 @@ class HashCacheStore:
         low, high = _prefix_range(root)
         return self._write(lambda c: c.execute("DELETE FROM hashes WHERE path >= ? AND path < ?", (low, high)))
 
+    def move_paths(self, pairs) -> bool:
+        """Files moved/renamed: (old, new) pairs. Whatever was stored for the
+        new path is dropped first (it was overwritten)."""
+        pairs = list(pairs)
+        if not pairs or not self.exists():
+            return True
+
+        def action(c):
+            for old, new in pairs:
+                c.execute("DELETE FROM hashes WHERE path = ?", (new,))
+                c.execute("UPDATE hashes SET path = ? WHERE path = ?", (new, old))
+        return self._write(action)
+
+    def move_tree(self, old: str, new: str) -> bool:
+        """A file or folder renamed: its rows, and every row below it, go to
+        the new path (stale rows already at the new path are dropped)."""
+        if not self.exists():
+            return True
+        new_low, new_high = _prefix_range(new)
+        old_low, old_high = _prefix_range(old)
+
+        def action(c):
+            c.execute("DELETE FROM hashes WHERE path = ? OR (path >= ? AND path < ?)", (new, new_low, new_high))
+            c.execute("UPDATE hashes SET path = ? WHERE path = ?", (new, old))
+            c.execute("UPDATE hashes SET path = ? || substr(path, ?) WHERE path >= ? AND path < ?",
+                      (new_low, len(old_low) + 1, old_low, old_high))
+        return self._write(action)
+
+    def copy_rows(self, items) -> bool:
+        """Files copied: (source, copy, size, mtime) tuples, size/mtime being
+        the copy's own. The copy inherits the source's digests only where
+        they were made for exactly that size and mtime."""
+        items = list(items)
+        if not items or not self.exists():
+            return True
+        stamp = time.time()
+
+        def action(c):
+            for src, dst, size, mtime in items:
+                c.execute("DELETE FROM hashes WHERE path = ?", (dst,))
+                c.execute(
+                    "INSERT INTO hashes (path, key, size, mtime, digest, stamp)"
+                    " SELECT ?, key, size, mtime, digest, ? FROM hashes"
+                    " WHERE path = ? AND size = ? AND mtime = ?", (dst, stamp, src, int(size), int(mtime)))
+        return self._write(action)
+
+    def delete_tree(self, path: str) -> bool:
+        """A file or folder deleted: its row(s) and everything below it."""
+        if not self.exists():
+            return True
+        low, high = _prefix_range(path)
+        return self._write(lambda c: c.execute(
+            "DELETE FROM hashes WHERE path = ? OR (path >= ? AND path < ?)", (path, low, high)))
+
     def clear(self) -> int:
         """Wipe every row; returns how many files had entries."""
         before = self.count()

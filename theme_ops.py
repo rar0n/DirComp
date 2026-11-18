@@ -888,6 +888,7 @@ class ThemeOpsMixin:
         tag_colors = {
             "directory": ["#E0E090", "blue"], "file": [None, None], "error": ["#FFB6C1", "red"],
             "unhashed_file": ["#C8C8C8", "black"], "unhashed_dir": ["#B0B0B0", "blue"],
+            "changed_file": ["#E8C888", "black"], "changed_dir": ["#D4A85C", "blue"],
             "hashed_file": ["#B8E0E8", "black"], "hashed_dir": ["#9CCBD6", "blue"],
         }
         for key, tag_keys in _SELECT_KEY_TO_TAG_COLOR_KEYS.items():
@@ -902,6 +903,7 @@ class ThemeOpsMixin:
             for tag_keys in _SELECT_KEY_TO_TAG_COLOR_KEYS.values():
                 tag_colors[tag_keys[-1]][1] = defaults["folder_fg_override"]
             tag_colors["unhashed_dir"][1] = defaults["folder_fg_override"]
+            tag_colors["changed_dir"][1] = defaults["folder_fg_override"]
             tag_colors["hashed_dir"][1] = defaults["folder_fg_override"]
         stats_palette = {
             "background_color": defaults["stats_bg"],

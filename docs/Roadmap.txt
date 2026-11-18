@@ -127,7 +127,7 @@ from / extends the plan above:
    drag-out disabled, also in the narrow layout).
 
 ==============================================================================
-Plan: persistent hash cache (decided 2026-11-18, steps 1-2 implemented, see status below)
+Plan: persistent hash cache (decided 2026-11-18, all five steps implemented, see status below)
 ==============================================================================
 
 Idea: make the existing in-memory hash cache (diff_engine._attach_cached_hash,
@@ -214,3 +214,18 @@ Hash button moved there from the toolbar, with the new Rehash button (step 5 don
 confirmation, same scope as Hash, replaces all keys of each file, bottom status line
 reports files that hashed differently with unchanged size/date). Rehash has its own
 row in Settings > File List View Colors > Button Colors. Still open: steps 3 and 4.
+
+Update 2026-11-18 (steps 3 and 4 done, same branch):
+ - "Changed since cached": a file node gets node["changed"] when the RAM cache
+   holds an entry for its path with another size/whole-second mtime and no
+   inode match (diff_engine._attach_cached_hash, hash_ops._reattach_cached_hashes);
+   hashing clears it. Pair state "changed" beside "unhashed"; tags changed_file /
+   changed_dir (lone items, paired files, folder ranks: rank -1 with direction
+   "changed" beats "unhashed"). Settings > Comparison Type Colors has the row
+   (File/Folder Fg/Bg).
+ - DirComp file operations keep the cache right (RAM always, the file only while
+   the cache is in use): move/rename carry hashes to the new path (folders re-key
+   everything below), delete removes them, copy inherits them when the copy's
+   size and date equal the source's. Hooks: transfer_ops._transfer_paths,
+   rename_selected, delete_selected -> HashOpsMixin._cache_files_moved/_copied,
+   _cache_path_renamed/_deleted. The upper status line reports it.

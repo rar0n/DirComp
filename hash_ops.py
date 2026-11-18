@@ -220,6 +220,7 @@ class HashOpsMixin:
         """Put a freshly computed digest on its node and into the RAM
         caches (by path, and by inode so a renamed file keeps it)."""
         node["hash"] = (key, digest)
+        node.pop("changed", None)
         cache = self.__dict__.setdefault("_hash_cache", {})
         by_inode = self.__dict__.setdefault("_hash_cache_by_inode", {})
         norm = os.path.normpath(node["full_path"])
@@ -329,13 +330,15 @@ class HashOpsMixin:
 
     def _reattach_cached_hashes(self) -> int:
         """Give the already built snapshots' files the cached digest for
-        the comparison key in effect now (RAM only, no disk access):
-        after the key changed, or after the cache was loaded for them."""
+        the comparison key in effect now, and flag files whose cached entry
+        is out of date ("Changed since cached"): RAM only, no disk access.
+        For after the key changed, or after the cache was loaded for them.
+        Returns how many files were attached or had their flag changed."""
         cache = self.__dict__.get("_hash_cache")
         if not cache:
             return 0
         key = self._comparison_key()
-        attached = 0
+        touched = 0
         for pane in (getattr(self, "left", None), getattr(self, "right", None)):
             if pane is None or getattr(pane, "snapshot_file", None):
                 continue
@@ -343,12 +346,19 @@ class HashOpsMixin:
                 if node["is_dir"] or self._node_hash(node) is not None:
                     continue
                 entry = cache.get(norm)
-                if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
+                if not entry:
+                    continue
+                if entry[0] == node["size"] and entry[1] == int(node["mtime"]):
                     digest = entry[2].get(key)
                     if digest is not None:
                         node["hash"] = (key, digest)
-                        attached += 1
-        return attached
+                        touched += 1
+                    if node.pop("changed", None):
+                        touched += 1
+                elif not node.get("changed"):
+                    node["changed"] = True
+                    touched += 1
+        return touched
 
     def _on_cache_hashed_folders_toggled(self, checked):
         """Settings > Options > "Cache hashed folders". Switching it on
@@ -380,12 +390,104 @@ class HashOpsMixin:
                 continue
             for node in (pane.snapshot_index or {}).values():
                 node.pop("hash", None)
+                node.pop("changed", None)
         self._invalidate_dir_rank_cache()
         if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):
             self.update_listings(rescan_disk=False)
         for pane in (self.left, self.right):
             self._set_upper_status(pane, "Hash cache cleared" if pane.snapshot_root is not None else "")
         self._set_settings_status(f"Hash cache cleared ({removed} file{'s' if removed != 1 else ''} had entries).")
+
+    # ---------- Keeping the cache right when DirComp itself changes files
+
+    def _note_cache_change(self, text):
+        """Queue "Hash cache updated ...: <text>" for both panes' upper status
+        lines: shown by the next _report_cache_read of each pane (the
+        listings are rescanned right after a file operation, which would
+        otherwise overwrite it at once)."""
+        self.__dict__["_cache_note_pending"] = {
+            "text": f"Hash cache updated {time.strftime('%H:%M:%S')}: {text}",
+            "t": time.monotonic(),
+            "panes": {id(getattr(self, "left", None)), id(getattr(self, "right", None))},
+        }
+
+    @staticmethod
+    def _plural(n, one, many):
+        return f"{n} {one if n == 1 else many}"
+
+    def _cache_files_moved(self, pairs):
+        """Files moved by DirComp (src, dest): their hashes follow them, so
+        they need not be hashed again. RAM always; the cache file only while
+        the cache is in use."""
+        norm = os.path.normpath
+        pairs = [(norm(s), norm(d)) for s, d in pairs]
+        cache = self.__dict__.get("_hash_cache") or {}
+        hits = 0
+        for src, dst in pairs:
+            cache.pop(dst, None)
+            entry = cache.pop(src, None)
+            if entry is not None:
+                cache[dst] = entry
+                hits += 1
+        if self._hash_cache_enabled():
+            self._hash_store().move_paths(pairs)
+            if hits:
+                self._note_cache_change(self._plural(hits, "hash moved", "hashes moved"))
+
+    def _cache_files_copied(self, pairs):
+        """Files copied by DirComp (src, dest): a copy inherits the source's
+        hashes if its size and date equal the source's (copy2 keeps the
+        date), else it starts unhashed."""
+        norm = os.path.normpath
+        cache = self.__dict__.get("_hash_cache") or {}
+        items = []
+        hits = 0
+        for src, dst in pairs:
+            src, dst = norm(src), norm(dst)
+            cache.pop(dst, None)
+            try:
+                st = os.stat(dst)
+            except OSError:
+                continue
+            items.append((src, dst, st.st_size, int(st.st_mtime)))
+            entry = cache.get(src)
+            if entry and (entry[0], entry[1]) == (st.st_size, int(st.st_mtime)):
+                cache[dst] = (entry[0], entry[1], dict(entry[2]))
+                hits += 1
+        if self._hash_cache_enabled():
+            self._hash_store().copy_rows(items)
+            if hits:
+                self._note_cache_change(self._plural(hits, "hash copied", "hashes copied"))
+
+    def _cache_path_renamed(self, old, new):
+        """A file or folder renamed by DirComp: everything below it re-keys."""
+        norm = os.path.normpath
+        old, new = norm(old), norm(new)
+        cache = self.__dict__.get("_hash_cache") or {}
+        old_pre, new_pre = old.rstrip(os.sep) + os.sep, new.rstrip(os.sep) + os.sep
+        for key in [k for k in cache if k == new or k.startswith(new_pre)]:
+            del cache[key]
+        hits = 0
+        for key in [k for k in cache if k == old or k.startswith(old_pre)]:
+            cache[new + key[len(old):]] = cache.pop(key)
+            hits += 1
+        if self._hash_cache_enabled():
+            self._hash_store().move_tree(old, new)
+            if hits:
+                self._note_cache_change(self._plural(hits, "hash moved", "hashes moved"))
+
+    def _cache_path_deleted(self, path):
+        """A file or folder deleted (sent to the trash) by DirComp."""
+        path = os.path.normpath(path)
+        cache = self.__dict__.get("_hash_cache") or {}
+        pre = path.rstrip(os.sep) + os.sep
+        gone = [k for k in cache if k == path or k.startswith(pre)]
+        for key in gone:
+            del cache[key]
+        if self._hash_cache_enabled():
+            self._hash_store().delete_tree(path)
+            if gone:
+                self._note_cache_change(self._plural(len(gone), "hash removed", "hashes removed"))
 
     def _rehash_pane(self, pane):
         """The pane's "Rehash" button: after a confirmation, hash every file
@@ -412,6 +514,12 @@ class HashOpsMixin:
         if not self._hash_cache_enabled() or pane.snapshot_root is None or getattr(pane, "snapshot_file", None):
             self._set_upper_status(pane, "")
             return
+        pending = self.__dict__.get("_cache_note_pending")
+        if pending and id(pane) in pending["panes"]:
+            pending["panes"].discard(id(pane))
+            if time.monotonic() - pending["t"] < 5:
+                self._set_upper_status(pane, pending["text"])
+                return
         files = hashed = 0
         for node in (pane.snapshot_index or {}).values():
             if not node["is_dir"]:

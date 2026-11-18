@@ -217,12 +217,17 @@ class DiffEngineMixin:
             if digest is not None:
                 node["hash"] = (key, digest)
                 return
+        elif entry:
+            # Cached, but the file has changed since: "Changed since cached"
+            # (unless the inode lookup below recognizes it as a moved file).
+            node["changed"] = True
         if st is not None:
             keys = getattr(self, "_hash_cache_by_inode", {}).get(
                 (st.st_dev, st.st_ino, st.st_size, int(st.st_mtime)))
             digest = keys.get(key) if keys else None
             if digest is not None:
                 node["hash"] = (key, digest)
+                node.pop("changed", None)
 
     def _pair_dir_files(self, node_a, node_b):
         """Hash comparison: pair the FILES of two counterpart folders by
@@ -232,7 +237,9 @@ class DiffEngineMixin:
         ties), "differs" (no content partner, but a still-unpaired file
         with the same name exists: other_node), "unhashed" (this file
         has no hash yet, or it has no partner while the other folder
-        still has unhashed files that could be it), "missing".
+        still has unhashed files that could be it), "changed" (its cached
+        hash is out of date: the file changed since it was hashed, see
+        _attach_cached_hash), "missing".
         Memoized; cleared with the rank cache."""
         cache = getattr(self, "_pair_cache", None)
         if cache is None:
@@ -250,7 +257,7 @@ class DiffEngineMixin:
             for name, child in files.items():
                 digest = self._node_hash(child)
                 if digest is None:
-                    states[name] = ("unhashed", None)
+                    states[name] = ("changed" if child.get("changed") else "unhashed", None)
                 else:
                     by_hash.setdefault(digest, []).append(name)
         unhashed_a = bool(states_a)
@@ -379,6 +386,8 @@ class DiffEngineMixin:
                     return "missing_file"
                 if state == "unhashed":
                     return "unhashed_file"
+                if state == "changed":
+                    return "changed_file"
                 if state == "matched":
                     return "common_file"
                 # Same name, different content: always "Content differs",
@@ -412,10 +421,11 @@ class DiffEngineMixin:
 
     def _lone_tag(self, full_path, is_dir):
         """Tag for an item with nothing to compare against: plain, except
-        under a hash comparison type, where a file without a hash is
-        "unhashed", a hashed file "hashed, but not compared", and a folder
-        takes "hashed" if every file below it is hashed, "unhashed" if any
-        is not (a folder without files stays plain)."""
+        under a hash comparison type, where a file with an out-of-date
+        cached hash is "changed", one without a hash "unhashed", and a
+        hashed one "hashed, but not compared". A folder takes "changed" if
+        any file below it is changed, else "unhashed" if any is unhashed,
+        else "hashed" (a folder without files stays plain)."""
         plain = "directory" if is_dir else "file"
         if not full_path or not self._hash_type_selected():
             return plain
@@ -427,7 +437,9 @@ class DiffEngineMixin:
         blocked = self._hash_comparison_blocked()
         has_hash = (lambda n: n.get("hash") is not None) if blocked else (lambda n: self._node_hash(n) is not None)
         if not is_dir:
-            return "hashed_file" if has_hash(node) else "unhashed_file"
+            if has_hash(node):
+                return "hashed_file"
+            return "changed_file" if node.get("changed") else "unhashed_file"
         cache = getattr(self, "_dir_rank_cache", None)
         if cache is None:
             cache = self._dir_rank_cache = {}
@@ -437,19 +449,21 @@ class DiffEngineMixin:
             files = 0
             state = "hashed"
             stack = [node]
-            while stack and state == "hashed":
+            while stack and state != "changed":
                 for child in (stack.pop()["children"] or {}).values():
                     if child["is_dir"]:
                         stack.append(child)
                     else:
                         files += 1
                         if not has_hash(child):
-                            state = "unhashed"
-                            break
+                            state = "changed" if child.get("changed") else "unhashed"
+                            if state == "changed":
+                                break
             if not files:
                 state = "plain"
             cache[key] = state
-        return {"hashed": "hashed_dir", "unhashed": "unhashed_dir"}.get(state, plain)
+        return {"hashed": "hashed_dir", "unhashed": "unhashed_dir",
+                "changed": "changed_dir"}.get(state, plain)
 
     def _diff_axes(self, is_dir, size_str, date_str, other_full, date_field="mtime", own_full=None):
         """Both ways an entry differs from its counterpart at `other_full`
@@ -476,7 +490,7 @@ class DiffEngineMixin:
                 state, other_node = hashed
                 if state == "missing":
                     return None
-                if state == "unhashed":
+                if state in ("unhashed", "changed"):
                     return AXES_UNHASHED
                 if state == "matched":
                     return (None, None)
@@ -515,7 +529,7 @@ class DiffEngineMixin:
     def _tag_from_rank(self, rank, direction, is_dir):
         suffix = "dir" if is_dir else "file"
         if rank < 0:
-            return f"unhashed_{suffix}"
+            return f"{'changed' if direction == 'changed' else 'unhashed'}_{suffix}"
         if rank == 0:
             return f"common_{suffix}"
         if rank == 2:
@@ -717,10 +731,14 @@ class DiffEngineMixin:
         hash_pairs = self._hash_mode_active() and node_b is not None
         states_a, states_b = self._pair_dir_files(node_a, node_b) if hash_pairs else ({}, {})
         saw_unhashed = False
+        saw_changed = False  # like saw_unhashed, but its cached hash is out of date
         for name, child_a in children_a.items():
             if hash_pairs and not child_a["is_dir"]:
                 state, other = states_a.get(name, ("missing", None))
                 if state == "matched":
+                    continue
+                if state == "changed":
+                    saw_changed = True
                     continue
                 if state == "unhashed":
                     saw_unhashed = True
@@ -748,7 +766,10 @@ class DiffEngineMixin:
             if child_a["is_dir"]:
                 rank, direction = self._dir_content_rank(child_a["full_path"], child_b["full_path"], date_field)
                 if rank < 0:
-                    saw_unhashed = True
+                    if direction == "changed":
+                        saw_changed = True
+                    else:
+                        saw_unhashed = True
                     continue
             else:
                 rank, direction = self._file_diff_rank(child_a, child_b, date_field)
@@ -769,6 +790,8 @@ class DiffEngineMixin:
                 state = states_b.get(name, ("missing", None))[0]
                 if state == "missing":
                     saw_missing = True
+                elif state == "changed":
+                    saw_changed = True
                 elif state == "unhashed":
                     saw_unhashed = True
         elif ignore_ext:
@@ -802,6 +825,9 @@ class DiffEngineMixin:
         if best_rank == 0:
             # Nothing definitely differs; if anything was left unjudged for
             # want of a hash, say so (rank -1) rather than "matching".
+            # Changed (an out-of-date cached hash) outranks plain unhashed.
+            if saw_changed:
+                return -1, "changed"
             return (-1, "unhashed") if saw_unhashed else (0, None)
         if len(best_directions) == 1:
             return best_rank, next(iter(best_directions))

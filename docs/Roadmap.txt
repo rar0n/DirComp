@@ -237,3 +237,9 @@ rehashes as before (confirmation first). The Global Options Refresh (both panes)
 Its old place in the upper status line, before Hash, now holds a copy of the Settings
 tab's "Comparison type" drop-down (kept in step both ways; algorithm and chunk sizes
 stay in Settings). Button Colors key: "pane_refresh".
+
+Update 2026-11-18 (later): the comparison type drop-down copies in the panes' upper status
+lines were replaced by ONE copy in the Main tab's Global Options, before its Refresh
+button (Recursive Folder Selections moved left, next to Dual Pane). It stays in step
+with the Settings tab's combo both ways.
+

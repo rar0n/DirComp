@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 # on purpose: other modules may still import them via ui_builder.
 from constants import IS_DIR_ROLE, CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, TAG_COLORS
 from constants import CMP_NAME_SIZE_DATE, DEFAULT_HASH_ALGORITHM, DEFAULT_FINGERPRINT_CHUNK_KB
+from constants import COMPARISON_TYPES
 from panes import DirectoryPane
 from snapshot_ops import is_snapshot_file_name
 from dnd_widgets import DirDropLineEdit, DirDropTreeWidget
@@ -1346,6 +1347,20 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.refresh_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("refresh")))
         self.refresh_button.clicked.connect(lambda checked=False: self._refresh_all())
 
+        # A copy of the Settings tab's "Comparison type" drop-down (kept in
+        # step both ways; algorithm and chunk sizes stay in the Settings
+        # tab). Sits before Refresh.
+        self.main_comparison_type_combo = QComboBox()
+        self.main_comparison_type_combo.addItems(COMPARISON_TYPES)
+        self.main_comparison_type_combo.setCurrentIndex(getattr(self, "_cmp_type", 0))
+        self.main_comparison_type_combo.setFixedHeight(self.refresh_button.height())
+        self.main_comparison_type_combo.setToolTip(
+            "How a file is judged to match its counterpart in the other pane "
+            "(same setting as Settings > Options > Comparison type, where the "
+            "hash algorithm and fingerprint chunk sizes are also set)."
+        )
+        self.main_comparison_type_combo.activated.connect(self._on_main_comparison_type_activated)
+
         row2.addSpacing(20)
 
         self.synchronize_views_cb = QCheckBox("Synchronize Views")
@@ -1405,14 +1420,18 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.recursive_folder_contents_cb.toggled.connect(self.expand_matching_cb.setEnabled)
         self.expand_matching_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
-        recursive_indent, expand_extra_indent = self._global_options_row_indents(row1, row2)
+        # Recursive Folder Selections now sits close to Dual Pane (no longer
+        # pushed over Expand To Selection, which is indented by its own
+        # amount below it).
+        _recursive_indent, expand_extra_indent = self._global_options_row_indents(row1, row2)
         row2.addSpacing(expand_extra_indent)
         row2.addWidget(self.expand_matching_cb)
         row2.addStretch(1)
 
-        row1.addSpacing(recursive_indent)
+        row1.addSpacing(16)
         row1.addWidget(self.recursive_folder_contents_cb)
         row1.addStretch(1)
+        row1.addWidget(self.main_comparison_type_combo)
         row1.addWidget(self.refresh_button)
 
         outer.addLayout(row1)

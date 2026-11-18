@@ -516,22 +516,21 @@ class HashOpsMixin:
             return self._hash_pane(pane, rehash=True)
         return True
 
-    def _on_pane_comparison_type_activated(self, index):
-        """A pane's comparison type drop-down was used: hand the choice to the
-        Settings tab's combo, whose change handler does everything."""
+    def _on_main_comparison_type_activated(self, index):
+        """The Main tab's comparison type drop-down was used: hand the choice
+        to the Settings tab's combo, whose change handler does everything."""
         if self.comparison_type_combo.currentIndex() != index:
             self.comparison_type_combo.setCurrentIndex(index)
 
-    def _sync_pane_comparison_combos(self):
+    def _sync_main_comparison_combo(self):
         """Settings tab's comparison type changed (or was loaded): show it in
-        both panes' copies, without triggering them."""
+        the Main tab's copy, without triggering it."""
+        combo = getattr(self, "main_comparison_type_combo", None)
         index = self.comparison_type_combo.currentIndex()
-        for pane in (getattr(self, "left", None), getattr(self, "right", None)):
-            combo = getattr(pane, "comparison_type_combo", None) if pane is not None else None
-            if combo is not None and combo.currentIndex() != index:
-                combo.blockSignals(True)
-                combo.setCurrentIndex(index)
-                combo.blockSignals(False)
+        if combo is not None and combo.currentIndex() != index:
+            combo.blockSignals(True)
+            combo.setCurrentIndex(index)
+            combo.blockSignals(False)
 
     def _report_cache_read(self, pane):
         """Upper status line after a folder was loaded (or the cache was
@@ -572,15 +571,11 @@ class HashOpsMixin:
             button = getattr(pane, "hash_button", None) if pane is not None else None
             if button is not None:
                 button.setEnabled(enabled and not getattr(pane, "snapshot_file", None))
-            # Refresh works in every comparison mode (not on a snapshot);
-            # the comparison type copy is locked like the other controls
-            # while an operation runs.
+            # Refresh works in every comparison mode (not on a snapshot).
             refresh = getattr(pane, "pane_refresh_button", None) if pane is not None else None
             if refresh is not None:
                 refresh.setEnabled(operation_enabled and not getattr(pane, "snapshot_file", None))
-            combo = getattr(pane, "comparison_type_combo", None) if pane is not None else None
-            if combo is not None:
-                combo.setEnabled(operation_enabled)
+
             # File Op (Rename / New Folder / Delete) can't act on a snapshot.
             if pane is None:
                 continue

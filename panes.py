@@ -63,7 +63,6 @@ class DirectoryPane:
         self.upper_status = ("", "")
         self.hash_button = None
         self.pane_refresh_button = None
-        self.comparison_type_combo = None  # copy of the Settings tab's combo
         self.save_snapshot_button = None
         self.select_group: QGroupBox | None = None
         # File Op / Clipboard groups, tracked the same way select_group

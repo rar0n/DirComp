@@ -433,3 +433,10 @@ Status 2026-11-19, additions after step 4:
    "dupfolder": plain folders in Duplicate Finder mode, Fg like Default Folder,
    Bg none = the file list's own background, so they do not look highlighted.
    (The tag is not "dup_..." because that prefix means a duplicate group.)
+
+ - "Empty folder" color for Compare folders mode (tag empty_dir_cmp, default
+   #D4DCE8 / blue): display only (ListingMixin._display_tag), so the stored tag
+   and the Select buttons are unchanged. Applies to Matching and uncompared
+   folders with no files below them; Missing/differing folders keep their own
+   colors. The Duplicate Finder one is the separate "Empty folder (Duplicate
+   Finder)" row.

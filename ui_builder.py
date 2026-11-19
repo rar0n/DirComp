@@ -162,10 +162,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 # "folder differs" color there, not whichever finer-
                 # grained smaller/larger/newer/older tag it's really
                 # storing underneath.
-                display_tag = tag
-                if (item.data(0, IS_DIR_ROLE) and tag in self._DIR_DIFF_TAGS
-                        and self._recursive_folder_contents_enabled()):
-                    display_tag = "diff_content_dir"
+                display_tag = self._display_tag(item, tag) if tag else tag
                 if display_tag and display_tag.startswith("dup_"):
                     bg = self._duplicate_group_colors(int(display_tag[4:]))[0]
                 else:

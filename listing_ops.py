@@ -1680,12 +1680,25 @@ class ListingMixin:
     _DIR_DIFF_TAGS = {"diff_count_smaller_dir", "diff_count_larger_dir",
                        "diff_date_newer_dir", "diff_date_older_dir"}
 
+    def _display_tag(self, item: QTreeWidgetItem, tag: str) -> str:
+        """The tag whose colors a row actually shows. Display only -- the
+        item's stored tag (and with it the Select buttons) is never
+        changed. A recursive-mode differing folder reads as the single
+        "folder differs" color; in Compare folders mode a matching (or
+        uncompared) folder with no files anywhere below it takes the
+        "Empty folder" color, while Missing/differing folders keep theirs."""
+        if not item.data(0, IS_DIR_ROLE):
+            return tag
+        if tag in self._DIR_DIFF_TAGS and self._recursive_folder_contents_enabled():
+            return "diff_content_dir"
+        if (self._dual_pane_enabled and tag in ("directory", "common_dir")
+                and self._folder_has_no_files(self._snapshot_lookup(item.data(0, PATH_ROLE)))):
+            return "empty_dir_cmp"
+        return tag
+
     def _apply_tag(self, item: QTreeWidgetItem, tag: str):
         item.setData(0, Qt.UserRole, tag)
-        display_tag = tag
-        if (item.data(0, IS_DIR_ROLE) and tag in self._DIR_DIFF_TAGS
-                and self._recursive_folder_contents_enabled()):
-            display_tag = "diff_content_dir"
+        display_tag = self._display_tag(item, tag)
         if display_tag.startswith("dup_"):
             # Duplicate Finder mode: one color per set of identical files,
             # "dup_<index>" (see DuplicateFinderMixin).

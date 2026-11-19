@@ -69,6 +69,10 @@ TAG_COLORS = {
     # Duplicate Finder mode (Compare folders off): a folder with no files
     # anywhere below it (Settings -> File List View Colors -> "Empty folder").
     "empty_dir": (None, "blue"),  # no Bg: the file list's own (Duplicate Finder mode only)
+    # Compare folders mode: a matching / uncompared folder with no files
+    # anywhere below it (display only -- the stored tag, and so the Select
+    # buttons, stay as they were; see ListingMixin._display_tag).
+    "empty_dir_cmp": ("#D4DCE8", "blue"),
     # Duplicate Finder mode's plain folder: no background of its own (the
     # file list's), so it does not read as a highlighted find.
     "dupfolder": (None, "blue"),

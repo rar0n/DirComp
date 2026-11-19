@@ -802,6 +802,8 @@ class SelectionMixin:
         width of what goes between two parts on a line."""
         from itertools import combinations
         count = len(widths)
+        if count == 0:
+            return [[]], 0  # nothing to show (Duplicate Finder mode before a scan)
         if sep is None:
             sep = self._type_count_separator_width
         best = None

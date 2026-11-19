@@ -202,6 +202,7 @@ class ListingMixin:
         # (see update_type_counts).
         if not self._recursive_folder_contents_enabled():
             self.update_type_counts(pane)
+            self._dup_schedule_regroup(pane)
 
     def update_listings(self, initiating_pane: "DirectoryPane | None" = None, rescan_disk: bool = True,
                         rescan_panes=None):
@@ -1594,6 +1595,7 @@ class ListingMixin:
         # already catches this up once, unthrottled, when it's done.
         if not self._recursive_folder_contents_enabled() and not getattr(pane, "_bulk_expand_pending", False):
             self.update_type_counts(pane)
+            self._dup_schedule_regroup(pane)
 
     def _on_item_collapsed(self, item: QTreeWidgetItem, pane: DirectoryPane):
         """Mirror of the count refresh in _on_item_expanded -- a single
@@ -1603,6 +1605,7 @@ class ListingMixin:
         whenever Recursive Folder Selections is off."""
         if not self._recursive_folder_contents_enabled() and not getattr(pane, "_bulk_expand_pending", False):
             self.update_type_counts(pane)
+            self._dup_schedule_regroup(pane)
 
     def _collect_expanded_paths(self, tree) -> set:
         """Full paths of all currently-expanded items, so a refresh (e.g.

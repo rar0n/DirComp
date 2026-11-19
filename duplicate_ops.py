@@ -36,6 +36,8 @@ files are deleted or moved; new groups continue the numbering.
 
 import os
 
+from PySide6.QtCore import QTimer
+
 
 class DuplicateFinderMixin:
     def _duplicate_mode_active(self) -> bool:
@@ -58,6 +60,49 @@ class DuplicateFinderMixin:
         in_filter = os.path.splitext(name)[1][1:].lower() in extensions
         return in_filter ^ (invert.isChecked() if invert else False)
 
+    def _dup_freeze_scope(self, pane, refresh=False):
+        """The expanded folders (normalized paths) a non-recursive scan
+        covers. With "Scan expanded folders" on this is always the tree's
+        current state; with it off the set is kept from the last Refresh /
+        Hash / folder load (refresh=True, or pane._dup_frozen_expanded
+        cleared by _dup_reset_colors, re-reads it)."""
+        live = getattr(self, "_scan_expanded", True)
+        frozen = getattr(pane, "_dup_frozen_expanded", None)
+        if live or refresh or frozen is None:
+            tree = getattr(pane, "tree", None)
+            frozen = ({os.path.normpath(p) for p in self._collect_expanded_paths(tree)}
+                      if tree is not None else set())
+            pane._dup_frozen_expanded = frozen
+        return frozen
+
+    def _dup_schedule_regroup(self, pane):
+        """A folder was expanded/collapsed in the left pane: with Scan
+        expanded folders on, regroup (once, after the burst of signals) --
+        only when the set of expanded folders really differs from the one
+        the last grouping used, which also keeps the listing's own
+        re-expansion from retriggering this."""
+        if (pane is not getattr(self, "left", None) or not self._duplicate_mode_active()
+                or not getattr(self, "_scan_expanded", True) or getattr(pane, "_dup_regroup_pending", False)
+                or getattr(pane, "tree", None) is None):
+            return
+        now = {os.path.normpath(p) for p in self._collect_expanded_paths(pane.tree)}
+        if now == getattr(pane, "_dup_frozen_expanded", None):
+            return
+        pane._dup_regroup_pending = True
+
+        def run():
+            pane._dup_regroup_pending = False
+            self.update_listings(rescan_disk=False)
+        QTimer.singleShot(0, run)
+
+    def _on_dup_scope_option_changed(self, *_args):
+        """Scan expanded folders / Hash only same-size files toggled."""
+        self._scan_expanded = self.scan_expanded_cb.isChecked()
+        self._hash_same_size = self.hash_same_size_cb.isChecked()
+        if self._duplicate_mode_active() and getattr(self.left, "snapshot_root", None) is not None:
+            self.left._dup_frozen_expanded = None
+            QTimer.singleShot(0, lambda: self.update_listings(rescan_disk=False))
+
     def _dup_scope_files(self, pane) -> list:
         """File nodes the duplicate search covers, in display order (folders
         first when "Sort Directories First" is on, names case-insensitive)."""
@@ -66,8 +111,8 @@ class DuplicateFinderMixin:
             return []
         recursive = self._recursive_folder_contents_enabled()
         expanded = None
-        if not recursive and getattr(pane, "tree", None) is not None:
-            expanded = {os.path.normpath(p) for p in self._collect_expanded_paths(pane.tree)}
+        if not recursive:
+            expanded = self._dup_freeze_scope(pane)
         dirs_first = getattr(self, "sort_directories_first_cb", None)
         dirs_first = dirs_first.isChecked() if dirs_first else True
         def display_kids(node):
@@ -94,6 +139,8 @@ class DuplicateFinderMixin:
         """The files the Hash button should hash in Duplicate Finder mode:
         those in scope whose size another file in scope shares."""
         files = self._dup_scope_files(pane)
+        if not getattr(self, "_hash_same_size", True):
+            return files
         counts = {}
         for node in files:
             counts[node["size"]] = counts.get(node["size"], 0) + 1
@@ -105,6 +152,7 @@ class DuplicateFinderMixin:
         """Forget the group -> color assignment (the pane's Refresh)."""
         pane._dup_color_map = {}
         pane._dup_next = 0
+        pane._dup_frozen_expanded = None  # re-read which folders are expanded
 
     def _dup_prepare(self, pane):
         """(Re)build pane._dup_info from the pane's current snapshot -- or
@@ -136,11 +184,12 @@ class DuplicateFinderMixin:
         pending, changed = set(), set()
         groups = {}
         if hashing:
+            same_size_only = getattr(self, "_hash_same_size", True)
             size_counts = {}
             for node in files:
                 size_counts[node["size"]] = size_counts.get(node["size"], 0) + 1
             for node in files:
-                if size_counts[node["size"]] < 2:
+                if same_size_only and size_counts[node["size"]] < 2:
                     continue  # a unique size cannot have a duplicate
                 digest = self._node_hash(node)
                 if digest is None:

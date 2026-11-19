@@ -361,6 +361,43 @@ class SettingsTabMixin:
         self.list_directories_cb.toggled.connect(sort_dirs_secondary.setEnabled)
         sort_dirs_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
+        # Duplicate Finder options (DuplicateFinderMixin). No Main-tab
+        # primary: these two only exist here. "Scan expanded folders" sits
+        # under Expand To Selection (its sibling dependent of Recursive
+        # Folder Selections, but enabled when that is OFF); "Hash only
+        # same-size files" sits in List Directories' column, unindented.
+        self.scan_expanded_cb = QCheckBox("Scan expanded folders")
+        self.scan_expanded_cb.setChecked(self._scan_expanded)
+        self.scan_expanded_cb.setToolTip(
+            "Duplicate Finder mode with Recursive Folder Selections off: only the "
+            "files in the top folder and in the folders you have expanded are "
+            "searched for duplicates.\n"
+            "On: expanding or collapsing a folder updates the search at once.\n"
+            "Off: the search keeps the folders that were expanded at the last "
+            "Refresh / Hash / folder load, until the next one."
+        )
+        self.scan_expanded_cb.setEnabled(not self.recursive_folder_contents_cb.isChecked())
+        self.recursive_folder_contents_cb.toggled.connect(lambda on: self.scan_expanded_cb.setEnabled(not on))
+        self.scan_expanded_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+        scan_wrapper = QHBoxLayout()
+        scan_wrapper.setContentsMargins(0, 0, 0, 0)
+        scan_wrapper.addSpacing(20)
+        scan_wrapper.addWidget(self.scan_expanded_cb)
+        global_grid.addLayout(scan_wrapper, 2, 2)
+
+        self.hash_same_size_cb = QCheckBox("Hash only same-size files")
+        self.hash_same_size_cb.setChecked(self._hash_same_size)
+        self.hash_same_size_cb.setToolTip(
+            "Duplicate Finder mode with Hash value / Fingerprint: files with a "
+            "size no other file in the search has cannot be duplicates, so they "
+            "are not hashed (they keep the plain file color). Saves time on big "
+            "folders. Off: every file in the search is hashed.\n"
+            "Compare folders mode always hashes every file in view."
+        )
+        global_grid.addWidget(self.hash_same_size_cb, 2, 3)
+        self.scan_expanded_cb.toggled.connect(self._on_dup_scope_option_changed)
+        self.hash_same_size_cb.toggled.connect(self._on_dup_scope_option_changed)
+
         # Row 3: Synchronize Views, aligned below Symmetrical GUI (same
         # indent, same column).
         sync_secondary = _add_synced(self.synchronize_views_cb, "Synchronize Views", 2, 0, indent=20)

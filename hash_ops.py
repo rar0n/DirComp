@@ -95,6 +95,7 @@ class HashOpsMixin:
             # Duplicate Finder mode: only files whose size is shared (the
             # scope -- Recursive Folder Selections, expanded folders, the
             # file filter -- is DuplicateFinderMixin's).
+            self._dup_freeze_scope(pane, refresh=True)  # Hash re-reads which folders are expanded
             for node in self._dup_hash_nodes(pane):
                 if not progress.tick():
                     break

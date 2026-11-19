@@ -400,3 +400,14 @@ Status 2026-11-19, step 3 (grouping engine + left-pane coloring): done.
    regroups from RAM and renumbers.
  - Not yet: grouping does not rerun by itself on expand/collapse when
    Recursive Folder Selections is off (happens on the next listing/Refresh).
+
+Status 2026-11-19, step 3 follow-up: two Global Options added (Settings tab).
+ - "Scan expanded folders" (under Expand To Selection; enabled while Recursive
+   Folder Selections is OFF): on = expanding/collapsing a folder regroups at
+   once (debounced, only when the expanded set really changed); off = scope is
+   frozen at the last Refresh / Hash / folder load.
+ - "Hash only same-size files" (row under Sort Directories First column,
+   unindented; default on): Duplicate Finder mode only. Compare folders mode
+   still hashes every file in view -- a size filter there would need
+   per-folder-pair handling in DiffEngineMixin._pair_dir_files and would
+   break "Multi Select matching files" across folders.

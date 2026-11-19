@@ -39,7 +39,7 @@ import os
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
-from constants import PATH_ROLE, TAG_COLORS
+from constants import DUP_SUMMARY_TYPES, PATH_ROLE, TAG_COLORS
 
 
 class DuplicateFinderMixin:
@@ -377,12 +377,39 @@ class DuplicateFinderMixin:
             widget = getattr(right, name, None)
             if widget is not None:
                 policy = widget.sizePolicy()
-                policy.setRetainSizeWhenHidden(True)
+                policy.setRetainSizeWhenHidden(False)
                 widget.setSizePolicy(policy)
                 widget.setVisible(False)
+        title = getattr(right, "dup_title_label", None)
+        if title is not None and self.left.entry.height() > 0:
+            # As tall as the left pane's status row + folder entry + gap.
+            title.setFixedHeight(self.left.entry.height() + self.left.hash_button.height()
+                                 + title.parentWidget().layout().spacing() if title.parentWidget().layout() else 0)
+        left_toolbar = getattr(self.left, "_toolbar_layout", None)
+        right_toolbar = getattr(right, "_toolbar_layout", None)
+        if left_toolbar is not None and right_toolbar is not None and not getattr(right, "_dup_row_spacer", False):
+            # Keep the row as tall as the left pane's, so both lists line up.
+            from PySide6.QtWidgets import QSizePolicy as _SP
+            from PySide6.QtWidgets import QSpacerItem
+            right_toolbar.addItem(QSpacerItem(0, left_toolbar.sizeHint().height(), _SP.Fixed, _SP.Fixed))
+            right._dup_row_spacer = True
         cluster = getattr(right, "cluster_container", None)
         if cluster is not None:
             cluster.setVisible(False)
+        toolbar = getattr(right, "_toolbar_layout", None)
+        free_label = getattr(right, "free_space_label", None)
+        total_label = getattr(right, "total_items_label", None)
+        if toolbar is not None and free_label is not None and total_label is not None:
+            # No "Free:" figure here: hide it and center "Total:" between the
+            # toolbar buttons (the stretches around the pair share the room).
+            free_label.setVisible(False)
+            right._free_atoms = []
+            idx = {toolbar.itemAt(i).widget(): i for i in range(toolbar.count()) if toolbar.itemAt(i).widget()}
+            t, f = idx[total_label], idx[free_label]
+            far = f + (1 if f > t else -1)
+            for i in range(toolbar.count()):
+                if toolbar.itemAt(i).widget() is None and toolbar.itemAt(i).spacerItem() is not None:
+                    toolbar.setStretch(i, 0 if i == far else 1)
         if root is None:
             self._dup_clear_right()
             return
@@ -535,12 +562,18 @@ class DuplicateFinderMixin:
         nbsp = "\u00a0"
         groups = info["groups"]
         copies = sum(len(nodes) for nodes in groups.values())
-        dup_color = self._select_colors["dup_all"][1]
-        waste_color = self._select_colors["dup_extra"][1]
+        folders = {os.path.dirname(n["full_path"]) for nodes in groups.values() for n in nodes}
+        colors = getattr(self, "_summary_colors", None) or {}
+
+        def color(key):
+            return colors.get(key, DUP_SUMMARY_TYPES[key][1])
+
+        wasted = self.format_size(info["wasted"]).replace(" ", nbsp)
         items = [
-            (f"Groups:{nbsp}{len(groups)}", dup_color),
-            (f"Duplicate{nbsp}files:{nbsp}{copies}", dup_color),
-            (f"Wasted:{nbsp}{self.format_size(info['wasted']).replace(' ', nbsp)}", waste_color),
+            (f"Groups:{nbsp}{len(groups)}", color("dup_groups")),
+            (f"Duplicate{nbsp}files:{nbsp}{copies}", color("dup_files")),
+            (f"Folders:{nbsp}{len(folders)}", color("dup_folders")),
+            (f"Wasted{nbsp}space:{nbsp}{wasted}", color("dup_wasted")),
         ]
         unhashed = len(info["pending"]) + len(info["changed"])
         if unhashed:

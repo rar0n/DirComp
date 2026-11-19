@@ -760,7 +760,9 @@ class ListingMixin:
         if getattr(pane, "free_space_label", None) is None or getattr(pane, "entry", None) is None:
             return  # called mid-construction, before this pane's toolbar exists
         path = pane.entry.text()
-        if path and not self._is_snapshot_path(path) and os.path.isdir(path):
+        if pane is getattr(self, "right", None) and not self._dual_pane_enabled:
+            pane._free_atoms = []  # Duplicate Finder: no drive free-space figure
+        elif path and not self._is_snapshot_path(path) and os.path.isdir(path):
             try:
                 free = shutil.disk_usage(path).free
                 size_text = self.format_size(free).replace(" ", "\u00a0")

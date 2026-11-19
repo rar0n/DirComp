@@ -43,6 +43,16 @@ CHANGED_FIELD_LABEL = "Created" if IS_WINDOWS else "Changed (ctime)"
 # alike (which is also what "Reload Defaults" restores them to -- see
 # UiBuilderMixin._reset_to_defaults (theme_ops.py) -- so a fresh start and a reset look
 # the same).
+# Duplicate Finder summary (under the file lists): label and default color per
+# category. Stored per theme in the same dict as the Comparison Type summary
+# colors (DirectoryComparisonApp._summary_colors); missing keys fall back here.
+DUP_SUMMARY_TYPES = {
+    "dup_groups": ("Groups", "#F0D080"),
+    "dup_files": ("Duplicate files", "#F0C060"),
+    "dup_folders": ("Folders", "#9CC8F0"),
+    "dup_wasted": ("Wasted space", "#E58E8E"),
+}
+
 TAG_COLORS = {
     # tag: (background, foreground)
     "common_file": ("#90E0C0", "black"),

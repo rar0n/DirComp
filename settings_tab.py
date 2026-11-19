@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 from constants import (
     COMPARISON_TYPES, HASH_ALGORITHMS, CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT,
     MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB,
-    TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
+    DUP_SUMMARY_TYPES, TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
     _MAX_TREE_INDENTATION, _MIN_TREE_INDENTATION, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE,
     _SUBSECTION_GAP, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE, _SUBTITLE_PT, _SUBTITLE_STYLE,
     _TABLE_HEADER_STYLE,
@@ -1635,6 +1635,24 @@ class SettingsTabMixin:
         comparison_colors_outer.addWidget(comparison_colors_table)
         comparison_colors_block = self._settings_subsubsection("Comparison Type Colors", comparison_colors_group)
 
+        # ---- Duplicate Finder Summary Colors: text colors of the Groups /
+        # Duplicate files / Folders / Wasted space figures in the summary under
+        # the file lists in Duplicate Finder mode. Per theme (kept in
+        # _summary_colors next to the Comparison Type summary colors). ----
+        dup_summary_group = QGroupBox("")
+        dup_summary_outer = QVBoxLayout(dup_summary_group)
+        dup_summary_table = QTableWidget(len(DUP_SUMMARY_TYPES), 2)
+        self._style_table_widget(dup_summary_table, ["Summary item", "Summary Text Color"])
+        for i, (key, (label, default)) in enumerate(DUP_SUMMARY_TYPES.items()):
+            dup_summary_table.setItem(i, 0, self._table_item(label))
+            dup_summary_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
+                lambda k=key, d=default: self._summary_colors.get(k, d),
+                lambda hexc, k=key: self._on_summary_color_changed(k, hexc),
+            )))
+        self._size_table_to_contents(dup_summary_table)
+        dup_summary_outer.addWidget(dup_summary_table)
+        dup_summary_block = self._settings_subsubsection("Duplicate Finder Summary Colors", dup_summary_group)
+
         # ---- Button Colors (Level 3, after Comparison Type Colors): the
         # buttons around each pane's File List View. They start at the
         # theme's default button colors -- see _main_button_color_for. ----
@@ -1662,7 +1680,7 @@ class SettingsTabMixin:
         flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
         flv_colors_super_outer.addLayout(
             self._settings_subsection_cascade(
-                flv_default_misc_block, comparison_colors_block, flv_buttons_block,
+                flv_default_misc_block, comparison_colors_block, dup_summary_block, flv_buttons_block,
             )
         )
         flv_flow.addWidget(self._settings_subsection("File List View Colors", flv_colors_super_group))

@@ -464,3 +464,4 @@ Status note (Duplicate Finder tweaks):
 - Right pane shows a large centered "Duplicate Finder" title in place of its status line/folder entry (group/wasted-space summary in its tooltip).
 - Selecting in the right pane selects every copy of the file's group in both panes (folders expand to their duplicate files). Click/Shift replace the selection; Ctrl toggles whole groups.
 - Duplicate Finder: no title tooltip (summary is under the lists); Copy/Move across buttons disabled; right progress bar/Cancel removed, left bar spans the full width with Cancel at its right end.
+- Duplicate Finder summary: "Groups - Duplicate files - Folders - Wasted space", each with its own color (Settings > File List View Colors > "Duplicate Finder Summary Colors", per theme, stored in summary_colors). Right pane: no "Free:" figure, "Total:" centered, rows aligned with the left pane.

@@ -43,6 +43,16 @@ CHANGED_FIELD_LABEL = "Created" if IS_WINDOWS else "Changed (ctime)"
 # alike (which is also what "Reload Defaults" restores them to -- see
 # UiBuilderMixin._reset_to_defaults (theme_ops.py) -- so a fresh start and a reset look
 # the same).
+# Duplicate Finder summary (under the file lists): label and default color per
+# category. Stored per theme in the same dict as the Comparison Type summary
+# colors (DirectoryComparisonApp._summary_colors); missing keys fall back here.
+DUP_SUMMARY_TYPES = {
+    "dup_groups": ("Groups", "#F0D080"),
+    "dup_files": ("Duplicate files", "#F0C060"),
+    "dup_folders": ("Folders", "#9CC8F0"),
+    "dup_wasted": ("Wasted space", "#E58E8E"),
+}
+
 TAG_COLORS = {
     # tag: (background, foreground)
     "common_file": ("#90E0C0", "black"),
@@ -63,6 +73,19 @@ TAG_COLORS = {
     "diff_content_file": ("#7777DD", "blue"),
     "directory": ("#E0E090", "blue"),
     "file": (None, None),
+    # "Ignore hard links": a file with more than one hard link, left out of
+    # every comparison (Settings -> File List View Colors -> "Hard link").
+    "hardlink_file": ("#D8C0E8", "black"),
+    # Duplicate Finder mode (Compare folders off): a folder with no files
+    # anywhere below it (Settings -> File List View Colors -> "Empty folder").
+    "empty_dir": (None, "blue"),  # no Bg: the file list's own (Duplicate Finder mode only)
+    # Compare folders mode: a matching / uncompared folder with no files
+    # anywhere below it (display only -- the stored tag, and so the Select
+    # buttons, stay as they were; see ListingMixin._display_tag).
+    "empty_dir_cmp": ("#D4DCE8", "blue"),
+    # Duplicate Finder mode's plain folder: no background of its own (the
+    # file list's), so it does not read as a highlighted find.
+    "dupfolder": (None, "blue"),
     "error": ("#FFB6C1", "red"),
     # Hash comparison types only: a file/folder that has no hash yet (see
     # Settings -> Comparison Type Colors -> "Unhashed"). Neutral greys.

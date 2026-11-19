@@ -272,7 +272,7 @@ class SyncMixin:
         node = self._snapshot_lookup(path)
         hash_mode = self._hash_mode_active()
         stem_mode = self._stem_mode() != 0
-        if node is None or node["is_dir"] or not (hash_mode or stem_mode):
+        if node is None or node["is_dir"] or not (hash_mode or stem_mode) or self._ignored_kind(node):
             return exact
         if (hash_mode and getattr(self, "_multi_select_matching", True)
                 and not getattr(self, "_multi_select_same_folder", True)):
@@ -289,7 +289,8 @@ class SyncMixin:
         parent = self._snapshot_lookup(os.path.dirname(cp))
         if parent is None or not parent["is_dir"]:
             return []
-        files = [c for c in (parent["children"] or {}).values() if not c["is_dir"]]
+        files = [c for c in (parent["children"] or {}).values()
+                 if not c["is_dir"] and not self._ignored_kind(c)]
         if hash_mode:
             digest = self._node_hash(node)
             if digest is not None:

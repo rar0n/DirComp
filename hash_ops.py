@@ -91,6 +91,16 @@ class HashOpsMixin:
         in the pane with Recursive Folder Selections on; otherwise only
         those currently visible (top level plus expanded folders)."""
         nodes = []
+        if self._duplicate_mode_active() and pane is self.left:
+            # Duplicate Finder mode: only files whose size is shared (the
+            # scope -- Recursive Folder Selections, expanded folders, the
+            # file filter -- is DuplicateFinderMixin's).
+            self._dup_freeze_scope(pane, refresh=True)  # Hash re-reads which folders are expanded
+            for node in self._dup_hash_nodes(pane):
+                if not progress.tick():
+                    break
+                nodes.append(node)
+            return nodes
         if self._recursive_folder_contents_enabled():
             stack = [pane.snapshot_root]
             while stack:
@@ -99,7 +109,7 @@ class HashOpsMixin:
                     return nodes
                 if node["is_dir"]:
                     stack.extend((node["children"] or {}).values())
-                else:
+                elif not self._ignored_kind(node):
                     nodes.append(node)
         else:
             from constants import IS_DIR_ROLE, PATH_ROLE
@@ -109,7 +119,7 @@ class HashOpsMixin:
                 if item.data(0, IS_DIR_ROLE):
                     continue
                 node = self._snapshot_lookup(item.data(0, PATH_ROLE))
-                if node is not None and not node["is_dir"]:
+                if node is not None and not node["is_dir"] and not self._ignored_kind(node):
                     nodes.append(node)
         return nodes
 
@@ -381,6 +391,13 @@ class HashOpsMixin:
     def _on_clear_hash_cache(self):
         """Settings > Options > "Clear cache": wipe the persistent file and
         every hash held in RAM, so open folders show as unhashed."""
+        answer = QMessageBox.question(
+            self, "Clear hash cache",
+            "Delete all cached hashes, on disk and in memory?\n\n"
+            "Open folders will show as unhashed and must be hashed again.",
+            QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
+        if answer != QMessageBox.Yes:
+            return
         removed = self._hash_store().clear()
         self.__dict__["_hash_cache"] = {}
         self.__dict__["_hash_cache_by_inode"] = {}
@@ -497,9 +514,11 @@ class HashOpsMixin:
         hashes are discarded."""
         if getattr(pane, "snapshot_file", None) or not pane.entry.text():
             return False
+        dup_mode = self._duplicate_mode_active() and pane is self.left
         rehash = self._hash_type_selected()
         if rehash:
-            scope = ("every file in this pane" if self._recursive_folder_contents_enabled()
+            scope = ("the files being scanned for duplicates" if dup_mode
+                     else "every file in this pane" if self._recursive_folder_contents_enabled()
                      else "the files currently visible in this pane")
             answer = QMessageBox.question(
                 self, "Refresh and rehash",
@@ -510,6 +529,9 @@ class HashOpsMixin:
                 QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
             if answer != QMessageBox.Yes:
                 return False
+        if dup_mode:
+            # Duplicate Finder mode: Refresh starts the duplicate colors over.
+            self._dup_reset_colors(pane)
         self.update_listings(initiating_pane=pane, rescan_panes=(pane,))
         self._recount_pane_items_with_indicator(pane)
         if rehash and pane.snapshot_root is not None:
@@ -587,6 +609,7 @@ class HashOpsMixin:
             blocked = self._hash_comparison_blocked()
             keys = (("missing", "matching", "larger", "smaller", "newer", "older", "diff_folders")
                     if blocked else ("larger", "smaller", "newer", "older"))
+            self._dup_update_buttons(pane)
             for key in ("missing", "matching", "larger", "smaller", "newer", "older", "diff_folders"):
                 btn = (getattr(pane, "select_toggle_buttons", None) or {}).get(key)
                 if btn is not None:
@@ -602,7 +625,7 @@ class HashOpsMixin:
                 if group is not None:
                     group.setEnabled(not snap)
             # A live pane can't copy/move INTO a snapshot pane either.
-            into_snap = bool(getattr(other, "snapshot_file", None))
+            into_snap = bool(getattr(other, "snapshot_file", None)) or self._duplicate_mode_active()
             for b in (getattr(pane, "_across_buttons", None) or {}).values():
                 b.setEnabled(not into_snap)
             # The buttons themselves too: in the narrow layout they live in

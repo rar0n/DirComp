@@ -340,3 +340,129 @@ Suggested implementation order
     semantics) and left-pane coloring.
  4. Duplicates / Extra copies buttons + survivor setting, and the disabled rules.
  5. Right pane duplicate listing, click-to-reveal, Statistics View feed, wasted space.
+
+Status 2026-11-19 (branch feature/duplicate-finder): step 1 implemented.
+ - Settings > Options: "Ignore empty files" and "Ignore hard links" (own row above
+   "Cache hashed folders"), saved with the shared settings, default off. They work in
+   Dual Pane and single pane mode with every comparison type.
+ - Engine (diff_engine.py): file nodes carry "nlink" (st_nlink). DiffEngineMixin.
+   _ignored_kind(node) -> "hardlink" / "empty" / None is THE test; ignored files are
+   dropped from folder contents in _pair_dir_files, _dir_content_rank_uncached,
+   _stem_index and _counterpart_node (a file whose only counterpart is ignored counts
+   as missing), tagged by _diff_tag/_lone_tag ("hardlink_file", or plain "file" for an
+   empty file) and reported by _diff_axes as AXES_IGNORED (counted as neither
+   missing nor matching). Not part of _comparison_key (it also keys the hashes);
+   _ignore_flags() is added to the rank/pair/stem cache keys instead.
+ - Not hashed (hash_ops._files_to_hash), left out of the hash-group index and of the
+   multi-select / Synchronize Views content matching (selection_ops, sync_views).
+ - Settings > File List View Colors > Default / Misc colors: new row "Hard link"
+   (TAG_COLORS "hardlink_file", Fg/Bg).
+ - .fss: optional per-file "l" (link count, only when > 1) and top-level "has_links";
+   format version unchanged. A snapshot without "has_links" counts every file as one
+   link, and a status warning says so while "Ignore hard links" is on.
+
+Status 2026-11-19 (branch feature/duplicate-finder): step 2 implemented.
+ - "Dual Pane" is now labelled "Compare folders" (Main tab and Settings tab, plus the
+   tooltips that named it); the saved key "dual_pane" and the internal names are
+   unchanged. The tooltip says that off = Duplicate Finder mode.
+ - Settings > File List View > File List View Colors > Default / Misc colors, last block
+   "Duplicate File Colors" (moved there from Misc Colors the same day), per theme:
+   Nr. of Steps (1-32, default 7; 1 disables Color 2/Swap/Reverse), Color 1, Color 2,
+   Swap (also flips the direction), Reverse Color Wheel Direction, and the text color
+   as exclusive radio buttons: "Set Fg color" (its swatch enabled only then), "Inverse
+   color" (255 - channel) and "Inverse luminance" (black/white; the default), plus a
+   preview strip with one chip per step. No hover color.
+   State: ThemeMixin._dup_steps/_dup_color1/_dup_color2/_dup_reverse/_dup_fg_mode/
+   _dup_fg_color, in each theme's color set (keys dup_*; older files fall back to the
+   defaults). The range comes from custom_widgets._indent_wheel_color, the same
+   generator the indentation lines use. ThemeMixin._duplicate_group_colors(i) ->
+   (bg hex, fg hex) is what the group coloring (step 3) should call.
+ - "Empty folder" (TAG_COLORS "empty_dir", Fg/Bg) in File List View Colors > Default / Misc
+   colors. DiffEngineMixin._folder_has_no_files / _lone_tag: with Compare folders off, a
+   folder with no files anywhere below it gets it; a snapshot folder that was not
+   scanned (or a folder that could not be read) keeps the plain folder color.
+ - Note for later tests: a raw tree.expandAll() on a populated single-pane tree
+   crashes (segfault in listing_ops._ensure_item_populated, also before these changes);
+   the app's own Expand All is not affected.
+ - Still to do in step 5: Duplicate Finder mode must NOT halve the window width any more
+   (ui_builder._on_dual_pane_changed halves/doubles it today); the right pane takes over
+   the duplicate list, so the window keeps its width.
+
+Status 2026-11-19, step 3 (grouping engine + left-pane coloring): done.
+ - New file duplicate_ops.py (DuplicateFinderMixin): scope (Recursive Folder
+   Selections / expanded folders, file filter, ignored files), size pre-filter
+   for Hash/Fingerprint, grouping by name key or digest, stable per-group color
+   indexes in pane._dup_color_map, wasted bytes, unhashed/changed marking.
+ - pane._dup_info is rebuilt in update_listing before any row is tagged; rows
+   get "dup_<index>" tags, colored by _duplicate_group_colors.
+ - Hash button hashes only the size-shared files; Refresh re-reads without
+   rehashing and starts the group colors over; switching comparison type
+   regroups from RAM and renumbers.
+ - Not yet: grouping does not rerun by itself on expand/collapse when
+   Recursive Folder Selections is off (happens on the next listing/Refresh).
+
+Status 2026-11-19, step 3 follow-up: two Global Options added (Settings tab).
+ - "Scan expanded folders" (under Expand To Selection; enabled while Recursive
+   Folder Selections is OFF): on = expanding/collapsing a folder regroups at
+   once (debounced, only when the expanded set really changed); off = scope is
+   frozen at the last Refresh / Hash / folder load.
+ - "Hash only same-size files" (row under Sort Directories First column,
+   unindented; default on): Duplicate Finder mode only. Compare folders mode
+   still hashes every file in view -- a size filter there would need
+   per-folder-pair handling in DiffEngineMixin._pair_dir_files and would
+   break "Multi Select matching files" across folders.
+
+Status 2026-11-19, step 4 (Select buttons): done.
+ - Duplicate Finder mode: "Duplicates" (every copy) and "Extra copies" (all but
+   one per group) replace the six compare buttons in the Select group
+   (pane.dup_layout; _group_buttons leaves empty cells). Toggle like the others.
+ - "Extra copies keep:" combo (Settings -> Options): shortest path (default),
+   oldest, newest, first in tree order.
+ - Disabled rules: both off until the scan is hashed (Hash/Fingerprint), and
+   "Extra copies" off for the two name-only options.
+ - Button colors: "Duplicates" / "Extra copies" rows in the Select Buttons
+   color table (_DEFAULT_SELECT_COLORS dup_all / dup_extra).
+ - Right pane is still untouched (step 5).
+
+Status 2026-11-19, additions after step 4:
+ - Summary under the file list in Duplicate Finder mode: "Groups / Duplicate
+   files / Wasted (/ Unhashed)" replaces the compare-type counts
+   (DuplicateFinderMixin._dup_summary_parts; colors follow the Duplicates /
+   Extra copies button colors).
+ - "Folder (Duplicate Finder)" color row (Default / Misc colors), tag
+   "dupfolder": plain folders in Duplicate Finder mode, Fg like Default Folder,
+   Bg none = the file list's own background, so they do not look highlighted.
+   (The tag is not "dup_..." because that prefix means a duplicate group.)
+
+ - "Empty folder" color for Compare folders mode (tag empty_dir_cmp, default
+   #D4DCE8 / blue): display only (ListingMixin._display_tag), so the stored tag
+   and the Select buttons are unchanged. Applies to Matching and uncompared
+   folders with no files below them; Missing/differing folders keep their own
+   colors. The Duplicate Finder one is the separate "Empty folder (Duplicate
+   Finder)" row.
+
+Status 2026-11-19, step 5 (right pane): done.
+ - Both panes are shown in both modes; the window no longer changes width.
+ - Duplicate Finder mode: the right pane lists the left pane's duplicates.
+   DuplicateFinderMixin._dup_build_right_snapshot makes a filtered copy of the
+   left snapshot (duplicate files + their parent folders, same paths, folder
+   sizes = kept files), _dup_sync_right lists it after every left listing (same
+   colors, the left pane's sort order). The list, Statistics View, totals and
+   summary all read that snapshot. _snapshot_lookup / _build_entries take a
+   pane so the right tree is not filled from the left pane's full snapshot.
+ - Wasted space is on the right pane's upper status line (and in the summary).
+ - Selecting rows in the right pane selects and reveals them in the left pane
+   (a selected folder = all duplicate files below it): _on_dup_right_selection.
+ - The right pane's folder entry, toolbar buttons and Select/File Op/Clipboard
+   cluster are hidden in this mode (read-only view). Its real snapshot is
+   stashed on entering and restored on returning to Compare folders.
+ - "Multi Select matching files" is ignored in this mode.
+ - Open: left pane selection does not mirror into the right pane.
+
+Status note (Duplicate Finder tweaks):
+- Symmetrical GUI option is no longer disabled in Duplicate Finder mode.
+- Right pane shows a large centered "Duplicate Finder" title in place of its status line/folder entry (group/wasted-space summary in its tooltip).
+- Selecting in the right pane selects every copy of the file's group in both panes (folders expand to their duplicate files). Click/Shift replace the selection; Ctrl toggles whole groups.
+- Duplicate Finder: no title tooltip (summary is under the lists); Copy/Move across buttons disabled; right progress bar/Cancel removed, left bar spans the full width with Cancel at its right end.
+- Duplicate Finder summary: "Groups - Duplicate files - Folders - Wasted space", each with its own color (Settings > File List View Colors > "Duplicate Finder Summary Colors", per theme, stored in summary_colors). Right pane: no "Free:" figure, "Total:" centered, rows aligned with the left pane.
+- Refresh in Duplicate Finder mode now behaves like Compare mode with a hash comparison type: after confirmation it discards the stored hashes and rehashes. "Clear cache" (Settings) asks for confirmation first.

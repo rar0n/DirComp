@@ -162,11 +162,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 # "folder differs" color there, not whichever finer-
                 # grained smaller/larger/newer/older tag it's really
                 # storing underneath.
-                display_tag = tag
-                if (item.data(0, IS_DIR_ROLE) and tag in self._DIR_DIFF_TAGS
-                        and self._recursive_folder_contents_enabled()):
-                    display_tag = "diff_content_dir"
-                bg, _fg = TAG_COLORS.get(display_tag, (None, None))
+                display_tag = self._display_tag(item, tag) if tag else tag
+                if display_tag and display_tag.startswith("dup_"):
+                    bg = self._duplicate_group_colors(int(display_tag[4:]))[0]
+                else:
+                    bg, _fg = TAG_COLORS.get(display_tag, (None, None))
                 # A "file"/"directory" tag (TAG_COLORS has no background
                 # for either -- see constants.py) means there's nothing
                 # on the other side to diff against right now, most
@@ -227,6 +227,20 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # Per theme.
             self._indent_line_style = 0
 
+        if not hasattr(self, "_dup_steps"):
+            # Settings tab -> File List View Colors -> Default / Misc colors -> Duplicate File Colors (Duplicate
+            # Finder mode: one background color per set of identical files,
+            # from a color-wheel range like the indentation lines'; see
+            # ThemeMixin._duplicate_group_colors). Per theme. _dup_fg_mode:
+            # 0 = the chosen Fg color, 1 = inverse of the background,
+            # 2 = black or white by the background's luminance.
+            self._dup_steps = 7
+            self._dup_color1 = "#F0A0A0"
+            self._dup_color2 = "#A0A0F0"
+            self._dup_reverse = False
+            self._dup_fg_mode = 2
+            self._dup_fg_color = "#000000"
+
         if not hasattr(self, "_indent_tick_enabled"):
             # Settings tab -> File List View -> Indentation Line -> Line
             # style -> Enable file tick marks / Tick mark length. Per theme.
@@ -254,6 +268,16 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._multi_select_matching = True
             self._multi_select_same_folder = True
             self._cmp_applied_key = None
+            # Settings tab -> Options -> "Ignore empty files" / "Ignore hard
+            # links" (see DiffEngineMixin._ignored_kind): off by default.
+            self._ignore_empty = False
+            self._ignore_hardlinks = False
+            self._ignore_applied = (False, False)
+            # Settings tab -> Global Options -> "Scan expanded folders" and
+            # "Hash only same-size files" (see DuplicateFinderMixin).
+            self._dup_survivor = 0  # Extra copies keep: 0 shortest path, 1 oldest, 2 newest, 3 first
+            self._scan_expanded = True
+            self._hash_same_size = True
             # Settings tab -> Options -> "Cache hashed folders" (see
             # HashOpsMixin._hash_cache_enabled): off by default.
             self._cache_hashed_folders = False
@@ -421,7 +445,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         right_widget = self._build_directory_widgets(self.right)
         panes_layout.addWidget(left_widget)
         panes_layout.addWidget(right_widget)
-        right_widget.setVisible(self._dual_pane_enabled)
+        # Duplicate Finder mode shows it too: it lists the duplicates found
+        # in the left pane (DuplicateFinderMixin._dup_sync_right).
+        right_widget.setVisible(True)
         self._panes_row = panes_row
         main_layout.addWidget(panes_row, stretch=1)
 
@@ -431,11 +457,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # pane's right edge and Global Options sits flush right in the
         # right half. Dual Pane off: the filter takes the width Global
         # Options (at its natural size, flush right) leaves over.
-        if self._dual_pane_enabled:
-            bottom_row = EqualSplitLayout(None, _PANE_GAP)
-        else:
-            bottom_row = QHBoxLayout()
-            bottom_row.setSpacing(_PANE_GAP)
+        bottom_row = EqualSplitLayout(None, _PANE_GAP)
         bottom_row.addWidget(self._build_filter_frame())
         options_holder = QWidget()
         holder_layout = QHBoxLayout(options_holder)
@@ -444,8 +466,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         holder_layout.addWidget(global_options)
         holder_layout.setAlignment(global_options, Qt.AlignRight)
         bottom_row.addWidget(options_holder)
-        if not self._dual_pane_enabled:
-            bottom_row.setStretch(0, 1)  # the filter takes what Global Options leaves
         main_layout.addLayout(bottom_row)
         self._bottom_row_layout = bottom_row
 
@@ -651,17 +671,43 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if enabled == self._dual_pane_enabled:
             return
         self._dual_pane_enabled = enabled
-        # Half the width going off, double it coming back -- based on
-        # the window's current width, not some fixed baseline, so this
-        # stays correct no matter what width you'd resized to first.
-        new_width = self.width() // 2 if not enabled else self.width() * 2
-        self.resize(max(new_width, MINIMUM_WINDOW_WIDTH), self.height())
+        # Both panes stay on screen in both modes (the right one lists the
+        # duplicates in Duplicate Finder mode), so the window keeps its size.
+        # The right pane's real snapshot is put away while it shows the
+        # duplicates, and back when Compare folders returns.
+        if not enabled:
+            self._dup_stashed_right = (self.right.snapshot_root, self.right.snapshot_index)
+        else:
+            stashed = getattr(self, "_dup_stashed_right", None)
+            if stashed is not None:
+                self.right.snapshot_root, self.right.snapshot_index = stashed
+            self._dup_stashed_right = None
+            self._set_upper_status(self.right, "")
 
         state = self._capture_ui_state()
+        # The left pane keeps its expanded folders and its selection across
+        # the switch (e.g. to pick things in Duplicate Finder mode and then
+        # copy them elsewhere in Compare folders mode).
+        left_tree = self.left.tree if getattr(self.left, "tree", None) is not None else None
+        kept_expanded = self._collect_expanded_paths(left_tree) if left_tree is not None else set()
+        kept_selected = self._collect_selected_paths(left_tree) if left_tree is not None else set()
         current_tab = self.tabs.currentIndex() if getattr(self, "tabs", None) else 0
         self._build_ui()
         self._restore_ui_state(state)
         self.tabs.setCurrentIndex(current_tab)
+        if kept_expanded or kept_selected:
+            # Left pane only: with Synchronize Views the selection must not
+            # be mirrored onto the right pane (whose own selection is gone).
+            guard_was_set = self._sync_guard
+            self._sync_guard = True
+            try:
+                self._restore_expanded_paths(self.left.tree, kept_expanded)
+                if kept_selected:
+                    self._select_paths_in_tree(self.left.tree, kept_selected, additive=False,
+                                                auto_expand=False, select_subtree=False)
+            finally:
+                self._sync_guard = guard_was_set
+            self.update_selection_count(self.left.tree, self.left)
         # Re-apply the "no dual pane -> no comparison coloring" fallback
         # (see _recolor_all_items) now that the just-rebuilt tree is
         # freshly repopulated -- _restore_ui_state's own navigate call
@@ -1130,7 +1176,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row.addWidget(self.left_progress_bar, 1)
         row.addWidget(self.left_cancel_button)
 
-        if self._dual_pane_enabled:
+        if not self._dual_pane_enabled:
+            # Duplicate Finder: nothing runs on the right, so the left bar
+            # takes the full width with Cancel at its right end.
+            self.right_progress_bar.hide()
+            self.right_cancel_button.hide()
+        else:
             if self._symmetrical_buttons:
                 row.addWidget(self.right_cancel_button)
                 row.addWidget(self.right_progress_bar, 1)
@@ -1139,19 +1190,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 row.addWidget(self.right_cancel_button)
             self.right_progress_bar.show()
             self.right_cancel_button.show()
-        else:
-            # No right-side operation for right_cancel_button to sit
-            # next to, so both it and its bar are hidden -- left_cancel_
-            # button ends up flush at the row's right edge instead,
-            # pushed there by left_progress_bar's own stretch factor,
-            # same mechanism as every left-pane button row elsewhere in
-            # this file.
-            self.right_progress_bar.hide()
-            self.right_cancel_button.hide()
 
         # Same dual-pane-off treatment for the right selection count
         # underneath -- no right pane means nothing for it to report.
-        self.right_selection_label.setVisible(self._dual_pane_enabled)
+        self.right_selection_label.setVisible(True)
 
     def _build_filter_frame(self) -> QGroupBox:
         """File Filter group: just the filter controls themselves plus
@@ -1304,11 +1346,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row1 = QHBoxLayout()
         row2 = QHBoxLayout()
 
-        self.dual_pane_cb = QCheckBox("Dual Pane")
+        self.dual_pane_cb = QCheckBox("Compare folders")
         self.dual_pane_cb.setToolTip(
-            "On: both panes shown side by side, as normal. Off: only the left pane is "
-            "shown -- the window's width halves when you turn this off, and doubles "
-            "back when you turn it on again."
+            "On: both panes shown side by side and compared, as normal. Off: Duplicate "
+            "Finder mode -- only the left pane is shown, and files are no longer "
+            "compared with the other pane. The window's width halves when you turn "
+            "this off, and doubles back when you turn it on again."
         )
         self.dual_pane_cb.blockSignals(True)
         self.dual_pane_cb.setChecked(self._dual_pane_enabled)
@@ -1369,7 +1412,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             "expanded/collapsed folders -- and make \"Make New Folder\" create the new "
             "folder in both locations at once. Items with no counterpart on the other "
             "side are simply left alone. The two panes' own root folders are never "
-            "affected by this. Meaningless (and disabled) with Dual Pane off, since "
+            "affected by this. Meaningless (and disabled) with Compare folders off, since "
             "there's no second pane to stay in step with."
         )
         self.synchronize_views_cb.setEnabled(self._dual_pane_enabled)
@@ -1395,14 +1438,14 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             "mirror the left pane's around the vertical center, and the right pane's "
             "Statistics view title line mirrors too (title right-aligned, Files/Folders "
             "swapped). When off, the right pane uses the same left-to-right order as the "
-            "left pane instead. Disabled with Dual Pane off, since there's no right pane "
+            "left pane instead. Disabled with Compare folders off, since there's no right pane "
             "to mirror against."
         )
         self.symmetrical_buttons_cb.blockSignals(True)
         self.symmetrical_buttons_cb.setChecked(self._symmetrical_buttons)
         self.symmetrical_buttons_cb.blockSignals(False)
-        self.symmetrical_buttons_cb.setEnabled(self._dual_pane_enabled)
-        self.dual_pane_cb.toggled.connect(self.symmetrical_buttons_cb.setEnabled)
+        # Applies to both panes in both modes (the right pane's buttons are
+        # hidden in Duplicate Finder mode, but its layout still mirrors).
         self.symmetrical_buttons_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.symmetrical_buttons_cb.stateChanged.connect(self._on_symmetrical_buttons_changed)
         row2.addWidget(self.symmetrical_buttons_cb)

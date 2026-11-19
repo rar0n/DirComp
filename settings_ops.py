@@ -57,6 +57,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
     "multi_select_matching", "multi_select_same_folder", "cache_hashed_folders",
+    "ignore_empty_files", "ignore_hard_links", "scan_expanded_folders", "hash_same_size_files", "extra_copies_keep",
 })
 
 
@@ -116,6 +117,11 @@ class SettingsMixin:
             "multi_select_matching": getattr(self, "multi_select_matching_cb", None),
             "multi_select_same_folder": getattr(self, "multi_select_same_folder_cb", None),
             "cache_hashed_folders": getattr(self, "cache_hashed_folders_cb", None),
+            "ignore_empty_files": getattr(self, "ignore_empty_files_cb", None),
+            "scan_expanded_folders": getattr(self, "scan_expanded_cb", None),
+            "extra_copies_keep": getattr(self, "extra_copies_keep_combo", None),
+            "hash_same_size_files": getattr(self, "hash_same_size_cb", None),
+            "ignore_hard_links": getattr(self, "ignore_hard_links_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)
@@ -586,21 +592,29 @@ class SettingsMixin:
         self._cmp_chunk_end_kb = self.fingerprint_end_spin.value()
         self._cmp_ignore_ext = self.ignore_file_extensions_cb.isChecked()
         self._cmp_first_name = self.first_name_only_cb.isChecked()
+        # Ignore empty files / hard links: work with every comparison type.
+        self._ignore_empty = self.ignore_empty_files_cb.isChecked()
+        self._ignore_hardlinks = self.ignore_hard_links_cb.isChecked()
         self._update_comparison_controls_enabled()
         self._update_hash_buttons_enabled()
         key = self._comparison_key()
-        if key == self._cmp_applied_key:
+        ignore = self._ignore_flags()
+        if key == self._cmp_applied_key and ignore == self._ignore_applied:
             return
+        key_changed = key != self._cmp_applied_key
         self._cmp_applied_key = key
+        self._ignore_applied = ignore
         self._invalidate_dir_rank_cache()
         # Persistent hash cache: with a hash type now selected, read the
         # rows for the open folders (once per root) and give the snapshots
         # whatever the RAM cache holds for the new key -- no disk rescan.
-        if self._hash_type_selected():
+        # (Nothing to do when only the ignore options changed.)
+        if key_changed and self._hash_type_selected():
             self._ensure_hash_cache_loaded()
             self._reattach_cached_hashes()
-        for pane in (self.left, self.right):
-            self._report_cache_read(pane)
+        if key_changed:
+            for pane in (self.left, self.right):
+                self._report_cache_read(pane)
         # Nothing to re-tag until a folder has been loaded (settings are
         # applied at startup, before any listing exists).
         if any(getattr(p, "snapshot_root", None) is not None for p in (self.left, self.right)):

@@ -392,10 +392,28 @@ class PaneBuilderMixin:
         # Upper status line: text, then Hash at the end (mirrored with the
         # pane's button order, like the toolbar below).
         upper_row.addWidget(snapshot_info_label, 1)
+        # (see the "Duplicate Finder" title added after this row below)
         if layout_left:
             upper_row.addWidget(hash_button)
         else:
             upper_row.insertWidget(0, hash_button)
+
+        # Duplicate Finder mode: the right pane is the Duplicate Finder.
+        # A big centered title takes the place of its status line, Hash button
+        # and folder entry (see DuplicateFinderMixin._dup_sync_right).
+        pane.dup_title_label = None
+        if pane is self.right and not self._dual_pane_enabled:
+            title = QLabel("Duplicate Finder")
+            title_font = title.font()
+            title_font.setPointSizeF(title_font.pointSizeF() * 1.6)
+            title_font.setBold(True)
+            title.setFont(title_font)
+            title.setAlignment(Qt.AlignCenter)
+            title.setFixedHeight(entry.sizeHint().height() + uniform_h + file_list_layout.spacing())
+            file_list_layout.insertWidget(0, title)
+            for widget in (snapshot_info_label, hash_button, entry):
+                widget.setVisible(False)
+            pane.dup_title_label = title
 
         free_space_label = QLabel("")
         free_space_label.setStyleSheet("font-weight: bold;")
@@ -777,6 +795,28 @@ class PaneBuilderMixin:
             if type_key in ("larger", "smaller", "newer", "older"):
                 btn.setEnabled(not self._hash_mode_active())
 
+        # Duplicate Finder mode (Compare folders off): these two take the
+        # place of the six compare buttons above (see _group_buttons).
+        pane.dup_layout = not self._dual_pane_enabled
+        for text, type_key, tip in (
+            ("Duplicates", "dup_all",
+             "Select every file that has an identical copy (the whole set of each group)."),
+            ("Extra copies", "dup_extra",
+             "Select all copies but one in each group of identical files -- the one "
+             "left alone is set under Settings -> Options -> \"Extra copies keep\". "
+             "Not available with the two name-only options (a shared name does not "
+             "make files identical)."),
+        ):
+            btn = QPushButton(text)
+            btn.setCheckable(True)
+            btn.setToolTip(tip)
+            btn.toggled.connect(lambda checked, p=pane, tk=type_key: self._select_by_type(p, tk, select=checked))
+            btn.setFixedSize(_select_button_width, _select_button_height)
+            fg, bg = self._select_colors[type_key]
+            btn.setStyleSheet(_bevel_button_stylesheet(bg, fg))
+            pane.select_toggle_buttons[type_key] = btn
+            btn.setEnabled(False)  # DuplicateFinderMixin._dup_update_buttons decides
+
         diff_folders_button = QPushButton("Diff Items")
         diff_folders_button.setCheckable(True)
         diff_folders_button.toggled.connect(
@@ -995,6 +1035,9 @@ class PaneBuilderMixin:
         # "Synchronize Views": mirror this pane's selection onto the other
         # pane's tree (no-op while it's off).
         tree.itemSelectionChanged.connect(lambda t=tree: self._sync_selection_from(t))
+        # Duplicate Finder mode: the right pane's selection is revealed in the
+        # left pane (no-op for anything else).
+        tree.itemSelectionChanged.connect(lambda p=pane: self._on_dup_right_selection(p))
         # A selection change not driven by the Select group's own
         # machinery -- a plain click/drag/keyboard selection right in
         # the tree -- means any checked Select-group toggle button no

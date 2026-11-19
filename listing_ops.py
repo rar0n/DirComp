@@ -202,6 +202,7 @@ class ListingMixin:
         # (see update_type_counts).
         if not self._recursive_folder_contents_enabled():
             self.update_type_counts(pane)
+            self._dup_schedule_regroup(pane)
 
     def update_listings(self, initiating_pane: "DirectoryPane | None" = None, rescan_disk: bool = True,
                         rescan_panes=None):
@@ -340,12 +341,16 @@ class ListingMixin:
             prev_right_dir = getattr(self.right, "_last_listed_dir", None)
             prev_right_snapshot = self.right.snapshot_root
 
+            dup_mode = self._duplicate_mode_active()
             if rescan_disk:
                 if owns_progress:
                     progress.start_phase(None)
                 if rescan_panes is None or self.left in rescan_panes:
                     self._refresh_pane_snapshot(self.left, left_dir if left_valid else None, progress)
-                if not progress.cancelled and (rescan_panes is None or self.right in rescan_panes):
+                # Duplicate Finder mode: the right pane is a view of the left
+                # pane's duplicates (_dup_sync_right below), never scanned.
+                if (not dup_mode and not progress.cancelled
+                        and (rescan_panes is None or self.right in rescan_panes)):
                     if owns_progress:
                         progress.start_phase(None)
                     self._refresh_pane_snapshot(self.right, right_dir if right_valid else None, progress)
@@ -417,7 +422,15 @@ class ListingMixin:
                     progress.start_phase(None)
                 self.update_listing(left_dir, self.left, right_dir if right_valid else None,
                                      progress=progress, refresh_snapshot=False, retag_only=left_unchanged)
-            if right_valid and not progress.cancelled:
+            if dup_mode:
+                if not progress.cancelled:
+                    if owns_progress:
+                        progress.start_phase(None)
+                    if left_valid:
+                        self._dup_sync_right(progress)
+                    else:
+                        self._dup_clear_right()
+            elif right_valid and not progress.cancelled:
                 if owns_progress:
                     progress.start_phase(None)
                 self.update_listing(right_dir, self.right, left_dir if left_valid else None,
@@ -524,7 +537,12 @@ class ListingMixin:
         if left_valid:
             self.update_listing(left_dir, self.left, right_dir if right_valid else None,
                                  refresh_snapshot=False, retag_only=False)
-        if right_valid:
+        if self._duplicate_mode_active():
+            if left_valid:
+                self._dup_sync_right()
+            else:
+                self._dup_clear_right()
+        elif right_valid:
             self.update_listing(right_dir, self.right, left_dir if left_valid else None,
                                  refresh_snapshot=False, retag_only=False)
 
@@ -733,6 +751,8 @@ class ListingMixin:
         the same busy/cancelable bar the checkbox toggle already does
         (see _on_recursive_folder_contents_changed) instead of running
         silently with no feedback."""
+        if self._duplicate_mode_active():
+            self._dup_reset_colors(self.left)  # Refresh starts the duplicate colors over
         self.update_listings()
         self._recount_all_panes()
 
@@ -740,7 +760,9 @@ class ListingMixin:
         if getattr(pane, "free_space_label", None) is None or getattr(pane, "entry", None) is None:
             return  # called mid-construction, before this pane's toolbar exists
         path = pane.entry.text()
-        if path and not self._is_snapshot_path(path) and os.path.isdir(path):
+        if pane is getattr(self, "right", None) and not self._dual_pane_enabled:
+            pane._free_atoms = []  # Duplicate Finder: no drive free-space figure
+        elif path and not self._is_snapshot_path(path) and os.path.isdir(path):
             try:
                 free = shutil.disk_usage(path).free
                 size_text = self.format_size(free).replace(" ", "\u00a0")
@@ -907,6 +929,10 @@ class ListingMixin:
             # through every subfolder opened while single-pane.
             other_dir = None
         tree = pane.tree
+
+        # Duplicate Finder mode: work out which files are copies of each
+        # other before any row is tagged (see DuplicateFinderMixin).
+        self._dup_prepare(pane)
 
         if retag_only:
             # See the retag_only paragraph above -- nothing here
@@ -1140,7 +1166,7 @@ class ListingMixin:
                 self.update_type_counts(pane)
                 return
 
-            entries = self._build_entries(directory, progress=progress)
+            entries = self._build_entries(directory, progress=progress, pane=pane)
             if entries is None:
                 self._add_tree_item(tree, "Error reading directory", "", "", "", "error")
                 pane._last_listed_dir = None
@@ -1238,7 +1264,7 @@ class ListingMixin:
         # rule beats one more special case to keep track of.
         self._refresh_pane_timeline(pane)
 
-    def _build_entries(self, directory, progress=None):
+    def _build_entries(self, directory, progress=None, pane=None):
         """List `directory`'s immediate contents as plain dicts, honoring
         the file filter and the List Directories/Files/Sort Directories
         First checkboxes. Returns None if the directory can't be read
@@ -1254,7 +1280,7 @@ class ListingMixin:
         is still ticked once per entry purely to keep Cancel responsive
         on a very large folder, not because there's disk I/O to pump
         the event loop around."""
-        node = self._snapshot_lookup(directory)
+        node = self._snapshot_lookup(directory, pane)
         if node is None or node["children"] is None:
             return None
 
@@ -1330,7 +1356,16 @@ class ListingMixin:
             return False
         return self.expand_matching_cb.isChecked()
 
-    def _count_filtered_recursive(self, directory, progress=None):
+    def _pane_root_dir(self, pane) -> str:
+        """The folder a pane lists: its entry's text -- except in Duplicate
+        Finder mode, where the right pane lists the duplicates found in the
+        left pane's folder (its own entry still holds the Compare folders
+        mode's folder)."""
+        if self._duplicate_mode_active() and pane is self.right:
+            return self.left.entry.text()
+        return pane.entry.text()
+
+    def _count_filtered_recursive(self, directory, progress=None, pane=None):
         """Like the old raw os.walk-based count, but walks the same
         filtered listing (_build_entries -- respecting the file filter
         and the List Directories/Files checkboxes) that a Select-group
@@ -1344,7 +1379,7 @@ class ListingMixin:
         filtered subset, so the bar would stall partway through and
         then jump straight to "done" once the (smaller) real total was
         actually reached."""
-        entries = self._build_entries(directory)
+        entries = self._build_entries(directory, pane=pane)
         if entries is None:
             return 0
         total = 0
@@ -1353,7 +1388,7 @@ class ListingMixin:
                 return total
             total += 1
             if e["is_dir"]:
-                total += self._count_filtered_recursive(e["full_path"], progress)
+                total += self._count_filtered_recursive(e["full_path"], progress, pane)
         return total
 
     def _recount_pane_items(self, pane: DirectoryPane, progress=None):
@@ -1363,15 +1398,15 @@ class ListingMixin:
         With it on, it's a full recursive walk -- `progress`, if given
         (see _recount_pane_items_with_indicator / _recount_all_panes),
         lets the caller show a shared busy indicator and cancel early."""
-        directory = pane.entry.text()
+        directory = self._pane_root_dir(pane)
         if not directory or not self._isdir(directory):
             pane.item_count = 0
             return
         if not self._recursive_folder_contents_enabled():
-            entries = self._build_entries(directory)
+            entries = self._build_entries(directory, pane=pane)
             pane.item_count = len(entries) if entries is not None else 0
             return
-        pane.item_count = self._count_filtered_recursive(directory, progress)
+        pane.item_count = self._count_filtered_recursive(directory, progress, pane)
 
     def _recount_pane_items_with_indicator(self, pane: DirectoryPane):
         """_recount_pane_items for a single pane, showing the central
@@ -1505,7 +1540,7 @@ class ListingMixin:
 
         directory = item.data(0, PATH_ROLE)
         other_dir = item.data(0, OTHER_DIR_ROLE)
-        entries = self._build_entries(directory, progress=progress)
+        entries = self._build_entries(directory, progress=progress, pane=self._pane_for_tree(tree))
         if entries is None:
             try:
                 self._add_tree_item(tree, "(error reading folder)", "", "", "", "error", parent_item=item)
@@ -1588,6 +1623,7 @@ class ListingMixin:
         # already catches this up once, unthrottled, when it's done.
         if not self._recursive_folder_contents_enabled() and not getattr(pane, "_bulk_expand_pending", False):
             self.update_type_counts(pane)
+            self._dup_schedule_regroup(pane)
 
     def _on_item_collapsed(self, item: QTreeWidgetItem, pane: DirectoryPane):
         """Mirror of the count refresh in _on_item_expanded -- a single
@@ -1597,6 +1633,7 @@ class ListingMixin:
         whenever Recursive Folder Selections is off."""
         if not self._recursive_folder_contents_enabled() and not getattr(pane, "_bulk_expand_pending", False):
             self.update_type_counts(pane)
+            self._dup_schedule_regroup(pane)
 
     def _collect_expanded_paths(self, tree) -> set:
         """Full paths of all currently-expanded items, so a refresh (e.g.
@@ -1671,13 +1708,31 @@ class ListingMixin:
     _DIR_DIFF_TAGS = {"diff_count_smaller_dir", "diff_count_larger_dir",
                        "diff_date_newer_dir", "diff_date_older_dir"}
 
+    def _display_tag(self, item: QTreeWidgetItem, tag: str) -> str:
+        """The tag whose colors a row actually shows. Display only -- the
+        item's stored tag (and with it the Select buttons) is never
+        changed. A recursive-mode differing folder reads as the single
+        "folder differs" color; in Compare folders mode a matching (or
+        uncompared) folder with no files anywhere below it takes the
+        "Empty folder" color, while Missing/differing folders keep theirs."""
+        if not item.data(0, IS_DIR_ROLE):
+            return tag
+        if tag in self._DIR_DIFF_TAGS and self._recursive_folder_contents_enabled():
+            return "diff_content_dir"
+        if (self._dual_pane_enabled and tag in ("directory", "common_dir")
+                and self._folder_has_no_files(self._snapshot_lookup(item.data(0, PATH_ROLE)))):
+            return "empty_dir_cmp"
+        return tag
+
     def _apply_tag(self, item: QTreeWidgetItem, tag: str):
         item.setData(0, Qt.UserRole, tag)
-        display_tag = tag
-        if (item.data(0, IS_DIR_ROLE) and tag in self._DIR_DIFF_TAGS
-                and self._recursive_folder_contents_enabled()):
-            display_tag = "diff_content_dir"
-        bg, fg = TAG_COLORS.get(display_tag, (None, None))
+        display_tag = self._display_tag(item, tag)
+        if display_tag.startswith("dup_"):
+            # Duplicate Finder mode: one color per set of identical files,
+            # "dup_<index>" (see DuplicateFinderMixin).
+            bg, fg = self._duplicate_group_colors(int(display_tag[4:]))
+        else:
+            bg, fg = TAG_COLORS.get(display_tag, (None, None))
         for col in range(COLUMN_COUNT):
             item.setBackground(col, QBrush(QColor(bg)) if bg else QBrush())
             item.setForeground(col, QBrush(QColor(fg)) if fg else QBrush())

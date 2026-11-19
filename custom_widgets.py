@@ -144,6 +144,9 @@ _DEFAULT_SELECT_COLORS = {
     "smaller": ("black", "#D9BCF0"),
     "larger": ("black", "#B98CE0"),
     "diff_folders": ("blue", "#7777DD"),
+    # Duplicate Finder mode's two search buttons (DuplicateFinderMixin).
+    "dup_all": ("black", "#F0D080"),
+    "dup_extra": ("black", "#E58E8E"),
     "file_parent": ("white", "#3355DD"),
     "all_parents": ("white", "#1A237E"),
 }

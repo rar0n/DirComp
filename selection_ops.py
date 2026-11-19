@@ -32,7 +32,7 @@ from constants import PATH_ROLE, IS_DIR_ROLE, POPULATED_ROLE, _DIFF_RANK, GNOME_
 from listing_ops import _DATE_FIELD_TO_ENTRY_KEY, _DATE_FIELD_TO_COLUMN, COL_SIZE
 from panes import DirectoryPane
 from progress import _CancellableProgress
-from diff_engine import AXES_UNHASHED, AXES_CONTENT_DIFFERS
+from diff_engine import AXES_UNHASHED, AXES_CONTENT_DIFFERS, AXES_IGNORED
 
 
 class _NoTargets(Exception):
@@ -380,7 +380,7 @@ class SelectionMixin:
             return cached
         groups = {}
         for node in (pane.snapshot_index or {}).values():
-            if not node["is_dir"]:
+            if not node["is_dir"] and not self._ignored_kind(node):
                 digest = self._node_hash(node)
                 if digest is not None:
                     groups.setdefault(digest, []).append(node)
@@ -388,6 +388,8 @@ class SelectionMixin:
         return groups
 
     def _select_duplicates_of_new(self, pane: DirectoryPane):
+        if self._duplicate_mode_active():
+            return  # Duplicate Finder mode: the groups are the Select buttons' job
         """Hash / Fingerprint comparison with "Multi Select matching files
         in same pane" on: files newly selected by hand (click, Ctrl-click,
         Shift-click range, drag) pull in the files with identical content --
@@ -413,7 +415,7 @@ class SelectionMixin:
         extra = []
         for path in new:
             node = self._snapshot_lookup(path)
-            if node is None or node["is_dir"]:
+            if node is None or node["is_dir"] or self._ignored_kind(node):
                 continue
             digest = self._node_hash(node)
             if digest is None:
@@ -425,7 +427,8 @@ class SelectionMixin:
                 pool = self._hash_groups_index(pane).get(digest, [])
             for c in pool:
                 cp = os.path.normpath(c["full_path"])
-                if (not c["is_dir"] and cp not in current and self._node_hash(c) == digest):
+                if (not c["is_dir"] and cp not in current and self._node_hash(c) == digest
+                        and not self._ignored_kind(c)):
                     extra.append(c["full_path"])
                     current.add(cp)
         if not same_folder and not recursive and extra:
@@ -611,13 +614,13 @@ class SelectionMixin:
         total_count = 0
         total_size = 0
 
-        directory = pane.entry.text()
+        directory = self._pane_root_dir(pane)
         if not directory or not self._isdir(directory):
             return counts, 0, 0
         other_pane = self.right if pane is self.left else self.left
         other_root = other_pane.entry.text()
-        if not other_root or not self._isdir(other_root):
-            other_root = None
+        if self._duplicate_mode_active() or not other_root or not self._isdir(other_root):
+            other_root = None  # Duplicate Finder mode: nothing to compare against
 
         # This pane's own Statistics-view Metric decides which date
         # field (mtime/ctime/atime) "Newer"/"Older" means here too -- see
@@ -629,7 +632,7 @@ class SelectionMixin:
 
         def walk(d, other_d):
             nonlocal total_count, total_size
-            entries = self._build_entries(d)
+            entries = self._build_entries(d, pane=pane)
             if entries is None:
                 return
             for e in entries:
@@ -686,8 +689,8 @@ class SelectionMixin:
                                            own_full=e["full_path"])
                     if axes is None:
                         counts["missing"] += 1
-                    elif axes is AXES_UNHASHED:
-                        pass  # not hashed yet: counted as neither
+                    elif axes is AXES_UNHASHED or axes is AXES_IGNORED:
+                        pass  # not hashed yet / ignored file: counted as neither
                     elif axes is AXES_CONTENT_DIFFERS:
                         counts["diff_folders"] += 1
                     else:
@@ -699,8 +702,10 @@ class SelectionMixin:
                 else:
                     # Same reasoning as the directory branch above: a
                     # file with no counterpart directory to even look in
-                    # (other_d is None) is missing, not uncategorized.
-                    counts["missing"] += 1
+                    # (other_d is None) is missing, not uncategorized --
+                    # unless it is an ignored (empty / hard link) file.
+                    if not self._ignored_file_tag(e["full_path"]):
+                        counts["missing"] += 1
 
         walk(directory, other_root)
         return counts, total_count, total_size
@@ -780,6 +785,8 @@ class SelectionMixin:
 
     def _type_count_parts(self, pane: DirectoryPane) -> list:
         """[(plain text, html)] for each per-type count of `pane`."""
+        if self._duplicate_mode_active():
+            return self._dup_summary_parts(pane)
         counts = getattr(pane, "_last_type_counts", None) or {}
         summary_colors = getattr(self, "_summary_colors", None) or {}
         parts = []
@@ -797,6 +804,8 @@ class SelectionMixin:
         width of what goes between two parts on a line."""
         from itertools import combinations
         count = len(widths)
+        if count == 0:
+            return [[]], 0  # nothing to show (Duplicate Finder mode before a scan)
         if sep is None:
             sep = self._type_count_separator_width
         best = None
@@ -820,7 +829,7 @@ class SelectionMixin:
             return
         panes = [left]
         right = getattr(self, "right", None)
-        if self._dual_pane_enabled and right is not None and getattr(right, "count_label", None) is not None:
+        if right is not None and getattr(right, "count_label", None) is not None:
             panes.append(right)
         try:
             plans = []
@@ -870,7 +879,7 @@ class SelectionMixin:
             return
         panes = [left]
         right = getattr(self, "right", None)
-        if self._dual_pane_enabled and right is not None and getattr(right, "total_items_label", None) is not None:
+        if right is not None and getattr(right, "total_items_label", None) is not None:
             panes.append(right)
         try:
             from PySide6.QtGui import QFont, QFontMetrics
@@ -942,7 +951,7 @@ class SelectionMixin:
             root = root.parentWidget()
         if row is None or root is None or row.width() < 300:
             return widget.width()
-        half = (row.width() - _PANE_GAP) // 2 if self._dual_pane_enabled else row.width()
+        half = (row.width() - _PANE_GAP) // 2  # two panes in both modes
         return half - max(0, root.width() - widget.width())
 
     def _render_stats_totals(self):
@@ -955,7 +964,7 @@ class SelectionMixin:
             return
         panes = [left]
         right = getattr(self, "right", None)
-        if self._dual_pane_enabled and right is not None and getattr(right, "tl_totals_label", None) is not None:
+        if right is not None and getattr(right, "tl_totals_label", None) is not None:
             panes.append(right)
         try:
             plans = []
@@ -1212,6 +1221,12 @@ class SelectionMixin:
                 or item.data(0, Qt.UserRole) == "diff_content_file"
             )
             return collector, predicate, True, False
+        if type_key in ("dup_all", "dup_extra"):
+            extra_only = type_key == "dup_extra"
+            collector = lambda root, other, progress, pn=pane, ex=extra_only: self._dup_select_paths(pn, ex)
+            predicate = lambda item, pn=pane, ex=extra_only: (
+                os.path.normpath(item.data(0, PATH_ROLE) or "") in self._dup_select_set(pn, ex))
+            return collector, predicate, False, False
         want_rank, want_direction = self._RANK_SELECT_TYPES[type_key]
         collector = lambda root, other, progress, wr=want_rank, wd=want_direction, df=date_field: (
             self._collect_matching_paths(root, other, wr, wd, progress, df)

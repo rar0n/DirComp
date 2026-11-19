@@ -120,6 +120,7 @@ class ResponsiveLayoutMixin:
         panes = (self.left,) if not self._dual_pane_enabled else (self.left, self.right)
         for pane in panes:
             self._relayout_pane_cluster(pane, force)
+        for pane in (self.left, self.right):  # the right pane lists duplicates in both modes
             self._update_pane_date_columns(pane)
 
     # ------------------------------------------------------------ Groups
@@ -142,6 +143,14 @@ class ResponsiveLayoutMixin:
         if key == "select":
             sp = pane.select_plain_buttons
             st = pane.select_toggle_buttons
+            if getattr(pane, "dup_layout", False):
+                # Duplicate Finder mode: the compare buttons give way to
+                # Duplicates / Extra copies (None = empty cell).
+                return [
+                    sp["select_all"], st["dup_all"], sp["all_parents"], sp["file_parent"],
+                    pane.invert_button, st["dup_extra"], None, None,
+                    sp["clear"], None, None, None,
+                ]
             return [
                 sp["select_all"], st["missing"], st["newer"], st["smaller"],
                 pane.invert_button, st["matching"], st["older"], st["larger"],
@@ -196,7 +205,8 @@ class ResponsiveLayoutMixin:
         align = Qt.AlignRight if mirrored else Qt.AlignLeft
         buttons = self._group_buttons(pane, key)
         for i, row, col in self._cell_positions(key, len(buttons), cols, mirrored):
-            grid.addWidget(buttons[i], row, col, alignment=align)
+            if buttons[i] is not None:
+                grid.addWidget(buttons[i], row, col, alignment=align)
         group.setAlignment(Qt.AlignRight if mirrored else Qt.AlignLeft)
 
     def _ensure_cluster_sizes(self, pane: DirectoryPane):
@@ -289,7 +299,7 @@ class ResponsiveLayoutMixin:
         total = row.width() if row is not None else 0
         if total < 300:
             total = self.width() - 20
-        half = (total - _PANE_GAP) // 2 if self._dual_pane_enabled else total
+        half = (total - _PANE_GAP) // 2  # two panes in both modes
         container = self.left.cluster_container.parentWidget()
         margins = container.layout().contentsMargins() if container is not None else None
         inner = (margins.left() + margins.right()) if margins is not None else 22

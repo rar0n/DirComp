@@ -20,7 +20,10 @@ File format (version 1), one JSON object:
   (hash_key = the key the stored hashes belong to, or null: no hashes), and
   tree = one node: {"n": name, "d": 1 if folder, "s": size, "m"/"c"/"a":
   mtime/ctime/atime, "h": hash digest, "k": [children], "ns": 1 +
-  "ni": item count for a folder whose contents were not scanned}.
+  "ni": item count for a folder whose contents were not scanned,
+  "l": link count of a file with more than one hard link}. "has_links" (top
+  level) says the file records link counts at all; older snapshots have none
+  and count every file as having one link ("Ignore hard links").
 """
 
 from __future__ import annotations
@@ -173,6 +176,8 @@ class SnapshotOpsMixin:
         d = {"n": node["name"], "s": node["size"], "m": node["mtime"],
              "c": node["ctime"], "a": node["atime"]}
         if not node["is_dir"]:
+            if node.get("nlink", 1) > 1:
+                d["l"] = node["nlink"]
             digest = self._node_hash(node)
             if digest is not None:
                 d["h"] = digest
@@ -210,8 +215,10 @@ class SnapshotOpsMixin:
         else:
             root_path = root["full_path"]
         key = self._comparison_key() if self._hash_type_selected() and counts["hashed"] else None
+        # Re-saving a snapshot that never had link counts must not claim any.
+        has_links = bool(meta.get("has_links", False)) if (getattr(pane, "snapshot_file", None) and meta) else True
         document = {
-            "format": _FORMAT, "version": _VERSION,
+            "format": _FORMAT, "version": _VERSION, "has_links": has_links,
             "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "root_path": root_path, "root_name": os.path.basename(root_path.rstrip(os.sep)) or root_path,
             "recursive": recursive,
@@ -283,6 +290,7 @@ class SnapshotOpsMixin:
         }
         index[os.path.normpath(full_path)] = node
         if not is_dir:
+            node["nlink"] = int(d.get("l", 1))
             if "h" in d and hash_key:
                 node["hash"] = (hash_key, d["h"])
             return node
@@ -328,12 +336,18 @@ class SnapshotOpsMixin:
         pane.snapshot_meta = {
             "root_path": document.get("root_path", "?"), "root_name": document.get("root_name", "?"),
             "created": document.get("created", "?"), "recursive": bool(document.get("recursive", True)),
+            "has_links": bool(document.get("has_links", False)),
         }
         pane.snapshot_full_root, pane.snapshot_full_index = root, index
         pane.snapshot_hash_key = hash_key
         self._update_snapshot_label(pane)
         self._update_hash_buttons_enabled()
         self._check_snapshot_comparison(pane, comparison, hash_key)
+        if (getattr(self, "_ignore_hardlinks", False) and not pane.snapshot_meta["has_links"]
+                and not getattr(self, "_pending_snapshot_warning", None)):
+            self._pending_snapshot_warning = (
+                pane, "Snapshot has no link counts (saved by an older version): "
+                      "no file counts as a hard link.")
         return True
 
     def _check_snapshot_comparison(self, pane, comparison, hash_key):

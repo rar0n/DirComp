@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 from constants import (
     COMPARISON_TYPES, HASH_ALGORITHMS, CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT,
     MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB,
-    TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
+    DUP_SUMMARY_TYPES, TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
     _MAX_TREE_INDENTATION, _MIN_TREE_INDENTATION, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE,
     _SUBSECTION_GAP, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE, _SUBTITLE_PT, _SUBTITLE_STYLE,
     _TABLE_HEADER_STYLE,
@@ -333,7 +333,7 @@ class SettingsTabMixin:
             return secondary
 
         # Row 1: independent/decider options.
-        _add_synced(self.dual_pane_cb, "Dual Pane", 0, 0)
+        _add_synced(self.dual_pane_cb, "Compare folders", 0, 0)
         _add_synced(self.recursive_folder_contents_cb, "Recursive Folder Selections", 0, 2)
         _add_synced(self.list_directories_cb, "List Directories", 0, 3)
         _add_synced(self.list_files_cb, "List Files", 0, 4)
@@ -347,8 +347,6 @@ class SettingsTabMixin:
         # these secondary copies too (_link_checkboxes only mirrors
         # checked state, not enabled state).
         symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical GUI", 1, 0, indent=20)
-        symmetrical_secondary.setEnabled(self.dual_pane_cb.isChecked())
-        self.dual_pane_cb.toggled.connect(symmetrical_secondary.setEnabled)
         symmetrical_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         expand_secondary = _add_synced(self.expand_matching_cb, "Expand To Selection", 1, 2, indent=20)
@@ -360,6 +358,43 @@ class SettingsTabMixin:
         sort_dirs_secondary.setEnabled(self.list_directories_cb.isChecked())
         self.list_directories_cb.toggled.connect(sort_dirs_secondary.setEnabled)
         sort_dirs_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+
+        # Duplicate Finder options (DuplicateFinderMixin). No Main-tab
+        # primary: these two only exist here. "Scan expanded folders" sits
+        # under Expand To Selection (its sibling dependent of Recursive
+        # Folder Selections, but enabled when that is OFF); "Hash only
+        # same-size files" sits in List Directories' column, unindented.
+        self.scan_expanded_cb = QCheckBox("Scan expanded folders")
+        self.scan_expanded_cb.setChecked(self._scan_expanded)
+        self.scan_expanded_cb.setToolTip(
+            "Duplicate Finder mode with Recursive Folder Selections off: only the "
+            "files in the top folder and in the folders you have expanded are "
+            "searched for duplicates.\n"
+            "On: expanding or collapsing a folder updates the search at once.\n"
+            "Off: the search keeps the folders that were expanded at the last "
+            "Refresh / Hash / folder load, until the next one."
+        )
+        self.scan_expanded_cb.setEnabled(not self.recursive_folder_contents_cb.isChecked())
+        self.recursive_folder_contents_cb.toggled.connect(lambda on: self.scan_expanded_cb.setEnabled(not on))
+        self.scan_expanded_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
+        scan_wrapper = QHBoxLayout()
+        scan_wrapper.setContentsMargins(0, 0, 0, 0)
+        scan_wrapper.addSpacing(20)
+        scan_wrapper.addWidget(self.scan_expanded_cb)
+        global_grid.addLayout(scan_wrapper, 2, 2)
+
+        self.hash_same_size_cb = QCheckBox("Hash only same-size files")
+        self.hash_same_size_cb.setChecked(self._hash_same_size)
+        self.hash_same_size_cb.setToolTip(
+            "Duplicate Finder mode with Hash value / Fingerprint: files with a "
+            "size no other file in the search has cannot be duplicates, so they "
+            "are not hashed (they keep the plain file color). Saves time on big "
+            "folders. Off: every file in the search is hashed.\n"
+            "Compare folders mode always hashes every file in view."
+        )
+        global_grid.addWidget(self.hash_same_size_cb, 2, 3)
+        self.scan_expanded_cb.toggled.connect(self._on_dup_scope_option_changed)
+        self.hash_same_size_cb.toggled.connect(self._on_dup_scope_option_changed)
 
         # Row 3: Synchronize Views, aligned below Symmetrical GUI (same
         # indent, same column).
@@ -582,7 +617,38 @@ class SettingsTabMixin:
         self.multi_select_matching_cb.toggled.connect(self._on_multi_select_setting_changed)
         self.multi_select_same_folder_cb.toggled.connect(self._on_multi_select_setting_changed)
 
-        # Row 18: the persistent hash cache (HashOpsMixin / hash_cache_store).
+        # Row 18: files left out of every comparison (DiffEngineMixin.
+        # _ignored_kind), in both Dual Pane and single pane mode and with
+        # every comparison type.
+        ignore_row = QHBoxLayout()
+        ignore_row.setContentsMargins(0, 0, 0, 0)
+        ignore_row.addSpacing(20)
+        self.ignore_empty_files_cb = QCheckBox("Ignore empty files")
+        self.ignore_empty_files_cb.setChecked(self._ignore_empty)
+        self.ignore_empty_files_cb.setToolTip(
+            "Files of 0 bytes take no part in any comparison, selection or "
+            "hashing: they are neither missing, matching nor different (and "
+            "never a duplicate of each other). They keep the plain file colors."
+        )
+        ignore_row.addWidget(self.ignore_empty_files_cb)
+        ignore_row.addSpacing(20)
+        self.ignore_hard_links_cb = QCheckBox("Ignore hard links")
+        self.ignore_hard_links_cb.setChecked(self._ignore_hardlinks)
+        self.ignore_hard_links_cb.setToolTip(
+            "Files that have more than one hard link (link count above 1) take "
+            "no part in any comparison, selection or hashing, and show the Hard "
+            "link colors (Default / Misc colors). A file whose other link is "
+            "outside the opened folders counts too.\n"
+            "Off: two links to one file are reported as identical, although "
+            "deleting one of them frees no space."
+        )
+        ignore_row.addWidget(self.ignore_hard_links_cb)
+        ignore_row.addStretch(1)
+        global_grid.addLayout(ignore_row, 18, 0, 1, 7)
+        self.ignore_empty_files_cb.toggled.connect(self._on_comparison_setting_changed)
+        self.ignore_hard_links_cb.toggled.connect(self._on_comparison_setting_changed)
+
+        # Row 19: the persistent hash cache (HashOpsMixin / hash_cache_store).
         cache_row = QHBoxLayout()
         cache_row.setContentsMargins(0, 0, 0, 0)
         cache_row.addSpacing(20)
@@ -607,11 +673,36 @@ class SettingsTabMixin:
         clear_cache_button.clicked.connect(self._on_clear_hash_cache)
         cache_row.addWidget(clear_cache_button)
         cache_row.addStretch(1)
-        global_grid.addLayout(cache_row, 18, 0, 1, 7)
+        global_grid.addLayout(cache_row, 19, 0, 1, 7)
         self.cache_hashed_folders_cb.toggled.connect(self._on_cache_hashed_folders_toggled)
+
+        # Row 20: which copy "Extra copies" leaves alone in every group of
+        # identical files (Duplicate Finder mode, DuplicateFinderMixin).
+        keep_row = QHBoxLayout()
+        keep_row.setContentsMargins(0, 0, 0, 0)
+        keep_row.addSpacing(20)
+        keep_row.addWidget(QLabel("Extra copies keep:"))
+        self.extra_copies_keep_combo = QComboBox()
+        self.extra_copies_keep_combo.addItems(
+            ["Shortest path", "Oldest", "Newest", "First in tree order"])
+        self.extra_copies_keep_combo.setCurrentIndex(self._dup_survivor)
+        self.extra_copies_keep_combo.setToolTip(
+            "Duplicate Finder mode: the \"Extra copies\" button selects every "
+            "copy in a group of identical files except one. This decides which "
+            "one is left alone:\n"
+            "Shortest path: the copy with the shortest full path (the first "
+            "of them in tree order on a tie).\n"
+            "Oldest / Newest: the copy with the oldest / newest modified date.\n"
+            "First in tree order: the copy listed first in the file list."
+        )
+        keep_row.addWidget(self.extra_copies_keep_combo)
+        keep_row.addStretch(1)
+        global_grid.addLayout(keep_row, 20, 0, 1, 7)
+        self.extra_copies_keep_combo.currentIndexChanged.connect(self._on_dup_survivor_changed)
 
         self._update_comparison_controls_enabled()
         self._cmp_applied_key = self._comparison_key()
+        self._ignore_applied = self._ignore_flags()
         self.comparison_type_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
         self.hash_algorithm_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
         self.fingerprint_start_spin.valueChanged.connect(self._on_comparison_setting_changed)
@@ -768,6 +859,7 @@ class SettingsTabMixin:
         default_colors_group = QGroupBox("")
         default_colors_group_outer = QVBoxLayout(default_colors_group)
         default_colors_group_outer.addWidget(default_colors_table)
+
         # Level 2 blocks of Global Settings: Theme, Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
@@ -848,6 +940,26 @@ class SettingsTabMixin:
              lambda: self._folder_color[0], lambda: self._folder_color[1],
              lambda hexc: self._on_folder_color_changed(True, hexc),
              lambda hexc: self._on_folder_color_changed(False, hexc)),
+            ("Hard link",
+             lambda: self._tag_color_hex("hardlink_file", True),
+             lambda: self._tag_color_hex("hardlink_file", False),
+             lambda hexc: self._on_comparison_color_changed("hardlink_file", True, hexc),
+             lambda hexc: self._on_comparison_color_changed("hardlink_file", False, hexc)),
+            ("Empty folder",
+             lambda: self._tag_color_hex("empty_dir_cmp", True),
+             lambda: self._tag_color_hex("empty_dir_cmp", False),
+             lambda hexc: self._on_comparison_color_changed("empty_dir_cmp", True, hexc),
+             lambda hexc: self._on_comparison_color_changed("empty_dir_cmp", False, hexc)),
+            ("Empty folder (Duplicate Finder)",
+             lambda: self._tag_color_hex("empty_dir", True),
+             lambda: TAG_COLORS.get("empty_dir", (None, None))[0] or self._effective_flv_bg(),
+             lambda hexc: self._on_comparison_color_changed("empty_dir", True, hexc),
+             lambda hexc: self._on_comparison_color_changed("empty_dir", False, hexc)),
+            ("Folder (Duplicate Finder)",
+             lambda: self._tag_color_hex("dupfolder", True),
+             lambda: TAG_COLORS.get("dupfolder", (None, None))[0] or self._effective_flv_bg(),
+             lambda hexc: self._on_comparison_color_changed("dupfolder", True, hexc),
+             lambda hexc: self._on_comparison_color_changed("dupfolder", False, hexc)),
             ("Scrollbar (Handle/Track)",
              lambda: _SCROLLBAR_COLORS["handle"], lambda: _SCROLLBAR_COLORS["groove"],
              lambda hexc: self._on_scrollbar_color_changed("handle", hexc),
@@ -870,10 +982,127 @@ class SettingsTabMixin:
             "below). The text color of a selected row is its Default File / Default "
             "Folder Fg."
         )
+        flv_colors_table.item(4, 0).setToolTip(
+            "Files that have more than one hard link, while Options -> Ignore "
+            "hard links is on."
+        )
+        flv_colors_table.item(5, 0).setToolTip(
+            "Compare folders mode: a folder with no files anywhere below it "
+            "that is either the same on both sides (Matching) or has nothing to "
+            "compare against. Missing and differing folders keep their own "
+            "colors. Display only: the Select buttons still see such a folder "
+            "as Matching."
+        )
+        flv_colors_table.item(6, 0).setToolTip(
+            "Duplicate Finder mode (Compare folders off) only: a folder with no "
+            "files anywhere below it. Its background follows the file list's own "
+            "(Default Background) until you pick one here."
+        )
+        flv_colors_table.item(7, 0).setToolTip(
+            "Duplicate Finder mode (Compare folders off) only: the color of a "
+            "plain folder. Its background follows the file list's own "
+            "(Default Background) until you pick one here, so folders do not "
+            "look like highlighted finds next to the duplicate groups."
+        )
         self._size_table_to_contents(flv_colors_table)
         flv_colors_group = QGroupBox("")
         flv_colors_group_outer = QVBoxLayout(flv_colors_group)
         flv_colors_group_outer.addWidget(flv_colors_table)
+
+        # ---- Duplicate File Colors (Level 3, at the bottom of File List View -> Default / Misc colors):
+        # Duplicate Finder mode gives each set of identical files its own
+        # background, from a color-wheel range like the indentation lines'
+        # (Nr. of steps, Color 1/2, Swap, Reverse) -- without the hover
+        # color. The text color is its own choice: a fixed Fg color, the
+        # background's inverse color, or black/white by its luminance. ----
+        dup_group = QGroupBox("")
+        dup_outer = QVBoxLayout(dup_group)
+        dup_steps_row = QHBoxLayout()
+        self.dup_steps_label = QLabel("Nr. of Steps:")
+        self.dup_steps_spin = SliderSpinBox()
+        self.dup_steps_spin.setRange(1, 32)
+        self.dup_steps_spin.setValue(self._dup_steps)
+        self.dup_steps_spin.setToolTip(
+            "How many different colors the sets of duplicate files cycle through. "
+            "With more sets than steps the colors repeat."
+        )
+        self.dup_steps_spin.valueChanged.connect(self._on_dup_steps_changed)
+        dup_steps_row.addWidget(spin_slider_inline(
+            self.dup_steps_label, self.dup_steps_spin, SpinSlider(self.dup_steps_spin),
+        ), 0, Qt.AlignVCenter)
+        dup_steps_row.addStretch(1)
+        dup_outer.addLayout(dup_steps_row)
+        self._aligned_option_rows.append((self.dup_steps_label, self.dup_steps_spin))
+
+        dup_grid = QGridLayout()
+        dup_grid.setHorizontalSpacing(6)
+        dup_grid.setColumnStretch(6, 1)
+        dup_grid.addWidget(QLabel("Color 1:"), 0, 0, Qt.AlignVCenter)
+        self.dup_color1_swatch = self._make_color_swatch(
+            lambda: self._dup_color1, lambda hexc: self._on_dup_color_changed(1, hexc))
+        dup_grid.addWidget(self.dup_color1_swatch, 0, 1, Qt.AlignVCenter)
+        self.dup_color2_label = QLabel("Color 2:")
+        dup_grid.addWidget(self.dup_color2_label, 0, 2, Qt.AlignVCenter)
+        self.dup_color2_swatch = self._make_color_swatch(
+            lambda: self._dup_color2, lambda hexc: self._on_dup_color_changed(2, hexc))
+        dup_grid.addWidget(self.dup_color2_swatch, 0, 3, Qt.AlignVCenter)
+        dup_swap_bg, dup_swap_fg = self._default_button_colors()
+        self.dup_swap_button = QPushButton("Swap")
+        self.dup_swap_button.setFixedHeight(self._uniform_button_size()[1])
+        self.dup_swap_button.setStyleSheet(
+            _bevel_button_stylesheet(dup_swap_bg, dup_swap_fg)
+            + " QPushButton:disabled { background-color: "
+            + _press_blend(dup_swap_bg, self._effective_gui_colors(self._theme)[1], 0.65).name()
+            + "; color: " + _press_blend(dup_swap_fg, self._effective_gui_colors(self._theme)[1], 0.55).name()
+            + "; }"
+        )
+        self.dup_swap_button.setToolTip(
+            "Swap Color 1 and Color 2, and flip Reverse Color Wheel Direction along with "
+            "them, so the range covers the same hues the other way round."
+        )
+        self.dup_swap_button.clicked.connect(self._on_dup_colors_swap)
+        dup_grid.addWidget(self.dup_swap_button, 0, 4, Qt.AlignVCenter)
+        self.dup_reverse_cb = QCheckBox("Reverse Color Wheel Direction")
+        self.dup_reverse_cb.setToolTip(
+            "Which way the range between Color 1 and Color 2 runs around the color wheel "
+            "(the short or the long way round for the same two colors)."
+        )
+        self.dup_reverse_cb.setChecked(self._dup_reverse)
+        self.dup_reverse_cb.toggled.connect(self._on_dup_reverse_changed)
+        dup_grid.addWidget(self.dup_reverse_cb, 0, 5, Qt.AlignVCenter)
+        dup_outer.addLayout(dup_grid)
+
+        # Text color: exclusive options; the swatch belongs to the first.
+        dup_fg_row = QHBoxLayout()
+        dup_fg_row.addWidget(QLabel("Text:"))
+        self.dup_fg_group = QButtonGroup(dup_group)
+        for mode, text, tip in (
+            (0, "Set Fg color", "Always use the color picked here as the text color."),
+            (1, "Inverse color", "The text color is the inverse of the background color "
+                                 "(it can be hard to read on mid-tones)."),
+            (2, "Inverse luminance", "The text is black on a light background and white on a "
+                                     "dark one."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.dup_fg_group.addButton(radio, mode)
+            radio.setChecked(mode == self._dup_fg_mode)
+            dup_fg_row.addWidget(radio)
+            if mode == 0:
+                self.dup_fg_swatch = self._make_color_swatch(
+                    lambda: self._dup_fg_color, self._on_dup_fg_color_changed)
+                dup_fg_row.addWidget(self.dup_fg_swatch)
+        dup_fg_row.addStretch(1)
+        self.dup_fg_group.idClicked.connect(self._on_dup_fg_mode_changed)
+        dup_outer.addLayout(dup_fg_row)
+
+        self.dup_preview_label = QLabel()
+        self.dup_preview_label.setTextFormat(Qt.RichText)
+        self.dup_preview_label.setWordWrap(True)
+        self.dup_preview_label.setToolTip("One chip per step: the background and text color of each set of duplicates.")
+        dup_outer.addWidget(self.dup_preview_label)
+        self._sync_dup_dependents()
+        self._refresh_dup_preview()
         # This is now a Level 3 block ("Default / Misc colors"), nested
         # with Comparison Type Colors inside one merged "File List View
         # Colors" Level 2 block -- see flv_colors_super_block below,
@@ -966,6 +1195,9 @@ class SettingsTabMixin:
         ), 0, Qt.AlignVCenter)
         track_opacity_row.addStretch(1)
         flv_colors_group_outer.addLayout(track_opacity_row)
+
+        # Duplicate File Colors (built above) closes the Default / Misc colors block.
+        flv_colors_group_outer.addWidget(self._settings_subsubsection("Duplicate File Colors", dup_group))
         self._aligned_option_rows.append((self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin))
 
         # ---- Line colors (inside the Indentation Line subsection built
@@ -1381,7 +1613,7 @@ class SettingsTabMixin:
         hashed_label.setToolTip(
             "Hash value / Fingerprint comparison only: files and folders that "
             "have been hashed but have nothing to be compared with (the other "
-            "pane is empty, or Dual Pane is off)."
+            "pane is empty, or Compare folders is off)."
         )
         comparison_colors_table.setItem(hashed_row, 0, hashed_label)
         for col, (tag, is_fg) in enumerate(
@@ -1402,6 +1634,24 @@ class SettingsTabMixin:
         self._size_table_to_contents(comparison_colors_table)
         comparison_colors_outer.addWidget(comparison_colors_table)
         comparison_colors_block = self._settings_subsubsection("Comparison Type Colors", comparison_colors_group)
+
+        # ---- Duplicate Finder Summary Colors: text colors of the Groups /
+        # Duplicate files / Folders / Wasted space figures in the summary under
+        # the file lists in Duplicate Finder mode. Per theme (kept in
+        # _summary_colors next to the Comparison Type summary colors). ----
+        dup_summary_group = QGroupBox("")
+        dup_summary_outer = QVBoxLayout(dup_summary_group)
+        dup_summary_table = QTableWidget(len(DUP_SUMMARY_TYPES), 2)
+        self._style_table_widget(dup_summary_table, ["Summary item", "Summary Text Color"])
+        for i, (key, (label, default)) in enumerate(DUP_SUMMARY_TYPES.items()):
+            dup_summary_table.setItem(i, 0, self._table_item(label))
+            dup_summary_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
+                lambda k=key, d=default: self._summary_colors.get(k, d),
+                lambda hexc, k=key: self._on_summary_color_changed(k, hexc),
+            )))
+        self._size_table_to_contents(dup_summary_table)
+        dup_summary_outer.addWidget(dup_summary_table)
+        dup_summary_block = self._settings_subsubsection("Duplicate Finder Summary Colors", dup_summary_group)
 
         # ---- Button Colors (Level 3, after Comparison Type Colors): the
         # buttons around each pane's File List View. They start at the
@@ -1430,7 +1680,7 @@ class SettingsTabMixin:
         flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
         flv_colors_super_outer.addLayout(
             self._settings_subsection_cascade(
-                flv_default_misc_block, comparison_colors_block, flv_buttons_block,
+                flv_default_misc_block, comparison_colors_block, dup_summary_block, flv_buttons_block,
             )
         )
         flv_flow.addWidget(self._settings_subsection("File List View Colors", flv_colors_super_group))
@@ -1923,6 +2173,7 @@ class SettingsTabMixin:
             "select_all": "Select All", "clear": "Clear", "missing": "Missing",
             "newer": "Newer", "smaller": "Smaller", "matching": "Matching",
             "older": "Older", "larger": "Larger", "diff_folders": "Diff Items",
+            "dup_all": "Duplicates", "dup_extra": "Extra copies",
             "file_parent": "Item Parent", "all_parents": "All Parents",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)

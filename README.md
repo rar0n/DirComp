@@ -1,31 +1,50 @@
-# DirComp - Directory Compare
+# DirComp - Directory Compare and Duplicate Finder
 
-Compare two folders side-by-side
+## Two modes
+- Compare Folders  (two folders side-by-side)
+- Duplicate Finder (find duplicates in same folder or sub folders)
+
 
 WIP! (Work in progress)
 
-<img width="1633" height="1239" alt="image" src="https://github.com/user-attachments/assets/e7980ea4-9a37-4a2b-9873-bce7c9a48825" />
+### Compare Folders:
+
+<img width="1671" height="1248" alt="image" src="https://github.com/user-attachments/assets/4256e895-f97d-4c76-ba79-cba630361caa" />
 
 
-### Features
+### Duplicate Finder:
+
+<img width="1671" height="1248" alt="image" src="https://github.com/user-attachments/assets/0c0e332e-5851-4411-9917-99f6b1b6b2ae" />
+
+
+## Features
 
 Basically
-
- - Compare two folders side-by-side / manually synchronize their contents
+ - Two modes
+   - Compare two folders side-by-side / manually synchronize their contents
+   - Find duplicate files, display duplicates in right-side view
+ - Both modes compare files based on
+   - Filename, size and date
+   - File extension(s) optional
+   - Hash value
+   - Fingerprint (quick hash beginning / end of file + filesize)
+ - Two views
+   - Tree view of files and folders (File List View)
+   - Statistics view, barchart timeline view of file dates or file sizes
  - Color coded highlights
- - Statistics View timeline or size bar char overview of files or folders
  - Select files based on time or size in Statistics View
  - Synchronize selection of both panes (if the corresponding item (files or folders) exists in the other pane)
- - Pastes multi-selected files from one pane automatically in their respective relative folders in the other pane
+ - Pastes multi-selected files from one pane and automatically re-create their folder structure (copying their relative path)
  - Symmetrical (ish) GUI, or not, depending on settings.
  - Color customization (theme colors, custom colors for most buttons etc.)
- - Snapshop of folders (see what was there, can also be used for comparisons, selections)
+ - Cached folders
+ - Manual Snapshop of folders (see what was there, can also be used for comparisons, selections)
 
 
 ### Road map / planned wish list / Maybe
 
- - Duplicate finder in same root folder (it kind of has currently if you select a hashing comparison)
- - Use snapshots as nitial cached file hashes (to avoid re-hash files).
+ - Layout tweaks?
+ - Other?
 
 ### Vibe coded
 

@@ -360,3 +360,26 @@ Status 2026-11-19 (branch feature/duplicate-finder): step 1 implemented.
  - .fss: optional per-file "l" (link count, only when > 1) and top-level "has_links";
    format version unchanged. A snapshot without "has_links" counts every file as one
    link, and a status warning says so while "Ignore hard links" is on.
+
+Status 2026-11-19 (branch feature/duplicate-finder): step 2 implemented.
+ - "Dual Pane" is now labelled "Compare folders" (Main tab and Settings tab, plus the
+   tooltips that named it); the saved key "dual_pane" and the internal names are
+   unchanged. The tooltip says that off = Duplicate Finder mode.
+ - Settings > Misc Colors > Duplicate File Colors (Level 3, below the table), per theme:
+   Nr. of Steps (1-32, default 7; 1 disables Color 2/Swap/Reverse), Color 1, Color 2,
+   Swap (also flips the direction), Reverse Color Wheel Direction, and the text color
+   as exclusive radio buttons: "Set Fg color" (its swatch enabled only then), "Inverse
+   color" (255 - channel) and "Inverse luminance" (black/white; the default), plus a
+   preview strip with one chip per step. No hover color.
+   State: ThemeMixin._dup_steps/_dup_color1/_dup_color2/_dup_reverse/_dup_fg_mode/
+   _dup_fg_color, in each theme's color set (keys dup_*; older files fall back to the
+   defaults). The range comes from custom_widgets._indent_wheel_color, the same
+   generator the indentation lines use. ThemeMixin._duplicate_group_colors(i) ->
+   (bg hex, fg hex) is what the group coloring (step 3) should call.
+ - "Empty folder" (TAG_COLORS "empty_dir", Fg/Bg) in File List View Colors > Default / Misc
+   colors. DiffEngineMixin._folder_has_no_files / _lone_tag: with Compare folders off, a
+   folder with no files anywhere below it gets it; a snapshot folder that was not
+   scanned (or a folder that could not be read) keeps the plain folder color.
+ - Note for later tests: a raw tree.expandAll() on a populated single-pane tree
+   crashes (segfault in listing_ops._ensure_item_populated, also before these changes);
+   the app's own Expand All is not affected.

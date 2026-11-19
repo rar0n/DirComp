@@ -227,6 +227,20 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # Per theme.
             self._indent_line_style = 0
 
+        if not hasattr(self, "_dup_steps"):
+            # Settings tab -> Misc Colors -> Duplicate File Colors (Duplicate
+            # Finder mode: one background color per set of identical files,
+            # from a color-wheel range like the indentation lines'; see
+            # ThemeMixin._duplicate_group_colors). Per theme. _dup_fg_mode:
+            # 0 = the chosen Fg color, 1 = inverse of the background,
+            # 2 = black or white by the background's luminance.
+            self._dup_steps = 7
+            self._dup_color1 = "#F0A0A0"
+            self._dup_color2 = "#A0A0F0"
+            self._dup_reverse = False
+            self._dup_fg_mode = 2
+            self._dup_fg_color = "#000000"
+
         if not hasattr(self, "_indent_tick_enabled"):
             # Settings tab -> File List View -> Indentation Line -> Line
             # style -> Enable file tick marks / Tick mark length. Per theme.
@@ -1309,11 +1323,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row1 = QHBoxLayout()
         row2 = QHBoxLayout()
 
-        self.dual_pane_cb = QCheckBox("Dual Pane")
+        self.dual_pane_cb = QCheckBox("Compare folders")
         self.dual_pane_cb.setToolTip(
-            "On: both panes shown side by side, as normal. Off: only the left pane is "
-            "shown -- the window's width halves when you turn this off, and doubles "
-            "back when you turn it on again."
+            "On: both panes shown side by side and compared, as normal. Off: Duplicate "
+            "Finder mode -- only the left pane is shown, and files are no longer "
+            "compared with the other pane. The window's width halves when you turn "
+            "this off, and doubles back when you turn it on again."
         )
         self.dual_pane_cb.blockSignals(True)
         self.dual_pane_cb.setChecked(self._dual_pane_enabled)
@@ -1374,7 +1389,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             "expanded/collapsed folders -- and make \"Make New Folder\" create the new "
             "folder in both locations at once. Items with no counterpart on the other "
             "side are simply left alone. The two panes' own root folders are never "
-            "affected by this. Meaningless (and disabled) with Dual Pane off, since "
+            "affected by this. Meaningless (and disabled) with Compare folders off, since "
             "there's no second pane to stay in step with."
         )
         self.synchronize_views_cb.setEnabled(self._dual_pane_enabled)
@@ -1400,7 +1415,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             "mirror the left pane's around the vertical center, and the right pane's "
             "Statistics view title line mirrors too (title right-aligned, Files/Folders "
             "swapped). When off, the right pane uses the same left-to-right order as the "
-            "left pane instead. Disabled with Dual Pane off, since there's no right pane "
+            "left pane instead. Disabled with Compare folders off, since there's no right pane "
             "to mirror against."
         )
         self.symmetrical_buttons_cb.blockSignals(True)

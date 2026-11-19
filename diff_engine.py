@@ -470,6 +470,40 @@ class DiffEngineMixin:
             return f"diff_date_{date_direction}_dir" if is_dir else f"diff_date_{date_direction}_file"
         return f"diff_count_{size_direction}_dir" if is_dir else f"diff_size_{size_direction}_file"
 
+    def _folder_has_no_files(self, node):
+        """True if the folder node holds no file anywhere below it; False if
+        it does; also False when that cannot be known (a snapshot folder
+        whose contents were not scanned, or a folder that could not be
+        read). Memoized on the nodes (a rebuilt snapshot brings new ones),
+        walking each subtree only once."""
+        if node is None or not node["is_dir"]:
+            return False
+        if "_empty" not in node:
+            order, stack = [], [node]
+            while stack:
+                n = stack.pop()
+                if "_empty" in n:
+                    continue
+                if n.get("not_scanned") or n.get("scan_failed"):
+                    n["_empty"] = None
+                    continue
+                order.append(n)
+                stack.extend(c for c in (n["children"] or {}).values() if c["is_dir"])
+            for n in reversed(order):  # children before their parents
+                state = True
+                for c in (n["children"] or {}).values():
+                    if not c["is_dir"]:
+                        state = False
+                        break
+                    sub = c["_empty"]
+                    if sub is False:
+                        state = False
+                        break
+                    if sub is None:
+                        state = None
+                n["_empty"] = state
+        return node["_empty"] is True
+
     def _lone_tag(self, full_path, is_dir):
         """Tag for an item with nothing to compare against: plain, except
         under a hash comparison type, where a file with an out-of-date
@@ -482,6 +516,12 @@ class DiffEngineMixin:
             ignored_tag = self._ignored_file_tag(full_path)
             if ignored_tag:
                 return ignored_tag
+        if is_dir and full_path and not getattr(self, "_dual_pane_enabled", True):
+            # Duplicate Finder mode: a folder with no files below it. A
+            # folder that has not been scanned (see _folder_has_no_files)
+            # keeps the plain folder color.
+            if self._folder_has_no_files(self._snapshot_lookup(full_path)):
+                return "empty_dir"
         if not full_path or not self._hash_type_selected():
             return plain
         node = self._snapshot_lookup(full_path)

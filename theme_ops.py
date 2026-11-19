@@ -22,7 +22,7 @@ from custom_widgets import (
     _INVERT_BUTTON_COLORS, _SCROLLBAR_COLORS,
     _SCROLLBAR_HANDLE_STYLES, _SCROLLBAR_STYLE, _SELECT_KEY_TO_TAG_COLOR_KEYS,
     _STATS_BUTTON_KEYS, _THEME_DEFAULT_MAIN_BUTTON_KEYS,
-    _bevel_button_stylesheet, _press_blend,
+    _bevel_button_stylesheet, _indent_wheel_color, _press_blend,
 )
 
 
@@ -256,6 +256,7 @@ class ThemeOpsMixin:
             self.indent_line_reverse_cb.setChecked(self._indent_line_reverse)
             self.indent_line_reverse_cb.blockSignals(False)
         self._sync_indent_steps_dependents()
+        self._sync_dup_widgets()
         if getattr(self, "indent_hover_opacity_spin", None):
             self.indent_hover_opacity_spin.blockSignals(True)
             self.indent_hover_opacity_spin.setValue(self._indent_hover_opacity)
@@ -615,6 +616,104 @@ class ThemeOpsMixin:
         self._indent_line_reverse = bool(checked)
         self._refresh_indent_line_display()
 
+    # ------------------------------------------- Duplicate File Colors
+
+    def _duplicate_group_colors(self, group_index: int) -> tuple:
+        """(background hex, foreground hex) of the group_index-th (0-based)
+        set of identical files in Duplicate Finder mode: the Duplicate File
+        Colors range (Nr. of steps colors around the color wheel, wrapping
+        once there are more groups than steps), and the Fg picked by the
+        chosen Fg option."""
+        bg = _indent_wheel_color(
+            self._dup_color1, self._dup_color2, self._dup_steps, group_index, self._dup_reverse)
+        if self._dup_fg_mode == 0:
+            fg = QColor(self._dup_fg_color)
+        elif self._dup_fg_mode == 1:
+            fg = QColor(255 - bg.red(), 255 - bg.green(), 255 - bg.blue())
+        else:
+            luminance = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
+            fg = QColor("#000000" if luminance > 140 else "#FFFFFF")
+        return bg.name(), fg.name()
+
+    def _sync_dup_widgets(self):
+        """Settings-tab Duplicate File Colors controls from the attributes
+        (signals blocked), then enabled states and the preview."""
+        if getattr(self, "dup_steps_spin", None):
+            self.dup_steps_spin.blockSignals(True)
+            self.dup_steps_spin.setValue(self._dup_steps)
+            self.dup_steps_spin.blockSignals(False)
+        if getattr(self, "dup_reverse_cb", None):
+            self.dup_reverse_cb.blockSignals(True)
+            self.dup_reverse_cb.setChecked(self._dup_reverse)
+            self.dup_reverse_cb.blockSignals(False)
+        group = getattr(self, "dup_fg_group", None)
+        if group is not None:
+            button = group.button(self._dup_fg_mode)
+            if button is not None:
+                group.blockSignals(True)
+                button.setChecked(True)
+                group.blockSignals(False)
+        self._sync_dup_dependents()
+        self._refresh_dup_preview()
+
+    def _sync_dup_dependents(self):
+        """Steps = 1 uses Color 1 only (as with the indentation lines), so
+        Color 2, Swap and Reverse need 2 steps; the Fg swatch applies to
+        "Set Fg color" only."""
+        multi = self._dup_steps > 1
+        for name in ("dup_color2_label", "dup_color2_swatch", "dup_swap_button", "dup_reverse_cb"):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.setEnabled(multi)
+        swatch = getattr(self, "dup_fg_swatch", None)
+        if swatch is not None:
+            swatch.setEnabled(self._dup_fg_mode == 0)
+
+    def _refresh_dup_preview(self):
+        """The Settings tab's strip of sample chips, one per step."""
+        label = getattr(self, "dup_preview_label", None)
+        if label is None:
+            return
+        chips = []
+        for i in range(self._dup_steps):
+            bg, fg = self._duplicate_group_colors(i)
+            chips.append(f'<span style="background-color:{bg}; color:{fg};">&nbsp;{i + 1}&nbsp;</span>')
+        label.setText("&nbsp;".join(chips))
+
+    def _on_dup_steps_changed(self, value):
+        self._dup_steps = int(value)
+        self._sync_dup_dependents()
+        self._refresh_dup_preview()
+
+    def _on_dup_color_changed(self, which, hex_color):
+        if which == 1:
+            self._dup_color1 = hex_color
+        else:
+            self._dup_color2 = hex_color
+        self._refresh_dup_preview()
+
+    def _on_dup_colors_swap(self):
+        """Swap Color 1/2 and flip the wheel direction with them, so the
+        range covers the same hues the other way round -- same as the
+        indentation lines' Swap."""
+        self._dup_color1, self._dup_color2 = self._dup_color2, self._dup_color1
+        self._dup_reverse = not self._dup_reverse
+        self._sync_dup_widgets()
+        self._refresh_color_swatches()
+
+    def _on_dup_reverse_changed(self, checked):
+        self._dup_reverse = bool(checked)
+        self._refresh_dup_preview()
+
+    def _on_dup_fg_mode_changed(self, mode):
+        self._dup_fg_mode = int(mode)
+        self._sync_dup_dependents()
+        self._refresh_dup_preview()
+
+    def _on_dup_fg_color_changed(self, hex_color):
+        self._dup_fg_color = hex_color
+        self._refresh_dup_preview()
+
     def _on_indent_hover_color_changed(self, hex_color):
         self._indent_hover_color = hex_color
         self._refresh_indent_line_display()
@@ -887,7 +986,7 @@ class ThemeOpsMixin:
         just a dict either way."""
         tag_colors = {
             "directory": ["#E0E090", "blue"], "file": [None, None], "error": ["#FFB6C1", "red"],
-            "hardlink_file": ["#D8C0E8", "black"],
+            "hardlink_file": ["#D8C0E8", "black"], "empty_dir": ["#D4DCE8", "blue"],
             "unhashed_file": ["#C8C8C8", "black"], "unhashed_dir": ["#B0B0B0", "blue"],
             "changed_file": ["#E8C888", "black"], "changed_dir": ["#D4A85C", "blue"],
             "hashed_file": ["#B8E0E8", "black"], "hashed_dir": ["#9CCBD6", "blue"],
@@ -906,6 +1005,7 @@ class ThemeOpsMixin:
             tag_colors["unhashed_dir"][1] = defaults["folder_fg_override"]
             tag_colors["changed_dir"][1] = defaults["folder_fg_override"]
             tag_colors["hashed_dir"][1] = defaults["folder_fg_override"]
+            tag_colors["empty_dir"][1] = defaults["folder_fg_override"]
         stats_palette = {
             "background_color": defaults["stats_bg"],
             "selection_color": "#E68C14",
@@ -978,6 +1078,13 @@ class ThemeOpsMixin:
             "stats_selection_opacity": {"file": 35, "folder": 35},
             "indent_line_steps": 1,
             "indent_line_reverse": False,
+            # Duplicate File Colors (Misc Colors), per theme.
+            "dup_steps": 7,
+            "dup_color1": "#F0A0A0" if theme == "light" else "#C07070",
+            "dup_color2": "#A0A0F0" if theme == "light" else "#7070C0",
+            "dup_reverse": False,
+            "dup_fg_mode": 2,
+            "dup_fg_color": "#000000",
             "indent_hover_opacity": 50,
             "indent_lines_enabled": True,
             "indent_line_thickness": 1,
@@ -1042,6 +1149,12 @@ class ThemeOpsMixin:
             },
             "indent_line_steps": self._indent_line_steps,
             "indent_line_reverse": self._indent_line_reverse,
+            "dup_steps": self._dup_steps,
+            "dup_color1": self._dup_color1,
+            "dup_color2": self._dup_color2,
+            "dup_reverse": self._dup_reverse,
+            "dup_fg_mode": self._dup_fg_mode,
+            "dup_fg_color": self._dup_fg_color,
             "indent_hover_opacity": self._indent_hover_opacity,
             "indent_lines_enabled": self._indent_lines_enabled,
             "indent_line_thickness": self._indent_line_thickness,
@@ -1131,6 +1244,12 @@ class ThemeOpsMixin:
                 self._stats_colors[mode]["selection_opacity"] = int(opacity)
         self._indent_line_steps = int(cs["indent_line_steps"])
         self._indent_line_reverse = bool(cs["indent_line_reverse"])
+        self._dup_steps = int(cs.get("dup_steps", 7))
+        self._dup_color1 = cs.get("dup_color1", "#F0A0A0")
+        self._dup_color2 = cs.get("dup_color2", "#A0A0F0")
+        self._dup_reverse = bool(cs.get("dup_reverse", False))
+        self._dup_fg_mode = int(cs.get("dup_fg_mode", 2))
+        self._dup_fg_color = cs.get("dup_fg_color", "#000000")
         self._indent_hover_opacity = int(cs["indent_hover_opacity"])
         self._indent_lines_enabled = bool(cs["indent_lines_enabled"])
         self._indent_line_thickness = int(cs["indent_line_thickness"])

@@ -347,8 +347,6 @@ class SettingsTabMixin:
         # these secondary copies too (_link_checkboxes only mirrors
         # checked state, not enabled state).
         symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical GUI", 1, 0, indent=20)
-        symmetrical_secondary.setEnabled(self.dual_pane_cb.isChecked())
-        self.dual_pane_cb.toggled.connect(symmetrical_secondary.setEnabled)
         symmetrical_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         expand_secondary = _add_synced(self.expand_matching_cb, "Expand To Selection", 1, 2, indent=20)

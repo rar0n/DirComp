@@ -36,7 +36,8 @@ files are deleted or moved; new groups continue the numbering.
 
 import os
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QApplication
 
 from constants import PATH_ROLE, TAG_COLORS
 
@@ -371,8 +372,8 @@ class DuplicateFinderMixin:
         # its folder entry and toolbar buttons are hidden (their space kept,
         # so both panes stay aligned).
         from PySide6.QtWidgets import QSizePolicy
-        for name in ("entry", "up_button", "select_button", "save_snapshot_button", "clear_view_button",
-                     "hash_button", "pane_refresh_button"):
+        for name in ("up_button", "select_button", "save_snapshot_button", "clear_view_button",
+                     "pane_refresh_button"):
             widget = getattr(right, name, None)
             if widget is not None:
                 policy = widget.sizePolicy()
@@ -399,8 +400,11 @@ class DuplicateFinderMixin:
         info = left._dup_info
         groups = len(info["groups"])
         wasted = self.format_size(info["wasted"])
-        text = f"Duplicates in {left_dir}: {groups} group{'s' if groups != 1 else ''}, wasted space {wasted}"
-        self._set_upper_status(right, text)
+        title = getattr(right, "dup_title_label", None)
+        if title is not None:
+            title.setToolTip(f"Duplicates in {left_dir}: {groups} group{'s' if groups != 1 else ''}, "
+                             f"wasted space {wasted}")
+        right._dup_sel_prev = self._dup_files_of(right, right.tree.selectedItems())
 
     def _dup_clear_right(self):
         """No duplicate scan (nothing loaded, or a Hash type not hashed yet
@@ -416,37 +420,71 @@ class DuplicateFinderMixin:
         self.update_type_counts(right)
         self._set_upper_status(right, "")
 
+    def _dup_files_of(self, pane, items) -> set:
+        """Normalized paths of the duplicate files among `items` of the right
+        pane's tree; a folder stands for every file below it."""
+        index = pane.snapshot_index or {}
+        files = set()
+        for item in items:
+            path = item.data(0, PATH_ROLE)
+            node = index.get(os.path.normpath(path)) if path else None
+            stack = [node] if node is not None else []
+            while stack:
+                current = stack.pop()
+                if current["is_dir"]:
+                    stack.extend((current["children"] or {}).values())
+                else:
+                    files.add(os.path.normpath(current["full_path"]))
+        return files
+
     def _on_dup_right_selection(self, pane):
-        """Duplicate Finder mode: rows selected in the right pane's list are
-        selected -- and revealed (their folders expanded, scrolled into view)
-        -- in the left pane. A selected folder stands for all duplicate files
-        below it."""
+        """Duplicate Finder mode: selecting files in the Duplicate File View
+        (the right pane) selects every copy of them -- the whole group -- in
+        both panes, and reveals them in the left one. Click, Shift and Ctrl
+        work as in any list: Ctrl toggles whole groups on and off, the others
+        replace the selection."""
         if (pane is not getattr(self, "right", None) or not self._duplicate_mode_active()
                 or getattr(self, "_dup_reveal_guard", False) or getattr(pane, "_tree_rebuild_pending", False)
                 or getattr(pane, "_dup_reveal_pending", False)):
             return
         pane._dup_reveal_pending = True
+        ctrl = bool(QApplication.keyboardModifiers() & Qt.ControlModifier)
 
         def run():
             pane._dup_reveal_pending = False
-            index = pane.snapshot_index or {}
-            paths = []
-            for item in pane.tree.selectedItems():
-                path = item.data(0, PATH_ROLE)
-                node = index.get(os.path.normpath(path)) if path else None
-                if node is None:
-                    continue
-                stack = [node]
-                while stack:
-                    current = stack.pop()
-                    if current["is_dir"]:
-                        stack.extend((current["children"] or {}).values())
-                    else:
-                        paths.append(current["full_path"])
+            info = getattr(self.left, "_dup_info", None) or {}
+            members = {}
+            for nodes in (info.get("groups") or {}).values():
+                paths = [os.path.normpath(n["full_path"]) for n in nodes]
+                for path in paths:
+                    members[path] = paths
+
+            def with_groups(files):
+                result = set()
+                for path in files:
+                    result.update(members.get(path, [path]))
+                return result
+
+            native = self._dup_files_of(pane, pane.tree.selectedItems())
+            previous = getattr(pane, "_dup_sel_prev", None) or set()
+            if ctrl:
+                result = (previous - with_groups(previous - native)) | with_groups(native - previous)
+            else:
+                result = with_groups(native)
+            pane._dup_sel_prev = result
+            full = {os.path.normpath(n["full_path"]): n["full_path"]
+                    for nodes in (info.get("groups") or {}).values() for n in nodes}
+            targets = [full[p] for p in result if p in full]
             self._dup_reveal_guard = True
             try:
-                if paths:
-                    self._select_paths_in_tree(self.left.tree, paths, additive=False,
+                if result != native:
+                    if targets:
+                        self._select_paths_in_tree(pane.tree, targets, additive=False,
+                                                    auto_expand=True, select_subtree=False)
+                    else:
+                        pane.tree.clearSelection()
+                if targets:
+                    self._select_paths_in_tree(self.left.tree, targets, additive=False,
                                                 auto_expand=True, select_subtree=False)
                     self._scroll_tree_to_first_selected(self.left.tree)
                 else:

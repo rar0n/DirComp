@@ -1448,8 +1448,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.symmetrical_buttons_cb.blockSignals(True)
         self.symmetrical_buttons_cb.setChecked(self._symmetrical_buttons)
         self.symmetrical_buttons_cb.blockSignals(False)
-        self.symmetrical_buttons_cb.setEnabled(self._dual_pane_enabled)
-        self.dual_pane_cb.toggled.connect(self.symmetrical_buttons_cb.setEnabled)
+        # Applies to both panes in both modes (the right pane's buttons are
+        # hidden in Duplicate Finder mode, but its layout still mirrors).
         self.symmetrical_buttons_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.symmetrical_buttons_cb.stateChanged.connect(self._on_symmetrical_buttons_changed)
         row2.addWidget(self.symmetrical_buttons_cb)

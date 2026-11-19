@@ -618,7 +618,7 @@ class HashOpsMixin:
                 if group is not None:
                     group.setEnabled(not snap)
             # A live pane can't copy/move INTO a snapshot pane either.
-            into_snap = bool(getattr(other, "snapshot_file", None))
+            into_snap = bool(getattr(other, "snapshot_file", None)) or self._duplicate_mode_active()
             for b in (getattr(pane, "_across_buttons", None) or {}).values():
                 b.setEnabled(not into_snap)
             # The buttons themselves too: in the narrow layout they live in

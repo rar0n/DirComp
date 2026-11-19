@@ -1176,7 +1176,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row.addWidget(self.left_progress_bar, 1)
         row.addWidget(self.left_cancel_button)
 
-        if True:  # two panes are shown in both modes
+        if not self._dual_pane_enabled:
+            # Duplicate Finder: nothing runs on the right, so the left bar
+            # takes the full width with Cancel at its right end.
+            self.right_progress_bar.hide()
+            self.right_cancel_button.hide()
+        else:
             if self._symmetrical_buttons:
                 row.addWidget(self.right_cancel_button)
                 row.addWidget(self.right_progress_bar, 1)
@@ -1185,15 +1190,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 row.addWidget(self.right_cancel_button)
             self.right_progress_bar.show()
             self.right_cancel_button.show()
-        else:
-            # No right-side operation for right_cancel_button to sit
-            # next to, so both it and its bar are hidden -- left_cancel_
-            # button ends up flush at the row's right edge instead,
-            # pushed there by left_progress_bar's own stretch factor,
-            # same mechanism as every left-pane button row elsewhere in
-            # this file.
-            self.right_progress_bar.hide()
-            self.right_cancel_button.hide()
 
         # Same dual-pane-off treatment for the right selection count
         # underneath -- no right pane means nothing for it to report.

@@ -400,10 +400,6 @@ class DuplicateFinderMixin:
         info = left._dup_info
         groups = len(info["groups"])
         wasted = self.format_size(info["wasted"])
-        title = getattr(right, "dup_title_label", None)
-        if title is not None:
-            title.setToolTip(f"Duplicates in {left_dir}: {groups} group{'s' if groups != 1 else ''}, "
-                             f"wasted space {wasted}")
         right._dup_sel_prev = self._dup_files_of(right, right.tree.selectedItems())
 
     def _dup_clear_right(self):

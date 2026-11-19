@@ -947,9 +947,9 @@ class SettingsTabMixin:
              lambda: self._tag_color_hex("hardlink_file", False),
              lambda hexc: self._on_comparison_color_changed("hardlink_file", True, hexc),
              lambda hexc: self._on_comparison_color_changed("hardlink_file", False, hexc)),
-            ("Empty folder",
+            ("Empty folder (Duplicate Finder)",
              lambda: self._tag_color_hex("empty_dir", True),
-             lambda: self._tag_color_hex("empty_dir", False),
+             lambda: TAG_COLORS.get("empty_dir", (None, None))[0] or self._effective_flv_bg(),
              lambda hexc: self._on_comparison_color_changed("empty_dir", True, hexc),
              lambda hexc: self._on_comparison_color_changed("empty_dir", False, hexc)),
             ("Folder (Duplicate Finder)",
@@ -985,7 +985,8 @@ class SettingsTabMixin:
         )
         flv_colors_table.item(5, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: a folder with no "
-            "files anywhere below it."
+            "files anywhere below it. Its background follows the file list's own "
+            "(Default Background) until you pick one here."
         )
         flv_colors_table.item(6, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: the color of a "

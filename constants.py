@@ -68,7 +68,7 @@ TAG_COLORS = {
     "hardlink_file": ("#D8C0E8", "black"),
     # Duplicate Finder mode (Compare folders off): a folder with no files
     # anywhere below it (Settings -> File List View Colors -> "Empty folder").
-    "empty_dir": ("#D4DCE8", "blue"),
+    "empty_dir": (None, "blue"),  # no Bg: the file list's own (Duplicate Finder mode only)
     # Duplicate Finder mode's plain folder: no background of its own (the
     # file list's), so it does not read as a highlighted find.
     "dupfolder": (None, "blue"),

@@ -952,6 +952,11 @@ class SettingsTabMixin:
              lambda: self._tag_color_hex("empty_dir", False),
              lambda hexc: self._on_comparison_color_changed("empty_dir", True, hexc),
              lambda hexc: self._on_comparison_color_changed("empty_dir", False, hexc)),
+            ("Folder (Duplicate Finder)",
+             lambda: self._tag_color_hex("dupfolder", True),
+             lambda: TAG_COLORS.get("dupfolder", (None, None))[0] or self._effective_flv_bg(),
+             lambda hexc: self._on_comparison_color_changed("dupfolder", True, hexc),
+             lambda hexc: self._on_comparison_color_changed("dupfolder", False, hexc)),
             ("Scrollbar (Handle/Track)",
              lambda: _SCROLLBAR_COLORS["handle"], lambda: _SCROLLBAR_COLORS["groove"],
              lambda hexc: self._on_scrollbar_color_changed("handle", hexc),
@@ -981,6 +986,12 @@ class SettingsTabMixin:
         flv_colors_table.item(5, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: a folder with no "
             "files anywhere below it."
+        )
+        flv_colors_table.item(6, 0).setToolTip(
+            "Duplicate Finder mode (Compare folders off) only: the color of a "
+            "plain folder. Its background follows the file list's own "
+            "(Default Background) until you pick one here, so folders do not "
+            "look like highlighted finds next to the duplicate groups."
         )
         self._size_table_to_contents(flv_colors_table)
         flv_colors_group = QGroupBox("")

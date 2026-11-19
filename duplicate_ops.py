@@ -38,6 +38,8 @@ import os
 
 from PySide6.QtCore import QTimer
 
+from constants import TAG_COLORS
+
 
 class DuplicateFinderMixin:
     def _duplicate_mode_active(self) -> bool:
@@ -331,4 +333,28 @@ class DuplicateFinderMixin:
             return "changed_dir"
         if norm in info["pending_dirs"]:
             return "unhashed_dir"
-        return "directory"
+        return "dupfolder"
+
+    def _dup_summary_parts(self, pane) -> list:
+        """[(plain text, html)] of the summary under the file list in
+        Duplicate Finder mode: groups of identical files, the files in
+        them, the space the extra copies waste (and, while hashing is
+        still to do, how many files are unhashed). Colors follow the
+        Duplicates / Extra copies button colors."""
+        info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
+        if not info:
+            return []
+        nbsp = "\u00a0"
+        groups = info["groups"]
+        copies = sum(len(nodes) for nodes in groups.values())
+        dup_color = self._select_colors["dup_all"][1]
+        waste_color = self._select_colors["dup_extra"][1]
+        items = [
+            (f"Groups:{nbsp}{len(groups)}", dup_color),
+            (f"Duplicate{nbsp}files:{nbsp}{copies}", dup_color),
+            (f"Wasted:{nbsp}{self.format_size(info['wasted']).replace(' ', nbsp)}", waste_color),
+        ]
+        unhashed = len(info["pending"]) + len(info["changed"])
+        if unhashed:
+            items.append((f"Unhashed:{nbsp}{unhashed}", TAG_COLORS["unhashed_file"][0] or "#C8C8C8"))
+        return [(text, f'<span style="color:{color};">{text}</span>') for text, color in items]

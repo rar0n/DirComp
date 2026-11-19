@@ -423,3 +423,13 @@ Status 2026-11-19, step 4 (Select buttons): done.
  - Button colors: "Duplicates" / "Extra copies" rows in the Select Buttons
    color table (_DEFAULT_SELECT_COLORS dup_all / dup_extra).
  - Right pane is still untouched (step 5).
+
+Status 2026-11-19, additions after step 4:
+ - Summary under the file list in Duplicate Finder mode: "Groups / Duplicate
+   files / Wasted (/ Unhashed)" replaces the compare-type counts
+   (DuplicateFinderMixin._dup_summary_parts; colors follow the Duplicates /
+   Extra copies button colors).
+ - "Folder (Duplicate Finder)" color row (Default / Misc colors), tag
+   "dupfolder": plain folders in Duplicate Finder mode, Fg like Default Folder,
+   Bg none = the file list's own background, so they do not look highlighted.
+   (The tag is not "dup_..." because that prefix means a duplicate group.)

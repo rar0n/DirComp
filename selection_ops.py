@@ -783,6 +783,8 @@ class SelectionMixin:
 
     def _type_count_parts(self, pane: DirectoryPane) -> list:
         """[(plain text, html)] for each per-type count of `pane`."""
+        if self._duplicate_mode_active():
+            return self._dup_summary_parts(pane)
         counts = getattr(pane, "_last_type_counts", None) or {}
         summary_colors = getattr(self, "_summary_colors", None) or {}
         parts = []

@@ -69,6 +69,9 @@ TAG_COLORS = {
     # Duplicate Finder mode (Compare folders off): a folder with no files
     # anywhere below it (Settings -> File List View Colors -> "Empty folder").
     "empty_dir": ("#D4DCE8", "blue"),
+    # Duplicate Finder mode's plain folder: no background of its own (the
+    # file list's), so it does not read as a highlighted find.
+    "dupfolder": (None, "blue"),
     "error": ("#FFB6C1", "red"),
     # Hash comparison types only: a file/folder that has no hash yet (see
     # Settings -> Comparison Type Colors -> "Unhashed"). Neutral greys.

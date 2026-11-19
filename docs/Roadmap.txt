@@ -365,7 +365,8 @@ Status 2026-11-19 (branch feature/duplicate-finder): step 2 implemented.
  - "Dual Pane" is now labelled "Compare folders" (Main tab and Settings tab, plus the
    tooltips that named it); the saved key "dual_pane" and the internal names are
    unchanged. The tooltip says that off = Duplicate Finder mode.
- - Settings > Misc Colors > Duplicate File Colors (Level 3, below the table), per theme:
+ - Settings > File List View > File List View Colors > Default / Misc colors, last block
+   "Duplicate File Colors" (moved there from Misc Colors the same day), per theme:
    Nr. of Steps (1-32, default 7; 1 disables Color 2/Swap/Reverse), Color 1, Color 2,
    Swap (also flips the direction), Reverse Color Wheel Direction, and the text color
    as exclusive radio buttons: "Set Fg color" (its swatch enabled only then), "Inverse
@@ -383,3 +384,6 @@ Status 2026-11-19 (branch feature/duplicate-finder): step 2 implemented.
  - Note for later tests: a raw tree.expandAll() on a populated single-pane tree
    crashes (segfault in listing_ops._ensure_item_populated, also before these changes);
    the app's own Expand All is not affected.
+ - Still to do in step 5: Duplicate Finder mode must NOT halve the window width any more
+   (ui_builder._on_dual_pane_changed halves/doubles it today); the right pane takes over
+   the duplicate list, so the window keeps its width.

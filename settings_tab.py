@@ -801,101 +801,6 @@ class SettingsTabMixin:
         default_colors_group_outer = QVBoxLayout(default_colors_group)
         default_colors_group_outer.addWidget(default_colors_table)
 
-        # ---- Duplicate File Colors (Level 3, at the bottom of Misc Colors):
-        # Duplicate Finder mode gives each set of identical files its own
-        # background, from a color-wheel range like the indentation lines'
-        # (Nr. of steps, Color 1/2, Swap, Reverse) -- without the hover
-        # color. The text color is its own choice: a fixed Fg color, the
-        # background's inverse color, or black/white by its luminance. ----
-        dup_group = QGroupBox("")
-        dup_outer = QVBoxLayout(dup_group)
-        dup_steps_row = QHBoxLayout()
-        self.dup_steps_label = QLabel("Nr. of Steps:")
-        self.dup_steps_spin = SliderSpinBox()
-        self.dup_steps_spin.setRange(1, 32)
-        self.dup_steps_spin.setValue(self._dup_steps)
-        self.dup_steps_spin.setToolTip(
-            "How many different colors the sets of duplicate files cycle through. "
-            "With more sets than steps the colors repeat."
-        )
-        self.dup_steps_spin.valueChanged.connect(self._on_dup_steps_changed)
-        dup_steps_row.addWidget(spin_slider_inline(
-            self.dup_steps_label, self.dup_steps_spin, SpinSlider(self.dup_steps_spin),
-        ), 0, Qt.AlignVCenter)
-        dup_steps_row.addStretch(1)
-        dup_outer.addLayout(dup_steps_row)
-        self._aligned_option_rows.append((self.dup_steps_label, self.dup_steps_spin))
-
-        dup_grid = QGridLayout()
-        dup_grid.setHorizontalSpacing(6)
-        dup_grid.setColumnStretch(6, 1)
-        dup_grid.addWidget(QLabel("Color 1:"), 0, 0, Qt.AlignVCenter)
-        self.dup_color1_swatch = self._make_color_swatch(
-            lambda: self._dup_color1, lambda hexc: self._on_dup_color_changed(1, hexc))
-        dup_grid.addWidget(self.dup_color1_swatch, 0, 1, Qt.AlignVCenter)
-        self.dup_color2_label = QLabel("Color 2:")
-        dup_grid.addWidget(self.dup_color2_label, 0, 2, Qt.AlignVCenter)
-        self.dup_color2_swatch = self._make_color_swatch(
-            lambda: self._dup_color2, lambda hexc: self._on_dup_color_changed(2, hexc))
-        dup_grid.addWidget(self.dup_color2_swatch, 0, 3, Qt.AlignVCenter)
-        dup_swap_bg, dup_swap_fg = self._default_button_colors()
-        self.dup_swap_button = QPushButton("Swap")
-        self.dup_swap_button.setFixedHeight(self._uniform_button_size()[1])
-        self.dup_swap_button.setStyleSheet(
-            _bevel_button_stylesheet(dup_swap_bg, dup_swap_fg)
-            + " QPushButton:disabled { background-color: "
-            + _press_blend(dup_swap_bg, self._effective_gui_colors(self._theme)[1], 0.65).name()
-            + "; color: " + _press_blend(dup_swap_fg, self._effective_gui_colors(self._theme)[1], 0.55).name()
-            + "; }"
-        )
-        self.dup_swap_button.setToolTip(
-            "Swap Color 1 and Color 2, and flip Reverse Color Wheel Direction along with "
-            "them, so the range covers the same hues the other way round."
-        )
-        self.dup_swap_button.clicked.connect(self._on_dup_colors_swap)
-        dup_grid.addWidget(self.dup_swap_button, 0, 4, Qt.AlignVCenter)
-        self.dup_reverse_cb = QCheckBox("Reverse Color Wheel Direction")
-        self.dup_reverse_cb.setToolTip(
-            "Which way the range between Color 1 and Color 2 runs around the color wheel "
-            "(the short or the long way round for the same two colors)."
-        )
-        self.dup_reverse_cb.setChecked(self._dup_reverse)
-        self.dup_reverse_cb.toggled.connect(self._on_dup_reverse_changed)
-        dup_grid.addWidget(self.dup_reverse_cb, 0, 5, Qt.AlignVCenter)
-        dup_outer.addLayout(dup_grid)
-
-        # Text color: exclusive options; the swatch belongs to the first.
-        dup_fg_row = QHBoxLayout()
-        dup_fg_row.addWidget(QLabel("Text:"))
-        self.dup_fg_group = QButtonGroup(dup_group)
-        for mode, text, tip in (
-            (0, "Set Fg color", "Always use the color picked here as the text color."),
-            (1, "Inverse color", "The text color is the inverse of the background color "
-                                 "(it can be hard to read on mid-tones)."),
-            (2, "Inverse luminance", "The text is black on a light background and white on a "
-                                     "dark one."),
-        ):
-            radio = QRadioButton(text)
-            radio.setToolTip(tip)
-            self.dup_fg_group.addButton(radio, mode)
-            radio.setChecked(mode == self._dup_fg_mode)
-            dup_fg_row.addWidget(radio)
-            if mode == 0:
-                self.dup_fg_swatch = self._make_color_swatch(
-                    lambda: self._dup_fg_color, self._on_dup_fg_color_changed)
-                dup_fg_row.addWidget(self.dup_fg_swatch)
-        dup_fg_row.addStretch(1)
-        self.dup_fg_group.idClicked.connect(self._on_dup_fg_mode_changed)
-        dup_outer.addLayout(dup_fg_row)
-
-        self.dup_preview_label = QLabel()
-        self.dup_preview_label.setTextFormat(Qt.RichText)
-        self.dup_preview_label.setWordWrap(True)
-        self.dup_preview_label.setToolTip("One chip per step: the background and text color of each set of duplicates.")
-        dup_outer.addWidget(self.dup_preview_label)
-        self._sync_dup_dependents()
-        self._refresh_dup_preview()
-        default_colors_group_outer.addWidget(self._settings_subsubsection("Duplicate File Colors", dup_group))
         # Level 2 blocks of Global Settings: Theme, Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
@@ -1020,6 +925,101 @@ class SettingsTabMixin:
         flv_colors_group = QGroupBox("")
         flv_colors_group_outer = QVBoxLayout(flv_colors_group)
         flv_colors_group_outer.addWidget(flv_colors_table)
+
+        # ---- Duplicate File Colors (Level 3, at the bottom of File List View -> Default / Misc colors):
+        # Duplicate Finder mode gives each set of identical files its own
+        # background, from a color-wheel range like the indentation lines'
+        # (Nr. of steps, Color 1/2, Swap, Reverse) -- without the hover
+        # color. The text color is its own choice: a fixed Fg color, the
+        # background's inverse color, or black/white by its luminance. ----
+        dup_group = QGroupBox("")
+        dup_outer = QVBoxLayout(dup_group)
+        dup_steps_row = QHBoxLayout()
+        self.dup_steps_label = QLabel("Nr. of Steps:")
+        self.dup_steps_spin = SliderSpinBox()
+        self.dup_steps_spin.setRange(1, 32)
+        self.dup_steps_spin.setValue(self._dup_steps)
+        self.dup_steps_spin.setToolTip(
+            "How many different colors the sets of duplicate files cycle through. "
+            "With more sets than steps the colors repeat."
+        )
+        self.dup_steps_spin.valueChanged.connect(self._on_dup_steps_changed)
+        dup_steps_row.addWidget(spin_slider_inline(
+            self.dup_steps_label, self.dup_steps_spin, SpinSlider(self.dup_steps_spin),
+        ), 0, Qt.AlignVCenter)
+        dup_steps_row.addStretch(1)
+        dup_outer.addLayout(dup_steps_row)
+        self._aligned_option_rows.append((self.dup_steps_label, self.dup_steps_spin))
+
+        dup_grid = QGridLayout()
+        dup_grid.setHorizontalSpacing(6)
+        dup_grid.setColumnStretch(6, 1)
+        dup_grid.addWidget(QLabel("Color 1:"), 0, 0, Qt.AlignVCenter)
+        self.dup_color1_swatch = self._make_color_swatch(
+            lambda: self._dup_color1, lambda hexc: self._on_dup_color_changed(1, hexc))
+        dup_grid.addWidget(self.dup_color1_swatch, 0, 1, Qt.AlignVCenter)
+        self.dup_color2_label = QLabel("Color 2:")
+        dup_grid.addWidget(self.dup_color2_label, 0, 2, Qt.AlignVCenter)
+        self.dup_color2_swatch = self._make_color_swatch(
+            lambda: self._dup_color2, lambda hexc: self._on_dup_color_changed(2, hexc))
+        dup_grid.addWidget(self.dup_color2_swatch, 0, 3, Qt.AlignVCenter)
+        dup_swap_bg, dup_swap_fg = self._default_button_colors()
+        self.dup_swap_button = QPushButton("Swap")
+        self.dup_swap_button.setFixedHeight(self._uniform_button_size()[1])
+        self.dup_swap_button.setStyleSheet(
+            _bevel_button_stylesheet(dup_swap_bg, dup_swap_fg)
+            + " QPushButton:disabled { background-color: "
+            + _press_blend(dup_swap_bg, self._effective_gui_colors(self._theme)[1], 0.65).name()
+            + "; color: " + _press_blend(dup_swap_fg, self._effective_gui_colors(self._theme)[1], 0.55).name()
+            + "; }"
+        )
+        self.dup_swap_button.setToolTip(
+            "Swap Color 1 and Color 2, and flip Reverse Color Wheel Direction along with "
+            "them, so the range covers the same hues the other way round."
+        )
+        self.dup_swap_button.clicked.connect(self._on_dup_colors_swap)
+        dup_grid.addWidget(self.dup_swap_button, 0, 4, Qt.AlignVCenter)
+        self.dup_reverse_cb = QCheckBox("Reverse Color Wheel Direction")
+        self.dup_reverse_cb.setToolTip(
+            "Which way the range between Color 1 and Color 2 runs around the color wheel "
+            "(the short or the long way round for the same two colors)."
+        )
+        self.dup_reverse_cb.setChecked(self._dup_reverse)
+        self.dup_reverse_cb.toggled.connect(self._on_dup_reverse_changed)
+        dup_grid.addWidget(self.dup_reverse_cb, 0, 5, Qt.AlignVCenter)
+        dup_outer.addLayout(dup_grid)
+
+        # Text color: exclusive options; the swatch belongs to the first.
+        dup_fg_row = QHBoxLayout()
+        dup_fg_row.addWidget(QLabel("Text:"))
+        self.dup_fg_group = QButtonGroup(dup_group)
+        for mode, text, tip in (
+            (0, "Set Fg color", "Always use the color picked here as the text color."),
+            (1, "Inverse color", "The text color is the inverse of the background color "
+                                 "(it can be hard to read on mid-tones)."),
+            (2, "Inverse luminance", "The text is black on a light background and white on a "
+                                     "dark one."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.dup_fg_group.addButton(radio, mode)
+            radio.setChecked(mode == self._dup_fg_mode)
+            dup_fg_row.addWidget(radio)
+            if mode == 0:
+                self.dup_fg_swatch = self._make_color_swatch(
+                    lambda: self._dup_fg_color, self._on_dup_fg_color_changed)
+                dup_fg_row.addWidget(self.dup_fg_swatch)
+        dup_fg_row.addStretch(1)
+        self.dup_fg_group.idClicked.connect(self._on_dup_fg_mode_changed)
+        dup_outer.addLayout(dup_fg_row)
+
+        self.dup_preview_label = QLabel()
+        self.dup_preview_label.setTextFormat(Qt.RichText)
+        self.dup_preview_label.setWordWrap(True)
+        self.dup_preview_label.setToolTip("One chip per step: the background and text color of each set of duplicates.")
+        dup_outer.addWidget(self.dup_preview_label)
+        self._sync_dup_dependents()
+        self._refresh_dup_preview()
         # This is now a Level 3 block ("Default / Misc colors"), nested
         # with Comparison Type Colors inside one merged "File List View
         # Colors" Level 2 block -- see flv_colors_super_block below,
@@ -1112,6 +1112,9 @@ class SettingsTabMixin:
         ), 0, Qt.AlignVCenter)
         track_opacity_row.addStretch(1)
         flv_colors_group_outer.addLayout(track_opacity_row)
+
+        # Duplicate File Colors (built above) closes the Default / Misc colors block.
+        flv_colors_group_outer.addWidget(self._settings_subsubsection("Duplicate File Colors", dup_group))
         self._aligned_option_rows.append((self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin))
 
         # ---- Line colors (inside the Indentation Line subsection built

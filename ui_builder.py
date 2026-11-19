@@ -228,7 +228,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._indent_line_style = 0
 
         if not hasattr(self, "_dup_steps"):
-            # Settings tab -> Misc Colors -> Duplicate File Colors (Duplicate
+            # Settings tab -> File List View Colors -> Default / Misc colors -> Duplicate File Colors (Duplicate
             # Finder mode: one background color per set of identical files,
             # from a color-wheel range like the indentation lines'; see
             # ThemeMixin._duplicate_group_colors). Per theme. _dup_fg_mode:

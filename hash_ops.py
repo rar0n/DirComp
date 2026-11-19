@@ -391,6 +391,13 @@ class HashOpsMixin:
     def _on_clear_hash_cache(self):
         """Settings > Options > "Clear cache": wipe the persistent file and
         every hash held in RAM, so open folders show as unhashed."""
+        answer = QMessageBox.question(
+            self, "Clear hash cache",
+            "Delete all cached hashes, on disk and in memory?\n\n"
+            "Open folders will show as unhashed and must be hashed again.",
+            QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
+        if answer != QMessageBox.Yes:
+            return
         removed = self._hash_store().clear()
         self.__dict__["_hash_cache"] = {}
         self.__dict__["_hash_cache_by_inode"] = {}
@@ -508,13 +515,10 @@ class HashOpsMixin:
         if getattr(pane, "snapshot_file", None) or not pane.entry.text():
             return False
         dup_mode = self._duplicate_mode_active() and pane is self.left
-        if dup_mode:
-            # Duplicate Finder mode: Refresh re-reads the folder and starts the
-            # duplicate colors over; hashing stays with the Hash button.
-            self._dup_reset_colors(pane)
-        rehash = self._hash_type_selected() and not dup_mode
+        rehash = self._hash_type_selected()
         if rehash:
-            scope = ("every file in this pane" if self._recursive_folder_contents_enabled()
+            scope = ("the files being scanned for duplicates" if dup_mode
+                     else "every file in this pane" if self._recursive_folder_contents_enabled()
                      else "the files currently visible in this pane")
             answer = QMessageBox.question(
                 self, "Refresh and rehash",
@@ -525,6 +529,9 @@ class HashOpsMixin:
                 QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
             if answer != QMessageBox.Yes:
                 return False
+        if dup_mode:
+            # Duplicate Finder mode: Refresh starts the duplicate colors over.
+            self._dup_reset_colors(pane)
         self.update_listings(initiating_pane=pane, rescan_panes=(pane,))
         self._recount_pane_items_with_indicator(pane)
         if rehash and pane.snapshot_root is not None:

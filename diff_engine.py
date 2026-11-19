@@ -31,6 +31,9 @@ from constants import CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT
 # drops them; the count code checks for them by identity.
 AXES_UNHASHED = ("unhashed", "unhashed")
 AXES_CONTENT_DIFFERS = ("content", "content")
+# A file that "Ignore empty files" / "Ignore hard links" leaves out of
+# every comparison: neither missing nor matching nor different.
+AXES_IGNORED = ("ignored", "ignored")
 
 
 class DiffEngineMixin:
@@ -82,6 +85,8 @@ class DiffEngineMixin:
         index[norm] = node
         if not is_dir:
             node["size"] = st.st_size
+            # Link count: "Ignore hard links" (see _ignored_kind).
+            node["nlink"] = getattr(st, "st_nlink", 1)
             self._attach_cached_hash(node, norm, st)
             return node
 
@@ -176,6 +181,48 @@ class DiffEngineMixin:
         """The Settings tab's comparison type is Hash value / Fingerprint."""
         return getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) in (CMP_HASH, CMP_FINGERPRINT)
 
+    # ------------------------------------------------ Ignored files
+
+    def _ignore_flags(self) -> tuple:
+        """(Ignore empty files, Ignore hard links) as set in the Settings
+        tab -- part of every comparison cache key that must not outlive a
+        change of either (they are NOT part of _comparison_key: that one
+        also keys the hashes, which these options do not affect)."""
+        return (bool(getattr(self, "_ignore_empty", False)),
+                bool(getattr(self, "_ignore_hardlinks", False)))
+
+    def _ignored_kind(self, node):
+        """Why a snapshot node takes no part in any comparison: "hardlink"
+        (Ignore hard links on, and the file has more than one link),
+        "empty" (Ignore empty files on, and it is 0 bytes) or None. Only
+        files are ever ignored; a node without a link count (an old
+        snapshot) counts as having one link."""
+        if node is None or node["is_dir"]:
+            return None
+        if getattr(self, "_ignore_hardlinks", False) and node.get("nlink", 1) > 1:
+            return "hardlink"
+        if getattr(self, "_ignore_empty", False) and node["size"] == 0:
+            return "empty"
+        return None
+
+    def _ignored_file_tag(self, full_path):
+        """The tag an ignored file shows -- "hardlink_file" for a hard
+        link, the plain "file" for an empty one -- or None if the file at
+        `full_path` is not ignored."""
+        if not (getattr(self, "_ignore_empty", False) or getattr(self, "_ignore_hardlinks", False)):
+            return None
+        kind = self._ignored_kind(self._snapshot_lookup(full_path))
+        if kind == "hardlink":
+            return "hardlink_file"
+        return "file" if kind else None
+
+    def _compared_children(self, node):
+        """A folder node's children without the ignored files."""
+        children = node["children"] or {}
+        if not any(self._ignore_flags()):
+            return children
+        return {n: c for n, c in children.items() if not self._ignored_kind(c)}
+
     def _hash_comparison_blocked(self) -> bool:
         """A hash type is selected but a loaded snapshot's hashes don't fit
         the current settings: nothing is compared; every item shows the
@@ -245,11 +292,11 @@ class DiffEngineMixin:
         if cache is None:
             cache = self._pair_cache = {}
         key = (os.path.normpath(node_a["full_path"]), os.path.normpath(node_b["full_path"]),
-               self._comparison_key())
+               self._comparison_key(), self._ignore_flags())
         if key in cache:
             return cache[key]
-        files_a = {n: c for n, c in (node_a["children"] or {}).items() if not c["is_dir"]}
-        files_b = {n: c for n, c in (node_b["children"] or {}).items() if not c["is_dir"]}
+        files_a = {n: c for n, c in self._compared_children(node_a).items() if not c["is_dir"]}
+        files_b = {n: c for n, c in self._compared_children(node_b).items() if not c["is_dir"]}
         states_a, states_b = {}, {}
         by_hash_a, by_hash_b = {}, {}
         unhashed_a = unhashed_b = False
@@ -318,13 +365,13 @@ class DiffEngineMixin:
         files (folders never take part -- a folder called "v1.2" has no
         extension to ignore). Built once per node and kept on it; a
         rebuilt snapshot brings new nodes, so it never goes stale."""
-        mode = self._stem_mode()
+        mode = (self._stem_mode(), self._ignore_flags())
         by_mode = dir_node.setdefault("_stems", {})
         index = by_mode.get(mode)
         if index is None:
             index = by_mode[mode] = {}
             for name, child in (dir_node["children"] or {}).items():
-                if not child["is_dir"]:
+                if not child["is_dir"] and not self._ignored_kind(child):
                     index.setdefault(self._name_stem(name), child)
         return index
 
@@ -334,7 +381,7 @@ class DiffEngineMixin:
         extensions" on, a file with no exact-name counterpart falls back
         to any file in that folder with the same name minus extension."""
         node = self._snapshot_lookup(other_full)
-        if node is not None and node["is_dir"] == is_dir:
+        if node is not None and node["is_dir"] == is_dir and not self._ignored_kind(node):
             return node
         if is_dir or not self._ignore_extensions_active():
             return None
@@ -374,6 +421,10 @@ class DiffEngineMixin:
         If Recursive Folder Contents is off, only the folder's own
         immediate item count and date are compared -- the original,
         cheaper behavior."""
+        if not is_dir and full_path:
+            ignored_tag = self._ignored_file_tag(full_path)
+            if ignored_tag:
+                return ignored_tag
         if other_dir is None or self._hash_comparison_blocked():
             return self._lone_tag(full_path, is_dir)
 
@@ -427,6 +478,10 @@ class DiffEngineMixin:
         any file below it is changed, else "unhashed" if any is unhashed,
         else "hashed" (a folder without files stays plain)."""
         plain = "directory" if is_dir else "file"
+        if not is_dir and full_path:
+            ignored_tag = self._ignored_file_tag(full_path)
+            if ignored_tag:
+                return ignored_tag
         if not full_path or not self._hash_type_selected():
             return plain
         node = self._snapshot_lookup(full_path)
@@ -443,7 +498,8 @@ class DiffEngineMixin:
         cache = getattr(self, "_dir_rank_cache", None)
         if cache is None:
             cache = self._dir_rank_cache = {}
-        key = ("hashed", os.path.normpath(full_path), self._comparison_key(), blocked)
+        key = ("hashed", os.path.normpath(full_path), self._comparison_key(), blocked,
+               self._ignore_flags())
         state = cache.get(key)
         if state is None:
             files = 0
@@ -453,6 +509,8 @@ class DiffEngineMixin:
                 for child in (stack.pop()["children"] or {}).values():
                     if child["is_dir"]:
                         stack.append(child)
+                    elif self._ignored_kind(child):
+                        continue
                     else:
                         files += 1
                         if not has_hash(child):
@@ -484,6 +542,9 @@ class DiffEngineMixin:
         For a directory this is its *immediate* item count and date --
         the non-recursive comparison -- regardless of Recursive Folder
         Contents; aggregate folder differences are Diff Folders' job."""
+        if not is_dir and own_full and any(self._ignore_flags()) \
+                and self._ignored_kind(self._snapshot_lookup(own_full)):
+            return AXES_IGNORED
         if not is_dir and own_full and other_full and self._hash_mode_active():
             hashed = self._hash_file_state(own_full, other_full)
             if hashed is not None:
@@ -656,7 +717,7 @@ class DiffEngineMixin:
             cache = self._dir_rank_cache = {}
         key = (os.path.normpath(dir_a) if dir_a else None,
                os.path.normpath(dir_b) if dir_b else None,
-               date_field, self._comparison_key())
+               date_field, self._comparison_key(), self._ignore_flags())
         if key in cache:
             return cache[key]
         result = self._dir_content_rank_uncached(dir_a, dir_b, date_field)
@@ -705,8 +766,10 @@ class DiffEngineMixin:
             return 3, self._count_direction(dir_a, dir_b)
         node_b = self._snapshot_lookup(dir_b)
 
-        children_a = node_a["children"] or {}
-        children_b = (node_b["children"] or {}) if node_b is not None else {}
+        # Ignored files (empty / hard links, see _ignored_kind) take no
+        # part: neither side's copy counts as present, matching or different.
+        children_a = self._compared_children(node_a)
+        children_b = self._compared_children(node_b) if node_b is not None else {}
 
         # Track every direction seen at the current worst rank -- and how
         # many children voted for each -- not just the first one

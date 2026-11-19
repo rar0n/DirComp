@@ -63,6 +63,9 @@ TAG_COLORS = {
     "diff_content_file": ("#7777DD", "blue"),
     "directory": ("#E0E090", "blue"),
     "file": (None, None),
+    # "Ignore hard links": a file with more than one hard link, left out of
+    # every comparison (Settings -> File List View Colors -> "Hard link").
+    "hardlink_file": ("#D8C0E8", "black"),
     "error": ("#FFB6C1", "red"),
     # Hash comparison types only: a file/folder that has no hash yet (see
     # Settings -> Comparison Type Colors -> "Unhashed"). Neutral greys.

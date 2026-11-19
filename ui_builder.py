@@ -254,6 +254,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._multi_select_matching = True
             self._multi_select_same_folder = True
             self._cmp_applied_key = None
+            # Settings tab -> Options -> "Ignore empty files" / "Ignore hard
+            # links" (see DiffEngineMixin._ignored_kind): off by default.
+            self._ignore_empty = False
+            self._ignore_hardlinks = False
+            self._ignore_applied = (False, False)
             # Settings tab -> Options -> "Cache hashed folders" (see
             # HashOpsMixin._hash_cache_enabled): off by default.
             self._cache_hashed_folders = False

@@ -32,7 +32,7 @@ from constants import PATH_ROLE, IS_DIR_ROLE, POPULATED_ROLE, _DIFF_RANK, GNOME_
 from listing_ops import _DATE_FIELD_TO_ENTRY_KEY, _DATE_FIELD_TO_COLUMN, COL_SIZE
 from panes import DirectoryPane
 from progress import _CancellableProgress
-from diff_engine import AXES_UNHASHED, AXES_CONTENT_DIFFERS
+from diff_engine import AXES_UNHASHED, AXES_CONTENT_DIFFERS, AXES_IGNORED
 
 
 class _NoTargets(Exception):
@@ -380,7 +380,7 @@ class SelectionMixin:
             return cached
         groups = {}
         for node in (pane.snapshot_index or {}).values():
-            if not node["is_dir"]:
+            if not node["is_dir"] and not self._ignored_kind(node):
                 digest = self._node_hash(node)
                 if digest is not None:
                     groups.setdefault(digest, []).append(node)
@@ -413,7 +413,7 @@ class SelectionMixin:
         extra = []
         for path in new:
             node = self._snapshot_lookup(path)
-            if node is None or node["is_dir"]:
+            if node is None or node["is_dir"] or self._ignored_kind(node):
                 continue
             digest = self._node_hash(node)
             if digest is None:
@@ -425,7 +425,8 @@ class SelectionMixin:
                 pool = self._hash_groups_index(pane).get(digest, [])
             for c in pool:
                 cp = os.path.normpath(c["full_path"])
-                if (not c["is_dir"] and cp not in current and self._node_hash(c) == digest):
+                if (not c["is_dir"] and cp not in current and self._node_hash(c) == digest
+                        and not self._ignored_kind(c)):
                     extra.append(c["full_path"])
                     current.add(cp)
         if not same_folder and not recursive and extra:
@@ -686,8 +687,8 @@ class SelectionMixin:
                                            own_full=e["full_path"])
                     if axes is None:
                         counts["missing"] += 1
-                    elif axes is AXES_UNHASHED:
-                        pass  # not hashed yet: counted as neither
+                    elif axes is AXES_UNHASHED or axes is AXES_IGNORED:
+                        pass  # not hashed yet / ignored file: counted as neither
                     elif axes is AXES_CONTENT_DIFFERS:
                         counts["diff_folders"] += 1
                     else:
@@ -699,8 +700,10 @@ class SelectionMixin:
                 else:
                     # Same reasoning as the directory branch above: a
                     # file with no counterpart directory to even look in
-                    # (other_d is None) is missing, not uncategorized.
-                    counts["missing"] += 1
+                    # (other_d is None) is missing, not uncategorized --
+                    # unless it is an ignored (empty / hard link) file.
+                    if not self._ignored_file_tag(e["full_path"]):
+                        counts["missing"] += 1
 
         walk(directory, other_root)
         return counts, total_count, total_size

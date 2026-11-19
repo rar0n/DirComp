@@ -340,3 +340,23 @@ Suggested implementation order
     semantics) and left-pane coloring.
  4. Duplicates / Extra copies buttons + survivor setting, and the disabled rules.
  5. Right pane duplicate listing, click-to-reveal, Statistics View feed, wasted space.
+
+Status 2026-11-19 (branch feature/duplicate-finder): step 1 implemented.
+ - Settings > Options: "Ignore empty files" and "Ignore hard links" (own row above
+   "Cache hashed folders"), saved with the shared settings, default off. They work in
+   Dual Pane and single pane mode with every comparison type.
+ - Engine (diff_engine.py): file nodes carry "nlink" (st_nlink). DiffEngineMixin.
+   _ignored_kind(node) -> "hardlink" / "empty" / None is THE test; ignored files are
+   dropped from folder contents in _pair_dir_files, _dir_content_rank_uncached,
+   _stem_index and _counterpart_node (a file whose only counterpart is ignored counts
+   as missing), tagged by _diff_tag/_lone_tag ("hardlink_file", or plain "file" for an
+   empty file) and reported by _diff_axes as AXES_IGNORED (counted as neither
+   missing nor matching). Not part of _comparison_key (it also keys the hashes);
+   _ignore_flags() is added to the rank/pair/stem cache keys instead.
+ - Not hashed (hash_ops._files_to_hash), left out of the hash-group index and of the
+   multi-select / Synchronize Views content matching (selection_ops, sync_views).
+ - Settings > File List View Colors > Default / Misc colors: new row "Hard link"
+   (TAG_COLORS "hardlink_file", Fg/Bg).
+ - .fss: optional per-file "l" (link count, only when > 1) and top-level "has_links";
+   format version unchanged. A snapshot without "has_links" counts every file as one
+   link, and a status warning says so while "Ignore hard links" is on.

@@ -99,7 +99,7 @@ class HashOpsMixin:
                     return nodes
                 if node["is_dir"]:
                     stack.extend((node["children"] or {}).values())
-                else:
+                elif not self._ignored_kind(node):
                     nodes.append(node)
         else:
             from constants import IS_DIR_ROLE, PATH_ROLE
@@ -109,7 +109,7 @@ class HashOpsMixin:
                 if item.data(0, IS_DIR_ROLE):
                     continue
                 node = self._snapshot_lookup(item.data(0, PATH_ROLE))
-                if node is not None and not node["is_dir"]:
+                if node is not None and not node["is_dir"] and not self._ignored_kind(node):
                     nodes.append(node)
         return nodes
 

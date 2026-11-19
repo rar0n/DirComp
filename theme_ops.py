@@ -887,6 +887,7 @@ class ThemeOpsMixin:
         just a dict either way."""
         tag_colors = {
             "directory": ["#E0E090", "blue"], "file": [None, None], "error": ["#FFB6C1", "red"],
+            "hardlink_file": ["#D8C0E8", "black"],
             "unhashed_file": ["#C8C8C8", "black"], "unhashed_dir": ["#B0B0B0", "blue"],
             "changed_file": ["#E8C888", "black"], "changed_dir": ["#D4A85C", "blue"],
             "hashed_file": ["#B8E0E8", "black"], "hashed_dir": ["#9CCBD6", "blue"],

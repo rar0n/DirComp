@@ -582,7 +582,38 @@ class SettingsTabMixin:
         self.multi_select_matching_cb.toggled.connect(self._on_multi_select_setting_changed)
         self.multi_select_same_folder_cb.toggled.connect(self._on_multi_select_setting_changed)
 
-        # Row 18: the persistent hash cache (HashOpsMixin / hash_cache_store).
+        # Row 18: files left out of every comparison (DiffEngineMixin.
+        # _ignored_kind), in both Dual Pane and single pane mode and with
+        # every comparison type.
+        ignore_row = QHBoxLayout()
+        ignore_row.setContentsMargins(0, 0, 0, 0)
+        ignore_row.addSpacing(20)
+        self.ignore_empty_files_cb = QCheckBox("Ignore empty files")
+        self.ignore_empty_files_cb.setChecked(self._ignore_empty)
+        self.ignore_empty_files_cb.setToolTip(
+            "Files of 0 bytes take no part in any comparison, selection or "
+            "hashing: they are neither missing, matching nor different (and "
+            "never a duplicate of each other). They keep the plain file colors."
+        )
+        ignore_row.addWidget(self.ignore_empty_files_cb)
+        ignore_row.addSpacing(20)
+        self.ignore_hard_links_cb = QCheckBox("Ignore hard links")
+        self.ignore_hard_links_cb.setChecked(self._ignore_hardlinks)
+        self.ignore_hard_links_cb.setToolTip(
+            "Files that have more than one hard link (link count above 1) take "
+            "no part in any comparison, selection or hashing, and show the Hard "
+            "link colors (Default / Misc colors). A file whose other link is "
+            "outside the opened folders counts too.\n"
+            "Off: two links to one file are reported as identical, although "
+            "deleting one of them frees no space."
+        )
+        ignore_row.addWidget(self.ignore_hard_links_cb)
+        ignore_row.addStretch(1)
+        global_grid.addLayout(ignore_row, 18, 0, 1, 7)
+        self.ignore_empty_files_cb.toggled.connect(self._on_comparison_setting_changed)
+        self.ignore_hard_links_cb.toggled.connect(self._on_comparison_setting_changed)
+
+        # Row 19: the persistent hash cache (HashOpsMixin / hash_cache_store).
         cache_row = QHBoxLayout()
         cache_row.setContentsMargins(0, 0, 0, 0)
         cache_row.addSpacing(20)
@@ -607,11 +638,12 @@ class SettingsTabMixin:
         clear_cache_button.clicked.connect(self._on_clear_hash_cache)
         cache_row.addWidget(clear_cache_button)
         cache_row.addStretch(1)
-        global_grid.addLayout(cache_row, 18, 0, 1, 7)
+        global_grid.addLayout(cache_row, 19, 0, 1, 7)
         self.cache_hashed_folders_cb.toggled.connect(self._on_cache_hashed_folders_toggled)
 
         self._update_comparison_controls_enabled()
         self._cmp_applied_key = self._comparison_key()
+        self._ignore_applied = self._ignore_flags()
         self.comparison_type_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
         self.hash_algorithm_combo.currentIndexChanged.connect(self._on_comparison_setting_changed)
         self.fingerprint_start_spin.valueChanged.connect(self._on_comparison_setting_changed)
@@ -848,6 +880,11 @@ class SettingsTabMixin:
              lambda: self._folder_color[0], lambda: self._folder_color[1],
              lambda hexc: self._on_folder_color_changed(True, hexc),
              lambda hexc: self._on_folder_color_changed(False, hexc)),
+            ("Hard link",
+             lambda: self._tag_color_hex("hardlink_file", True),
+             lambda: self._tag_color_hex("hardlink_file", False),
+             lambda hexc: self._on_comparison_color_changed("hardlink_file", True, hexc),
+             lambda hexc: self._on_comparison_color_changed("hardlink_file", False, hexc)),
             ("Scrollbar (Handle/Track)",
              lambda: _SCROLLBAR_COLORS["handle"], lambda: _SCROLLBAR_COLORS["groove"],
              lambda hexc: self._on_scrollbar_color_changed("handle", hexc),
@@ -869,6 +906,10 @@ class SettingsTabMixin:
             "Highlight color of selected rows (see Selection opacity "
             "below). The text color of a selected row is its Default File / Default "
             "Folder Fg."
+        )
+        flv_colors_table.item(4, 0).setToolTip(
+            "Files that have more than one hard link, while Options -> Ignore "
+            "hard links is on."
         )
         self._size_table_to_contents(flv_colors_table)
         flv_colors_group = QGroupBox("")

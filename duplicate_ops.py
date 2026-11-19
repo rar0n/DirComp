@@ -1,0 +1,220 @@
+"""
+DuplicateFinderMixin: Duplicate Finder mode (Compare folders off) -- finds the
+sets of identical files in the left pane's folder and tells the rest of the
+app which color each one gets. No Qt widgets are created here; it reads the
+pane's snapshot (see DiffEngineMixin._build_snapshot) and the tree's expansion
+state, and leaves painting to ListingMixin._apply_tag.
+
+What is "identical" follows the comparison type (Settings -> Options):
+ - Name, size and date: same name, size and whole-second modified date; with
+   "Ignore file extensions" / "Only first part of file name" the (shortened)
+   name alone.
+ - Hash value / Fingerprint: same digest. Only files whose size is shared with
+   another file in scope can be duplicates, so only those are hashed (see
+   _dup_hash_nodes) -- unique-size files are never touched, and show the plain
+   file color.
+
+Scope: Recursive Folder Selections on = every file under the pane's root;
+off = the root's files plus the files of the folders expanded at the time of
+the scan. The Global File Filter / "List Files" limit the files considered,
+and ignored files (empty files / hard links, see DiffEngineMixin._ignored_kind)
+never take part.
+
+The result, pane._dup_info, is rebuilt by _dup_prepare at the start of every
+listing/re-tag (ListingMixin.update_listing) -- so after a Hash, a setting
+change or a Refresh -- and is what DiffEngineMixin._lone_tag reads:
+    "group_of"  {normalized path: color index} of every file that has a copy
+    "groups"    {group key: [file nodes]} (2 or more each), first appearance first
+    "pending"   hash types: files that need a hash and have none ("unhashed")
+    "changed"   hash types: files whose cached hash is out of date
+    "pending_dirs"/"changed_dirs"  the folders holding such files
+    "wasted"    bytes held by the extra copies
+A group's color index is remembered per group key in pane._dup_color_map until
+the folder changes or the pane's Refresh is pressed, so colors stay put while
+files are deleted or moved; new groups continue the numbering.
+"""
+
+import os
+
+
+class DuplicateFinderMixin:
+    def _duplicate_mode_active(self) -> bool:
+        """Compare folders is off: the left pane is searched for duplicates."""
+        return not getattr(self, "_dual_pane_enabled", True)
+
+    # ------------------------------------------------------------- Scope
+
+    def _dup_file_passes_filter(self, name: str) -> bool:
+        """The file filter / List Files rules ListingMixin._build_entries
+        applies to a file row."""
+        list_files = getattr(self, "list_files_cb", None)
+        if list_files is not None and not list_files.isChecked():
+            return False
+        entry = getattr(self, "file_filter_entry", None)
+        extensions = [e.strip().lower() for e in entry.text().split(",") if e.strip()] if entry else []
+        if not extensions:
+            return True
+        invert = getattr(self, "invert_filter_cb", None)
+        in_filter = os.path.splitext(name)[1][1:].lower() in extensions
+        return in_filter ^ (invert.isChecked() if invert else False)
+
+    def _dup_scope_files(self, pane) -> list:
+        """File nodes the duplicate search covers, in display order (folders
+        first when "Sort Directories First" is on, names case-insensitive)."""
+        root = pane.snapshot_root
+        if root is None:
+            return []
+        recursive = self._recursive_folder_contents_enabled()
+        expanded = None
+        if not recursive and getattr(pane, "tree", None) is not None:
+            expanded = {os.path.normpath(p) for p in self._collect_expanded_paths(pane.tree)}
+        dirs_first = getattr(self, "sort_directories_first_cb", None)
+        dirs_first = dirs_first.isChecked() if dirs_first else True
+        def display_kids(node):
+            kids = sorted((node["children"] or {}).values(), key=lambda c: c["name"].lower())
+            if dirs_first:
+                kids = [c for c in kids if c["is_dir"]] + [c for c in kids if not c["is_dir"]]
+            return kids
+
+        # Depth-first in the order the tree shows the rows (a folder's
+        # contents come right after the folder), so the first group met is
+        # the first one on screen.
+        files, stack = [], list(reversed(display_kids(root)))
+        while stack:
+            child = stack.pop()
+            if child["is_dir"]:
+                if recursive or (expanded is not None and os.path.normpath(child["full_path"]) in expanded):
+                    stack.extend(reversed(display_kids(child)))
+            elif (not child.get("placeholder") and not self._ignored_kind(child)
+                    and self._dup_file_passes_filter(child["name"])):
+                files.append(child)
+        return files
+
+    def _dup_hash_nodes(self, pane) -> list:
+        """The files the Hash button should hash in Duplicate Finder mode:
+        those in scope whose size another file in scope shares."""
+        files = self._dup_scope_files(pane)
+        counts = {}
+        for node in files:
+            counts[node["size"]] = counts.get(node["size"], 0) + 1
+        return [n for n in files if counts[n["size"]] > 1]
+
+    # ------------------------------------------------------------- Groups
+
+    def _dup_reset_colors(self, pane):
+        """Forget the group -> color assignment (the pane's Refresh)."""
+        pane._dup_color_map = {}
+        pane._dup_next = 0
+
+    def _dup_prepare(self, pane):
+        """(Re)build pane._dup_info from the pane's current snapshot -- or
+        clear it (None) when Duplicate Finder mode does not apply."""
+        if pane is not getattr(self, "left", None):
+            return
+        if (not self._duplicate_mode_active() or pane.snapshot_root is None
+                or self._hash_comparison_blocked()):
+            pane._dup_info = None
+            return
+        root_key = os.path.normpath(pane.snapshot_root["full_path"])
+        if getattr(pane, "_dup_root", None) != root_key:
+            pane._dup_root = root_key
+            self._dup_reset_colors(pane)
+        color_map = getattr(pane, "_dup_color_map", None)
+        if color_map is None:
+            self._dup_reset_colors(pane)
+            color_map = pane._dup_color_map
+
+        files = self._dup_scope_files(pane)
+        hashing = self._hash_type_selected()
+        # A different way of grouping (comparison type, name options) starts
+        # the numbering over; within one way the colors stay put.
+        grouping = (hashing, self._comparison_key() if hashing else self._stem_mode())
+        if getattr(pane, "_dup_grouping", None) != grouping:
+            pane._dup_grouping = grouping
+            self._dup_reset_colors(pane)
+            color_map = pane._dup_color_map
+        pending, changed = set(), set()
+        groups = {}
+        if hashing:
+            size_counts = {}
+            for node in files:
+                size_counts[node["size"]] = size_counts.get(node["size"], 0) + 1
+            for node in files:
+                if size_counts[node["size"]] < 2:
+                    continue  # a unique size cannot have a duplicate
+                digest = self._node_hash(node)
+                if digest is None:
+                    (changed if node.get("changed") else pending).add(os.path.normpath(node["full_path"]))
+                else:
+                    groups.setdefault(digest, []).append(node)
+        else:
+            stem_mode = self._stem_mode()
+            for node in files:
+                if stem_mode:
+                    key = self._name_stem(node["name"])
+                else:
+                    key = (node["name"], node["size"], int(node["mtime"]))
+                groups.setdefault(key, []).append(node)
+        groups = {k: v for k, v in groups.items() if len(v) > 1}
+
+        group_of, wasted = {}, 0
+        for key, nodes in groups.items():
+            index = color_map.get(key)
+            if index is None:
+                index = color_map[key] = pane._dup_next
+                pane._dup_next += 1
+            for node in nodes:
+                group_of[os.path.normpath(node["full_path"])] = index
+            sizes = [n["size"] for n in nodes]
+            wasted += sum(sizes) - max(sizes)
+
+        def with_ancestors(paths):
+            dirs = set()
+            for path in paths:
+                parent = os.path.dirname(path)
+                while parent and parent not in dirs:
+                    dirs.add(parent)
+                    if parent == root_key or os.path.dirname(parent) == parent:
+                        break
+                    parent = os.path.dirname(parent)
+            return dirs
+
+        pane._dup_info = {
+            "group_of": group_of, "groups": groups, "wasted": wasted,
+            "pending": pending, "changed": changed,
+            "pending_dirs": with_ancestors(pending), "changed_dirs": with_ancestors(changed),
+        }
+
+    # --------------------------------------------------------------- Tags
+
+    def _dup_file_tag(self, full_path):
+        """Tag of a file in Duplicate Finder mode: "dup_<color index>" for a
+        file with copies, "unhashed_file" / "changed_file" for one that still
+        needs a (fresh) hash, else the plain "file". None when there is no
+        duplicate scan to go by (the caller falls back to the usual tags)."""
+        info = getattr(getattr(self, "left", None), "_dup_info", None)
+        if not info or not self._duplicate_mode_active():
+            return None
+        norm = os.path.normpath(full_path)
+        index = info["group_of"].get(norm)
+        if index is not None:
+            return f"dup_{index}"
+        if norm in info["changed"]:
+            return "changed_file"
+        if norm in info["pending"]:
+            return "unhashed_file"
+        return "file"
+
+    def _dup_dir_tag(self, full_path):
+        """Tag of a folder in Duplicate Finder mode: marked "unhashed" /
+        "changed" while a file below it still needs a hash, else plain. None
+        without a duplicate scan."""
+        info = getattr(getattr(self, "left", None), "_dup_info", None)
+        if not info or not self._duplicate_mode_active():
+            return None
+        norm = os.path.normpath(full_path)
+        if norm in info["changed_dirs"]:
+            return "changed_dir"
+        if norm in info["pending_dirs"]:
+            return "unhashed_dir"
+        return "directory"

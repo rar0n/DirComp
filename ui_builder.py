@@ -166,7 +166,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 if (item.data(0, IS_DIR_ROLE) and tag in self._DIR_DIFF_TAGS
                         and self._recursive_folder_contents_enabled()):
                     display_tag = "diff_content_dir"
-                bg, _fg = TAG_COLORS.get(display_tag, (None, None))
+                if display_tag and display_tag.startswith("dup_"):
+                    bg = self._duplicate_group_colors(int(display_tag[4:]))[0]
+                else:
+                    bg, _fg = TAG_COLORS.get(display_tag, (None, None))
                 # A "file"/"directory" tag (TAG_COLORS has no background
                 # for either -- see constants.py) means there's nothing
                 # on the other side to diff against right now, most

@@ -733,6 +733,8 @@ class ListingMixin:
         the same busy/cancelable bar the checkbox toggle already does
         (see _on_recursive_folder_contents_changed) instead of running
         silently with no feedback."""
+        if self._duplicate_mode_active():
+            self._dup_reset_colors(self.left)  # Refresh starts the duplicate colors over
         self.update_listings()
         self._recount_all_panes()
 
@@ -907,6 +909,10 @@ class ListingMixin:
             # through every subfolder opened while single-pane.
             other_dir = None
         tree = pane.tree
+
+        # Duplicate Finder mode: work out which files are copies of each
+        # other before any row is tagged (see DuplicateFinderMixin).
+        self._dup_prepare(pane)
 
         if retag_only:
             # See the retag_only paragraph above -- nothing here
@@ -1677,7 +1683,12 @@ class ListingMixin:
         if (item.data(0, IS_DIR_ROLE) and tag in self._DIR_DIFF_TAGS
                 and self._recursive_folder_contents_enabled()):
             display_tag = "diff_content_dir"
-        bg, fg = TAG_COLORS.get(display_tag, (None, None))
+        if display_tag.startswith("dup_"):
+            # Duplicate Finder mode: one color per set of identical files,
+            # "dup_<index>" (see DuplicateFinderMixin).
+            bg, fg = self._duplicate_group_colors(int(display_tag[4:]))
+        else:
+            bg, fg = TAG_COLORS.get(display_tag, (None, None))
         for col in range(COLUMN_COUNT):
             item.setBackground(col, QBrush(QColor(bg)) if bg else QBrush())
             item.setForeground(col, QBrush(QColor(fg)) if fg else QBrush())

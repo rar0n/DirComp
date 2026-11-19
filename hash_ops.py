@@ -91,6 +91,15 @@ class HashOpsMixin:
         in the pane with Recursive Folder Selections on; otherwise only
         those currently visible (top level plus expanded folders)."""
         nodes = []
+        if self._duplicate_mode_active() and pane is self.left:
+            # Duplicate Finder mode: only files whose size is shared (the
+            # scope -- Recursive Folder Selections, expanded folders, the
+            # file filter -- is DuplicateFinderMixin's).
+            for node in self._dup_hash_nodes(pane):
+                if not progress.tick():
+                    break
+                nodes.append(node)
+            return nodes
         if self._recursive_folder_contents_enabled():
             stack = [pane.snapshot_root]
             while stack:
@@ -497,7 +506,12 @@ class HashOpsMixin:
         hashes are discarded."""
         if getattr(pane, "snapshot_file", None) or not pane.entry.text():
             return False
-        rehash = self._hash_type_selected()
+        dup_mode = self._duplicate_mode_active() and pane is self.left
+        if dup_mode:
+            # Duplicate Finder mode: Refresh re-reads the folder and starts the
+            # duplicate colors over; hashing stays with the Hash button.
+            self._dup_reset_colors(pane)
+        rehash = self._hash_type_selected() and not dup_mode
         if rehash:
             scope = ("every file in this pane" if self._recursive_folder_contents_enabled()
                      else "the files currently visible in this pane")

@@ -516,12 +516,19 @@ class DiffEngineMixin:
             ignored_tag = self._ignored_file_tag(full_path)
             if ignored_tag:
                 return ignored_tag
+            # Duplicate Finder mode: its own file tags (DuplicateFinderMixin).
+            dup_tag = self._dup_file_tag(full_path)
+            if dup_tag:
+                return dup_tag
         if is_dir and full_path and not getattr(self, "_dual_pane_enabled", True):
             # Duplicate Finder mode: a folder with no files below it. A
             # folder that has not been scanned (see _folder_has_no_files)
             # keeps the plain folder color.
             if self._folder_has_no_files(self._snapshot_lookup(full_path)):
                 return "empty_dir"
+            dup_dir_tag = self._dup_dir_tag(full_path)
+            if dup_dir_tag:
+                return dup_dir_tag
         if not full_path or not self._hash_type_selected():
             return plain
         node = self._snapshot_lookup(full_path)

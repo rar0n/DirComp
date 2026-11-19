@@ -679,6 +679,9 @@ class ThemeOpsMixin:
             bg, fg = self._duplicate_group_colors(i)
             chips.append(f'<span style="background-color:{bg}; color:{fg};">&nbsp;{i + 1}&nbsp;</span>')
         label.setText("&nbsp;".join(chips))
+        # The duplicate rows already on screen follow the new colors.
+        if not getattr(self, "_dual_pane_enabled", True):
+            self._recolor_all_items()
 
     def _on_dup_steps_changed(self, value):
         self._dup_steps = int(value)

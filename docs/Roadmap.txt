@@ -387,3 +387,16 @@ Status 2026-11-19 (branch feature/duplicate-finder): step 2 implemented.
  - Still to do in step 5: Duplicate Finder mode must NOT halve the window width any more
    (ui_builder._on_dual_pane_changed halves/doubles it today); the right pane takes over
    the duplicate list, so the window keeps its width.
+
+Status 2026-11-19, step 3 (grouping engine + left-pane coloring): done.
+ - New file duplicate_ops.py (DuplicateFinderMixin): scope (Recursive Folder
+   Selections / expanded folders, file filter, ignored files), size pre-filter
+   for Hash/Fingerprint, grouping by name key or digest, stable per-group color
+   indexes in pane._dup_color_map, wasted bytes, unhashed/changed marking.
+ - pane._dup_info is rebuilt in update_listing before any row is tagged; rows
+   get "dup_<index>" tags, colored by _duplicate_group_colors.
+ - Hash button hashes only the size-shared files; Refresh re-reads without
+   rehashing and starts the group colors over; switching comparison type
+   regroups from RAM and renumbers.
+ - Not yet: grouping does not rerun by itself on expand/collapse when
+   Recursive Folder Selections is off (happens on the next listing/Refresh).

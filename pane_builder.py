@@ -1017,6 +1017,9 @@ class PaneBuilderMixin:
         # "Synchronize Views": mirror this pane's selection onto the other
         # pane's tree (no-op while it's off).
         tree.itemSelectionChanged.connect(lambda t=tree: self._sync_selection_from(t))
+        # Duplicate Finder mode: the right pane's selection is revealed in the
+        # left pane (no-op for anything else).
+        tree.itemSelectionChanged.connect(lambda p=pane: self._on_dup_right_selection(p))
         # A selection change not driven by the Select group's own
         # machinery -- a plain click/drag/keyboard selection right in
         # the tree -- means any checked Select-group toggle button no

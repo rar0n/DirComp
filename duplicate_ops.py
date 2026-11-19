@@ -38,7 +38,7 @@ import os
 
 from PySide6.QtCore import QTimer
 
-from constants import TAG_COLORS
+from constants import PATH_ROLE, TAG_COLORS
 
 
 class DuplicateFinderMixin:
@@ -301,6 +301,160 @@ class DuplicateFinderMixin:
                 btn.blockSignals(False)
             btn.setEnabled(on)
 
+    # ---------------------------------------------------------- Right pane
+
+    def _dup_build_right_snapshot(self):
+        """The right pane's snapshot in Duplicate Finder mode: the left
+        pane's duplicate files and every folder above them, as copies of the
+        left pane's nodes under the very same paths (so colors, the statistics
+        and revealing a row in the left tree all go by path). Folder sizes
+        are the sum of the files kept in them. (root, index), or (None, {})
+        without a duplicate scan."""
+        left = self.left
+        info = getattr(left, "_dup_info", None)
+        real_root = left.snapshot_root
+        if not info or real_root is None:
+            return None, {}
+        real_index = left.snapshot_index or {}
+        root_path = os.path.normpath(real_root["full_path"])
+
+        def copy_dir(real):
+            node = {k: v for k, v in real.items() if k not in ("children", "_empty", "_stems", "size")}
+            node["children"] = {}
+            node["size"] = 0
+            return node
+
+        root = copy_dir(real_root)
+        index = {root_path: root}
+
+        def ensure_dir(path):
+            norm = os.path.normpath(path)
+            node = index.get(norm)
+            if node is not None:
+                return node
+            real = real_index.get(norm)
+            if real is None:
+                return root
+            node = copy_dir(real)
+            index[norm] = node
+            ensure_dir(os.path.dirname(norm))["children"][node["name"]] = node
+            return node
+
+        for nodes in info["groups"].values():
+            for real in nodes:
+                node = dict(real)
+                node.pop("_stems", None)
+                parent = ensure_dir(os.path.dirname(os.path.normpath(real["full_path"])))
+                parent["children"][node["name"]] = node
+                index[os.path.normpath(real["full_path"])] = node
+                size = real["size"] or 0
+                ancestor = os.path.normpath(parent["full_path"])
+                while True:
+                    index[ancestor]["size"] += size
+                    if ancestor == root_path or os.path.dirname(ancestor) == ancestor:
+                        break
+                    ancestor = os.path.dirname(ancestor)
+        return root, index
+
+    def _dup_sync_right(self, progress=None):
+        """Duplicate Finder mode: rebuild the right pane's snapshot from the
+        left pane's duplicate scan and list it (same colors, the left pane's
+        sort order), feed its Statistics View, and report the wasted space on
+        its upper status line. Called after every left-pane listing."""
+        left, right = self.left, self.right
+        left_dir = left.entry.text()
+        root, index = self._dup_build_right_snapshot()
+        right.snapshot_root, right.snapshot_index = root, index
+        if root is None:
+            right.snapshot_root, right.snapshot_index = None, {}
+        # The right pane is a read-only view of the left one's duplicates:
+        # its folder entry and toolbar buttons are hidden (their space kept,
+        # so both panes stay aligned).
+        from PySide6.QtWidgets import QSizePolicy
+        for name in ("entry", "up_button", "select_button", "save_snapshot_button", "clear_view_button",
+                     "hash_button", "pane_refresh_button"):
+            widget = getattr(right, name, None)
+            if widget is not None:
+                policy = widget.sizePolicy()
+                policy.setRetainSizeWhenHidden(True)
+                widget.setSizePolicy(policy)
+                widget.setVisible(False)
+        cluster = getattr(right, "cluster_container", None)
+        if cluster is not None:
+            cluster.setVisible(False)
+        if root is None:
+            self._dup_clear_right()
+            return
+        self.update_listing(left_dir, right, None, progress=progress,
+                            refresh_snapshot=False, retag_only=False)
+        sort_column = getattr(left.tree, "_sort_column", None)
+        if sort_column is not None:
+            asc = getattr(left.tree, "_sort_ascending", True)
+            right.tree._sort_column, right.tree._sort_ascending = sort_column, asc
+            self._apply_sort(right.tree, sort_column, asc)
+        timeline = getattr(right, "timeline", None)
+        if timeline is not None:
+            timeline.set_folder_open(True)
+        self._refresh_pane_timeline(right)
+        info = left._dup_info
+        groups = len(info["groups"])
+        wasted = self.format_size(info["wasted"])
+        text = f"Duplicates in {left_dir}: {groups} group{'s' if groups != 1 else ''}, wasted space {wasted}"
+        self._set_upper_status(right, text)
+
+    def _dup_clear_right(self):
+        """No duplicate scan (nothing loaded, or a Hash type not hashed yet
+        is simply an empty list): blank the right pane."""
+        right = self.right
+        right.tree.clear()
+        right.snapshot_root, right.snapshot_index = None, {}
+        right._last_listed_dir = None
+        timeline = getattr(right, "timeline", None)
+        if timeline is not None:
+            timeline.set_folder_open(False)
+        self._refresh_pane_timeline(right)
+        self.update_type_counts(right)
+        self._set_upper_status(right, "")
+
+    def _on_dup_right_selection(self, pane):
+        """Duplicate Finder mode: rows selected in the right pane's list are
+        selected -- and revealed (their folders expanded, scrolled into view)
+        -- in the left pane. A selected folder stands for all duplicate files
+        below it."""
+        if (pane is not getattr(self, "right", None) or not self._duplicate_mode_active()
+                or getattr(self, "_dup_reveal_guard", False) or getattr(pane, "_tree_rebuild_pending", False)
+                or getattr(pane, "_dup_reveal_pending", False)):
+            return
+        pane._dup_reveal_pending = True
+
+        def run():
+            pane._dup_reveal_pending = False
+            index = pane.snapshot_index or {}
+            paths = []
+            for item in pane.tree.selectedItems():
+                path = item.data(0, PATH_ROLE)
+                node = index.get(os.path.normpath(path)) if path else None
+                if node is None:
+                    continue
+                stack = [node]
+                while stack:
+                    current = stack.pop()
+                    if current["is_dir"]:
+                        stack.extend((current["children"] or {}).values())
+                    else:
+                        paths.append(current["full_path"])
+            self._dup_reveal_guard = True
+            try:
+                if paths:
+                    self._select_paths_in_tree(self.left.tree, paths, additive=False,
+                                                auto_expand=True, select_subtree=False)
+                    self._scroll_tree_to_first_selected(self.left.tree)
+                else:
+                    self.left.tree.clearSelection()
+            finally:
+                self._dup_reveal_guard = False
+        QTimer.singleShot(0, run)
+
     # --------------------------------------------------------------- Tags
 
     def _dup_file_tag(self, full_path):
@@ -341,7 +495,7 @@ class DuplicateFinderMixin:
         them, the space the extra copies waste (and, while hashing is
         still to do, how many files are unhashed). Colors follow the
         Duplicates / Extra copies button colors."""
-        info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
+        info = getattr(getattr(self, "left", None), "_dup_info", None)
         if not info:
             return []
         nbsp = "\u00a0"

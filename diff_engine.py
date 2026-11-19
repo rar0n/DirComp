@@ -114,7 +114,7 @@ class DiffEngineMixin:
         node["size"] = total_size
         return node
 
-    def _snapshot_lookup(self, path):
+    def _snapshot_lookup(self, path, pane=None):
         """O(1) lookup of a path's snapshot node, checking both panes'
         indexes (a caller doesn't generally know -- or need to know --
         which side `path` belongs to; it's always one or the other, or
@@ -123,8 +123,11 @@ class DiffEngineMixin:
         if not path:
             return None
         norm = os.path.normpath(path)
-        for pane in (getattr(self, "left", None), getattr(self, "right", None)):
-            index = getattr(pane, "snapshot_index", None) if pane else None
+        # `pane` (when the caller knows which pane it is listing) is looked in
+        # first: in Duplicate Finder mode the right pane's snapshot holds a
+        # filtered copy of the left pane's nodes under the very same paths.
+        for candidate in (pane, getattr(self, "left", None), getattr(self, "right", None)):
+            index = getattr(candidate, "snapshot_index", None) if candidate else None
             if index and norm in index:
                 return index[norm]
         return None

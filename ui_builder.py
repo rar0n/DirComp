@@ -445,7 +445,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         right_widget = self._build_directory_widgets(self.right)
         panes_layout.addWidget(left_widget)
         panes_layout.addWidget(right_widget)
-        right_widget.setVisible(self._dual_pane_enabled)
+        # Duplicate Finder mode shows it too: it lists the duplicates found
+        # in the left pane (DuplicateFinderMixin._dup_sync_right).
+        right_widget.setVisible(True)
         self._panes_row = panes_row
         main_layout.addWidget(panes_row, stretch=1)
 
@@ -455,11 +457,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # pane's right edge and Global Options sits flush right in the
         # right half. Dual Pane off: the filter takes the width Global
         # Options (at its natural size, flush right) leaves over.
-        if self._dual_pane_enabled:
-            bottom_row = EqualSplitLayout(None, _PANE_GAP)
-        else:
-            bottom_row = QHBoxLayout()
-            bottom_row.setSpacing(_PANE_GAP)
+        bottom_row = EqualSplitLayout(None, _PANE_GAP)
         bottom_row.addWidget(self._build_filter_frame())
         options_holder = QWidget()
         holder_layout = QHBoxLayout(options_holder)
@@ -468,8 +466,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         holder_layout.addWidget(global_options)
         holder_layout.setAlignment(global_options, Qt.AlignRight)
         bottom_row.addWidget(options_holder)
-        if not self._dual_pane_enabled:
-            bottom_row.setStretch(0, 1)  # the filter takes what Global Options leaves
         main_layout.addLayout(bottom_row)
         self._bottom_row_layout = bottom_row
 
@@ -675,11 +671,18 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if enabled == self._dual_pane_enabled:
             return
         self._dual_pane_enabled = enabled
-        # Half the width going off, double it coming back -- based on
-        # the window's current width, not some fixed baseline, so this
-        # stays correct no matter what width you'd resized to first.
-        new_width = self.width() // 2 if not enabled else self.width() * 2
-        self.resize(max(new_width, MINIMUM_WINDOW_WIDTH), self.height())
+        # Both panes stay on screen in both modes (the right one lists the
+        # duplicates in Duplicate Finder mode), so the window keeps its size.
+        # The right pane's real snapshot is put away while it shows the
+        # duplicates, and back when Compare folders returns.
+        if not enabled:
+            self._dup_stashed_right = (self.right.snapshot_root, self.right.snapshot_index)
+        else:
+            stashed = getattr(self, "_dup_stashed_right", None)
+            if stashed is not None:
+                self.right.snapshot_root, self.right.snapshot_index = stashed
+            self._dup_stashed_right = None
+            self._set_upper_status(self.right, "")
 
         state = self._capture_ui_state()
         # The left pane keeps its expanded folders and its selection across
@@ -1173,7 +1176,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row.addWidget(self.left_progress_bar, 1)
         row.addWidget(self.left_cancel_button)
 
-        if self._dual_pane_enabled:
+        if True:  # two panes are shown in both modes
             if self._symmetrical_buttons:
                 row.addWidget(self.right_cancel_button)
                 row.addWidget(self.right_progress_bar, 1)
@@ -1194,7 +1197,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
         # Same dual-pane-off treatment for the right selection count
         # underneath -- no right pane means nothing for it to report.
-        self.right_selection_label.setVisible(self._dual_pane_enabled)
+        self.right_selection_label.setVisible(True)
 
     def _build_filter_frame(self) -> QGroupBox:
         """File Filter group: just the filter controls themselves plus

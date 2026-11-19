@@ -388,6 +388,8 @@ class SelectionMixin:
         return groups
 
     def _select_duplicates_of_new(self, pane: DirectoryPane):
+        if self._duplicate_mode_active():
+            return  # Duplicate Finder mode: the groups are the Select buttons' job
         """Hash / Fingerprint comparison with "Multi Select matching files
         in same pane" on: files newly selected by hand (click, Ctrl-click,
         Shift-click range, drag) pull in the files with identical content --
@@ -612,13 +614,13 @@ class SelectionMixin:
         total_count = 0
         total_size = 0
 
-        directory = pane.entry.text()
+        directory = self._pane_root_dir(pane)
         if not directory or not self._isdir(directory):
             return counts, 0, 0
         other_pane = self.right if pane is self.left else self.left
         other_root = other_pane.entry.text()
-        if not other_root or not self._isdir(other_root):
-            other_root = None
+        if self._duplicate_mode_active() or not other_root or not self._isdir(other_root):
+            other_root = None  # Duplicate Finder mode: nothing to compare against
 
         # This pane's own Statistics-view Metric decides which date
         # field (mtime/ctime/atime) "Newer"/"Older" means here too -- see
@@ -630,7 +632,7 @@ class SelectionMixin:
 
         def walk(d, other_d):
             nonlocal total_count, total_size
-            entries = self._build_entries(d)
+            entries = self._build_entries(d, pane=pane)
             if entries is None:
                 return
             for e in entries:
@@ -827,7 +829,7 @@ class SelectionMixin:
             return
         panes = [left]
         right = getattr(self, "right", None)
-        if self._dual_pane_enabled and right is not None and getattr(right, "count_label", None) is not None:
+        if right is not None and getattr(right, "count_label", None) is not None:
             panes.append(right)
         try:
             plans = []
@@ -877,7 +879,7 @@ class SelectionMixin:
             return
         panes = [left]
         right = getattr(self, "right", None)
-        if self._dual_pane_enabled and right is not None and getattr(right, "total_items_label", None) is not None:
+        if right is not None and getattr(right, "total_items_label", None) is not None:
             panes.append(right)
         try:
             from PySide6.QtGui import QFont, QFontMetrics
@@ -949,7 +951,7 @@ class SelectionMixin:
             root = root.parentWidget()
         if row is None or root is None or row.width() < 300:
             return widget.width()
-        half = (row.width() - _PANE_GAP) // 2 if self._dual_pane_enabled else row.width()
+        half = (row.width() - _PANE_GAP) // 2  # two panes in both modes
         return half - max(0, root.width() - widget.width())
 
     def _render_stats_totals(self):
@@ -962,7 +964,7 @@ class SelectionMixin:
             return
         panes = [left]
         right = getattr(self, "right", None)
-        if self._dual_pane_enabled and right is not None and getattr(right, "tl_totals_label", None) is not None:
+        if right is not None and getattr(right, "tl_totals_label", None) is not None:
             panes.append(right)
         try:
             plans = []

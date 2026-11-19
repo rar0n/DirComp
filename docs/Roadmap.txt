@@ -440,3 +440,21 @@ Status 2026-11-19, additions after step 4:
    folders with no files below them; Missing/differing folders keep their own
    colors. The Duplicate Finder one is the separate "Empty folder (Duplicate
    Finder)" row.
+
+Status 2026-11-19, step 5 (right pane): done.
+ - Both panes are shown in both modes; the window no longer changes width.
+ - Duplicate Finder mode: the right pane lists the left pane's duplicates.
+   DuplicateFinderMixin._dup_build_right_snapshot makes a filtered copy of the
+   left snapshot (duplicate files + their parent folders, same paths, folder
+   sizes = kept files), _dup_sync_right lists it after every left listing (same
+   colors, the left pane's sort order). The list, Statistics View, totals and
+   summary all read that snapshot. _snapshot_lookup / _build_entries take a
+   pane so the right tree is not filled from the left pane's full snapshot.
+ - Wasted space is on the right pane's upper status line (and in the summary).
+ - Selecting rows in the right pane selects and reveals them in the left pane
+   (a selected folder = all duplicate files below it): _on_dup_right_selection.
+ - The right pane's folder entry, toolbar buttons and Select/File Op/Clipboard
+   cluster are hidden in this mode (read-only view). Its real snapshot is
+   stashed on entering and restored on returning to Compare folders.
+ - "Multi Select matching files" is ignored in this mode.
+ - Open: left pane selection does not mirror into the right pane.

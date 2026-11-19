@@ -685,10 +685,29 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.resize(max(new_width, MINIMUM_WINDOW_WIDTH), self.height())
 
         state = self._capture_ui_state()
+        # The left pane keeps its expanded folders and its selection across
+        # the switch (e.g. to pick things in Duplicate Finder mode and then
+        # copy them elsewhere in Compare folders mode).
+        left_tree = self.left.tree if getattr(self.left, "tree", None) is not None else None
+        kept_expanded = self._collect_expanded_paths(left_tree) if left_tree is not None else set()
+        kept_selected = self._collect_selected_paths(left_tree) if left_tree is not None else set()
         current_tab = self.tabs.currentIndex() if getattr(self, "tabs", None) else 0
         self._build_ui()
         self._restore_ui_state(state)
         self.tabs.setCurrentIndex(current_tab)
+        if kept_expanded or kept_selected:
+            # Left pane only: with Synchronize Views the selection must not
+            # be mirrored onto the right pane (whose own selection is gone).
+            guard_was_set = self._sync_guard
+            self._sync_guard = True
+            try:
+                self._restore_expanded_paths(self.left.tree, kept_expanded)
+                if kept_selected:
+                    self._select_paths_in_tree(self.left.tree, kept_selected, additive=False,
+                                                auto_expand=False, select_subtree=False)
+            finally:
+                self._sync_guard = guard_was_set
+            self.update_selection_count(self.left.tree, self.left)
         # Re-apply the "no dual pane -> no comparison coloring" fallback
         # (see _recolor_all_items) now that the just-rebuilt tree is
         # freshly repopulated -- _restore_ui_state's own navigate call

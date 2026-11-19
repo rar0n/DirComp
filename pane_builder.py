@@ -392,18 +392,18 @@ class PaneBuilderMixin:
         # Upper status line: text, then Hash at the end (mirrored with the
         # pane's button order, like the toolbar below).
         upper_row.addWidget(snapshot_info_label, 1)
-        # (see the "Duplicate File View" title added after this row below)
+        # (see the "Duplicate Finder" title added after this row below)
         if layout_left:
             upper_row.addWidget(hash_button)
         else:
             upper_row.insertWidget(0, hash_button)
 
-        # Duplicate Finder mode: the right pane is the Duplicate File View.
+        # Duplicate Finder mode: the right pane is the Duplicate Finder.
         # A big centered title takes the place of its status line, Hash button
         # and folder entry (see DuplicateFinderMixin._dup_sync_right).
         pane.dup_title_label = None
         if pane is self.right and not self._dual_pane_enabled:
-            title = QLabel("Duplicate File View")
+            title = QLabel("Duplicate Finder")
             title_font = title.font()
             title_font.setPointSizeF(title_font.pointSizeF() * 1.6)
             title_font.setBold(True)

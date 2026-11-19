@@ -438,7 +438,7 @@ class DuplicateFinderMixin:
         return files
 
     def _on_dup_right_selection(self, pane):
-        """Duplicate Finder mode: selecting files in the Duplicate File View
+        """Duplicate Finder mode: selecting files in the Duplicate Finder
         (the right pane) selects every copy of them -- the whole group -- in
         both panes, and reveals them in the left one. Click, Shift and Ctrl
         work as in any list: Ctrl toggles whole groups on and off, the others

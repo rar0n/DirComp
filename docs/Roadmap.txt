@@ -243,3 +243,100 @@ lines were replaced by ONE copy in the Main tab's Global Options, before its Ref
 button (Recursive Folder Selections moved left, next to Dual Pane). It stays in step
 with the Settings tab's combo both ways.
 
+==============================================================================
+Plan: Duplicate Finder mode (decided 2026-11-19, not implemented yet)
+==============================================================================
+
+Idea: with Dual Pane off, DirComp becomes a duplicate finder for the one open folder.
+Everything builds on the existing comparison types, hash/fingerprint cache and the
+"Multi Select matching files" content matching.
+
+Mode switch
+ - The "Dual Pane" checkbox is renamed "Compare folders" (label only; the saved setting
+   key "dual_pane" stays). Ticked = today's dual-pane comparison, unchanged.
+   Unticked = Duplicate Finder. No separate option; the checkbox tooltip explains it.
+ - Symmetrical GUI / Synchronize Views stay dependent on "Compare folders".
+
+Finding duplicates
+ - Duplicates are found by the current comparison type (Name/size/date, Hash value,
+   Fingerprint, plus the name-only options "Ignore file extensions" / "Only first part
+   of file name"). Group = files with equal key.
+ - Scope = Recursive Folder Selections: on = everything from the root, off = only
+   expanded (visible) folders. The Global File Filter limits what is scanned. The
+   status line states the scope used.
+ - Hash / Fingerprint: only files whose size occurs more than once are hashed (a
+   unique size cannot have a duplicate). Files already hashed in the RAM or persistent
+   cache are not rehashed; cache entries are used only while size and mtime match (as
+   today), changed files keep the "Changed since cached" state.
+ - Hash types: the Duplicates buttons stay disabled until the files are hashed (Hash
+   button, upper status line). Name, size and date needs no hashing and works at once.
+ - Refresh (per pane) re-reads the folder and regroups using hashes already known;
+   changing the comparison type regroups from RAM when hashes exist.
+ - Groups and colors are fixed at scan/Refresh. After deleting files a group left with
+   one copy keeps its color until the next Refresh.
+ - "Multi Select matching files in same pane" is OFF/ignored in this mode; the new
+   Select buttons do that job instead.
+
+Select group (single pane only; replaces Missing, Matching, Newer, Older, Smaller, Larger)
+ - "Duplicates": selects every file that has at least one copy.
+ - "Extra copies": selects all but one file per group. The survivor is chosen by a new
+   setting; default "Shortest path", other choices e.g. oldest, newest, first in tree
+   order.
+ - "Extra copies" is disabled with the two name-only options ("Ignore file extensions",
+   "Only first part of file name") because those matches are not safe to delete from.
+   It stays enabled for Name/size/date, Hash value and Fingerprint. "Duplicates" works
+   for all types.
+ - Colors: new rows in the Button Colors table.
+
+Colors (File List View)
+ - Each duplicate group gets a Background color from a series, numbered in order of
+   first appearance in the tree (so neighboring groups differ). When the number of
+   groups exceeds the steps the series wraps around.
+ - Settings > Global Settings > Misc Colors, new bottom block "Duplicate File Colors",
+   modelled on File List View > Indentation Lines > Line Colors but without hover:
+   Nr of color steps (spin box + slider), Color 1 and Color 2 (swatches), Swap button,
+   "Reverse Color Wheel Direction". The series generator should be shared with the
+   indentation line colors.
+ - Foreground, exclusive radio buttons: "Set Fg color" (its swatch is enabled only
+   then), "Inverse color" (255 - channel of the background), "Inverse luminance"
+   (black or white by background luminance).
+ - Folders in the left pane stay plain, except:
+   * New row "Empty folder" (Fg/Bg) in File List View Colors > Default / Misc colors:
+     a folder with no files anywhere below it. Duplicate Finder mode only. A folder
+     that has not been scanned yet is NOT classified: it keeps the plain folder
+     color until it has been read.
+
+Right pane (reused, Duplicate Finder mode only)
+ - File List View showing only the duplicate files plus their parent folders, in the
+   same tree order and with the same colors as the left pane. Clicking an item
+   reveals and selects it in the left tree (expanding folders as needed).
+ - Statistics View of the right pane is fed from this duplicate listing.
+ - Top status line shows the wasted space: sum over groups of (copies - 1) * size.
+
+Ignore empty files / Ignore hard links (Settings > Options; global, work in BOTH modes)
+ - Both default off, saved with the shared settings.
+ - "Ignore empty files": 0-byte files do not take part in any comparison, selection
+   or hashing.
+ - "Ignore hard links": a hard link = a file with st_nlink > 1 (the scan already stats
+   every file). Such files do not take part in any comparison, selection or hashing.
+   Simple rule: a file with another link outside the scanned folders is also flagged.
+   With the option off, two links to one file are reported as duplicates (tooltip
+   mentions that deleting one frees no space).
+ - Ignored files show the plain file colors in dual-pane mode, never count as missing
+   or matching. New row "Hard link" (File/Fg/Bg) in Default / Misc colors for hard
+   links ignored this way; empty files keep plain colors unless a row is wanted later.
+ - Folder snapshots (.fss): store st_nlink as an optional per-file field. Old snapshots
+   without it count every file as "not a hard link"; a status note says so.
+
+Persistent hash cache database (hash_cache_store.py): no backward compatibility needed
+if the schema changes; the user clears or deletes the file.
+
+Suggested implementation order
+ 1. Ignore empty files / Ignore hard links (both modes, plus Hard link colors and the
+    .fss field) -- small, independent, useful for the rest.
+ 2. Rename to "Compare folders"; shared color-series generator; "Duplicate File Colors"
+    settings block (steps, colors, swap, reverse, Fg options); "Empty folder" row.
+ 3. Duplicate grouping engine (all comparison types, size pre-filter, scope, refresh
+    semantics) and left-pane coloring.
+ 4. Duplicates / Extra copies buttons + survivor setting, and the disabled rules.
+ 5. Right pane duplicate listing, click-to-reveal, Statistics View feed, wasted space.

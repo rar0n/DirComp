@@ -602,6 +602,7 @@ class HashOpsMixin:
             blocked = self._hash_comparison_blocked()
             keys = (("missing", "matching", "larger", "smaller", "newer", "older", "diff_folders")
                     if blocked else ("larger", "smaller", "newer", "older"))
+            self._dup_update_buttons(pane)
             for key in ("missing", "matching", "larger", "smaller", "newer", "older", "diff_folders"):
                 btn = (getattr(pane, "select_toggle_buttons", None) or {}).get(key)
                 if btn is not None:

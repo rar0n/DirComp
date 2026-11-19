@@ -678,6 +678,30 @@ class SettingsTabMixin:
         global_grid.addLayout(cache_row, 19, 0, 1, 7)
         self.cache_hashed_folders_cb.toggled.connect(self._on_cache_hashed_folders_toggled)
 
+        # Row 20: which copy "Extra copies" leaves alone in every group of
+        # identical files (Duplicate Finder mode, DuplicateFinderMixin).
+        keep_row = QHBoxLayout()
+        keep_row.setContentsMargins(0, 0, 0, 0)
+        keep_row.addSpacing(20)
+        keep_row.addWidget(QLabel("Extra copies keep:"))
+        self.extra_copies_keep_combo = QComboBox()
+        self.extra_copies_keep_combo.addItems(
+            ["Shortest path", "Oldest", "Newest", "First in tree order"])
+        self.extra_copies_keep_combo.setCurrentIndex(self._dup_survivor)
+        self.extra_copies_keep_combo.setToolTip(
+            "Duplicate Finder mode: the \"Extra copies\" button selects every "
+            "copy in a group of identical files except one. This decides which "
+            "one is left alone:\n"
+            "Shortest path: the copy with the shortest full path (the first "
+            "of them in tree order on a tie).\n"
+            "Oldest / Newest: the copy with the oldest / newest modified date.\n"
+            "First in tree order: the copy listed first in the file list."
+        )
+        keep_row.addWidget(self.extra_copies_keep_combo)
+        keep_row.addStretch(1)
+        global_grid.addLayout(keep_row, 20, 0, 1, 7)
+        self.extra_copies_keep_combo.currentIndexChanged.connect(self._on_dup_survivor_changed)
+
         self._update_comparison_controls_enabled()
         self._cmp_applied_key = self._comparison_key()
         self._ignore_applied = self._ignore_flags()
@@ -2109,6 +2133,7 @@ class SettingsTabMixin:
             "select_all": "Select All", "clear": "Clear", "missing": "Missing",
             "newer": "Newer", "smaller": "Smaller", "matching": "Matching",
             "older": "Older", "larger": "Larger", "diff_folders": "Diff Items",
+            "dup_all": "Duplicates", "dup_extra": "Extra copies",
             "file_parent": "Item Parent", "all_parents": "All Parents",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)

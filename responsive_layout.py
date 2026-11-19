@@ -142,6 +142,14 @@ class ResponsiveLayoutMixin:
         if key == "select":
             sp = pane.select_plain_buttons
             st = pane.select_toggle_buttons
+            if getattr(pane, "dup_layout", False):
+                # Duplicate Finder mode: the compare buttons give way to
+                # Duplicates / Extra copies (None = empty cell).
+                return [
+                    sp["select_all"], st["dup_all"], sp["all_parents"], sp["file_parent"],
+                    pane.invert_button, st["dup_extra"], None, None,
+                    sp["clear"], None, None, None,
+                ]
             return [
                 sp["select_all"], st["missing"], st["newer"], st["smaller"],
                 pane.invert_button, st["matching"], st["older"], st["larger"],
@@ -196,7 +204,8 @@ class ResponsiveLayoutMixin:
         align = Qt.AlignRight if mirrored else Qt.AlignLeft
         buttons = self._group_buttons(pane, key)
         for i, row, col in self._cell_positions(key, len(buttons), cols, mirrored):
-            grid.addWidget(buttons[i], row, col, alignment=align)
+            if buttons[i] is not None:
+                grid.addWidget(buttons[i], row, col, alignment=align)
         group.setAlignment(Qt.AlignRight if mirrored else Qt.AlignLeft)
 
     def _ensure_cluster_sizes(self, pane: DirectoryPane):

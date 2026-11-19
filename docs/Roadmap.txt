@@ -411,3 +411,15 @@ Status 2026-11-19, step 3 follow-up: two Global Options added (Settings tab).
    still hashes every file in view -- a size filter there would need
    per-folder-pair handling in DiffEngineMixin._pair_dir_files and would
    break "Multi Select matching files" across folders.
+
+Status 2026-11-19, step 4 (Select buttons): done.
+ - Duplicate Finder mode: "Duplicates" (every copy) and "Extra copies" (all but
+   one per group) replace the six compare buttons in the Select group
+   (pane.dup_layout; _group_buttons leaves empty cells). Toggle like the others.
+ - "Extra copies keep:" combo (Settings -> Options): shortest path (default),
+   oldest, newest, first in tree order.
+ - Disabled rules: both off until the scan is hashed (Hash/Fingerprint), and
+   "Extra copies" off for the two name-only options.
+ - Button colors: "Duplicates" / "Extra copies" rows in the Select Buttons
+   color table (_DEFAULT_SELECT_COLORS dup_all / dup_extra).
+ - Right pane is still untouched (step 5).

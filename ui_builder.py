@@ -278,6 +278,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._ignore_applied = (False, False)
             # Settings tab -> Global Options -> "Scan expanded folders" and
             # "Hash only same-size files" (see DuplicateFinderMixin).
+            self._dup_survivor = 0  # Extra copies keep: 0 shortest path, 1 oldest, 2 newest, 3 first
             self._scan_expanded = True
             self._hash_same_size = True
             # Settings tab -> Options -> "Cache hashed folders" (see

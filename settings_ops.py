@@ -57,7 +57,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
     "multi_select_matching", "multi_select_same_folder", "cache_hashed_folders",
-    "ignore_empty_files", "ignore_hard_links", "scan_expanded_folders", "hash_same_size_files",
+    "ignore_empty_files", "ignore_hard_links", "scan_expanded_folders", "hash_same_size_files", "extra_copies_keep",
 })
 
 
@@ -119,6 +119,7 @@ class SettingsMixin:
             "cache_hashed_folders": getattr(self, "cache_hashed_folders_cb", None),
             "ignore_empty_files": getattr(self, "ignore_empty_files_cb", None),
             "scan_expanded_folders": getattr(self, "scan_expanded_cb", None),
+            "extra_copies_keep": getattr(self, "extra_copies_keep_combo", None),
             "hash_same_size_files": getattr(self, "hash_same_size_cb", None),
             "ignore_hard_links": getattr(self, "ignore_hard_links_cb", None),
         }

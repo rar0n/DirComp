@@ -233,6 +233,71 @@ class DuplicateFinderMixin:
             "pending": pending, "changed": changed,
             "pending_dirs": with_ancestors(pending), "changed_dirs": with_ancestors(changed),
         }
+        self._dup_update_buttons(pane)
+
+    # ----------------------------------------------------- Select buttons
+
+    def _on_dup_survivor_changed(self, *_args):
+        """"Extra copies keep:" changed."""
+        self._dup_survivor = self.extra_copies_keep_combo.currentIndex()
+
+    def _dup_survivor_node(self, nodes):
+        """The copy in a group "Extra copies" leaves alone (nodes are in tree
+        order, so ties go to the first)."""
+        mode = getattr(self, "_dup_survivor", 0)
+        if mode == 1:
+            return min(nodes, key=lambda n: n["mtime"])
+        if mode == 2:
+            return max(nodes, key=lambda n: n["mtime"])
+        if mode == 3:
+            return nodes[0]
+        return min(nodes, key=lambda n: len(n["full_path"]))
+
+    def _dup_select_set(self, pane, extra_only: bool) -> set:
+        """Normalized paths the Duplicates (every copy) / Extra copies (all
+        but one per group) button selects; empty without a duplicate scan.
+        Only the left pane has one."""
+        info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
+        if not info:
+            return set()
+        paths = set()
+        for nodes in info["groups"].values():
+            keep = self._dup_survivor_node(nodes) if extra_only else None
+            for node in nodes:
+                if node is not keep:
+                    paths.add(os.path.normpath(node["full_path"]))
+        return paths
+
+    def _dup_select_paths(self, pane, extra_only: bool) -> list:
+        return sorted(self._dup_select_set(pane, extra_only))
+
+    def _dup_buttons_state(self, pane):
+        """(duplicates enabled, extra copies enabled) for the pane's two
+        Duplicate Finder buttons. Hash value / Fingerprint need the scanned
+        files hashed first (nothing left unhashed or changed); "Extra copies"
+        is off for the two name-only options, where a shared name does not
+        mean identical content."""
+        info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
+        if not info:
+            return False, False
+        hashing = self._hash_type_selected()
+        ready = not (hashing and (info["pending"] or info["changed"]))
+        name_only = (not hashing) and bool(self._stem_mode())
+        return ready, ready and not name_only
+
+    def _dup_update_buttons(self, pane):
+        """Enable/disable (and un-press, if now disabled) the two buttons."""
+        buttons = getattr(pane, "select_toggle_buttons", None) or {}
+        enabled = self._dup_buttons_state(pane) if self._duplicate_mode_active() else (False, False)
+        for key, on in zip(("dup_all", "dup_extra"), enabled):
+            btn = buttons.get(key)
+            if btn is None:
+                continue
+            if not on and btn.isChecked():
+                btn.blockSignals(True)
+                btn.setChecked(False)
+                btn.blockSignals(False)
+            btn.setEnabled(on)
 
     # --------------------------------------------------------------- Tags
 

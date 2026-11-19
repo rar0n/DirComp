@@ -777,6 +777,28 @@ class PaneBuilderMixin:
             if type_key in ("larger", "smaller", "newer", "older"):
                 btn.setEnabled(not self._hash_mode_active())
 
+        # Duplicate Finder mode (Compare folders off): these two take the
+        # place of the six compare buttons above (see _group_buttons).
+        pane.dup_layout = not self._dual_pane_enabled
+        for text, type_key, tip in (
+            ("Duplicates", "dup_all",
+             "Select every file that has an identical copy (the whole set of each group)."),
+            ("Extra copies", "dup_extra",
+             "Select all copies but one in each group of identical files -- the one "
+             "left alone is set under Settings -> Options -> \"Extra copies keep\". "
+             "Not available with the two name-only options (a shared name does not "
+             "make files identical)."),
+        ):
+            btn = QPushButton(text)
+            btn.setCheckable(True)
+            btn.setToolTip(tip)
+            btn.toggled.connect(lambda checked, p=pane, tk=type_key: self._select_by_type(p, tk, select=checked))
+            btn.setFixedSize(_select_button_width, _select_button_height)
+            fg, bg = self._select_colors[type_key]
+            btn.setStyleSheet(_bevel_button_stylesheet(bg, fg))
+            pane.select_toggle_buttons[type_key] = btn
+            btn.setEnabled(False)  # DuplicateFinderMixin._dup_update_buttons decides
+
         diff_folders_button = QPushButton("Diff Items")
         diff_folders_button.setCheckable(True)
         diff_folders_button.toggled.connect(

@@ -1215,6 +1215,12 @@ class SelectionMixin:
                 or item.data(0, Qt.UserRole) == "diff_content_file"
             )
             return collector, predicate, True, False
+        if type_key in ("dup_all", "dup_extra"):
+            extra_only = type_key == "dup_extra"
+            collector = lambda root, other, progress, pn=pane, ex=extra_only: self._dup_select_paths(pn, ex)
+            predicate = lambda item, pn=pane, ex=extra_only: (
+                os.path.normpath(item.data(0, PATH_ROLE) or "") in self._dup_select_set(pn, ex))
+            return collector, predicate, False, False
         want_rank, want_direction = self._RANK_SELECT_TYPES[type_key]
         collector = lambda root, other, progress, wr=want_rank, wd=want_direction, df=date_field: (
             self._collect_matching_paths(root, other, wr, wd, progress, df)

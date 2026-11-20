@@ -863,7 +863,7 @@ class SettingsTabMixin:
         misc_buttons_group = self._main_button_color_table([
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
-            ("swap_pane", "Swap pane"),
+            ("swap_pane", "Swap"),
         ])
         global_settings_flow.addWidget(self._settings_subsection("Misc Buttons", misc_buttons_group))
 

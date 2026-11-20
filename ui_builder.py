@@ -516,13 +516,13 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         cluster_layout.setSpacing(6)
 
         metrics = QFontMetrics(self.font())
-        mode_w = max(metrics.horizontalAdvance("Duplicate finder"),
+        mode_w = max(metrics.horizontalAdvance("Duplicate Finder"),
                      metrics.horizontalAdvance("Compare Folders")) + 2 * (8 + 2) + 16
 
         mode_group = QButtonGroup(cluster)
         mode_group.setExclusive(True)
 
-        self.mode_duplicate_button = QPushButton("Duplicate finder", cluster)
+        self.mode_duplicate_button = QPushButton("Duplicate Finder", cluster)
         self.mode_duplicate_button.setToolTip(
             "Duplicate Finder mode: the left pane is searched for duplicate files, "
             "listed in the right pane."
@@ -543,7 +543,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.mode_duplicate_button.clicked.connect(lambda checked=False: self._request_mode(False))
         self.mode_compare_button.clicked.connect(lambda checked=False: self._request_mode(True))
 
-        self.swap_pane_button = QPushButton("Swap pane", cluster)
+        self.swap_pane_button = QPushButton("Swap", cluster)
         self.swap_pane_button.setToolTip(
             "Swap the two panes: their folders and folder histories (and what is expanded "
             "and selected in them). In Duplicate Finder mode the left pane swaps with the "

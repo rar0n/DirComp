@@ -340,7 +340,7 @@ def _bevel_button_stylesheet(bg: str, fg: str) -> str:
 
 def _mode_button_stylesheet(bg: str, fg: str, pressed_bg: str, pressed_fg: str) -> str:
     """Stylesheet for a checkable, radio-like mode-switch button (the
-    Main tab's "Duplicate finder" / "Compare Folders" pair): the normal
+    Main tab's "Duplicate Finder" / "Compare Folders" pair): the normal
     raised bevel in (bg, fg) while released, and while checked ("pressed
     in") its OWN colors (pressed_bg, pressed_fg) with the sunken bevel --
     unlike _bevel_button_stylesheet, whose checked state is merely a

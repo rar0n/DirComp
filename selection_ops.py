@@ -844,7 +844,10 @@ class SelectionMixin:
                 # Row is [+][-] <label> [Clear view] (mirrored on the right
                 # pane): the label only gets what's left between them.
                 clear_btn = getattr(pane, "clear_view_button", None)
-                clear_w = max(clear_btn.sizeHint().width(), clear_btn.width()) if clear_btn is not None else 32
+                # sizeHint, never .width(): a hidden button (the right pane's
+                # in Duplicate Finder mode) keeps a stale, layout-stretched
+                # width that made every summary wrap to one part per line.
+                clear_w = clear_btn.sizeHint().width() if clear_btn is not None else 32
                 avail = self._shared_width_for(pane, pane.tree) - 2 * 32 - clear_w - 5 * spacing - 4
                 needed = len(parts)
                 for lines in range(1, len(parts) + 1):
@@ -979,17 +982,25 @@ class SelectionMixin:
                 sep = metrics.horizontalAdvance(" - ")
                 widths = [metrics.horizontalAdvance(plain) for plain, _html in atoms]
                 row = pane._stats_title_row
-                others = 0
-                count = row.count()
-                for i in range(count):
-                    item = row.itemAt(i)
-                    if item.widget() is label:
-                        continue
-                    others += item.sizeHint().width()
-                others += max(0, row.spacing()) * (count - 1)
-                avail = self._shared_width_for(pane, pane._stats_widget)
+                # Totals sit at the pane's center: the two outer boxes take
+                # the same width (the wider one's), so the room left for the
+                # totals is the pane minus two of those and two row gaps.
+                boxes = getattr(pane, "_stats_title_boxes", ())
+                side = max((box.layout().sizeHint().width() for box in boxes), default=0)
+                total = self._shared_width_for(pane, pane._stats_widget)
                 margins = pane._stats_widget.layout().contentsMargins()
-                avail -= margins.left() + margins.right() + others
+                total -= margins.left() + margins.right()
+                others = 2 * side + 2 * max(0, row.spacing())
+                avail = total - others
+                # Too narrow to keep the totals centered (it would push the
+                # right-hand buttons out of the pane): stop forcing equal
+                # boxes and let each take just what it needs.
+                forced = side if avail >= max(widths, default=0) else 0  # even the 2-line form must fit
+                for box in boxes:
+                    if box.minimumWidth() != forced:
+                        box.setMinimumWidth(forced)
+                if not forced:
+                    avail = total - sum(box.layout().sizeHint().width() for box in boxes) - 2 * max(0, row.spacing())
                 one_line = sum(widths) + sep * max(0, len(widths) - 1)
                 needed = 1 if (not widths or one_line <= avail) else len(widths)
                 plans.append((pane, atoms, needed, metrics.height()))

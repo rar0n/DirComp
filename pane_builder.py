@@ -539,12 +539,24 @@ class PaneBuilderMixin:
         # TimelineOpsMixin._on_timeline_mode_changed), and the live
         # file/folder counts -- always both, regardless of which one is
         # currently plotted (see _update_timeline_totals_label).
+        # Three parts so the Files/Folders totals sit at the exact center
+        # of the pane: [title + mode buttons] <totals> [Zoom to + Reset],
+        # the two outer boxes stretching equally (and held to the same
+        # minimum width in SelectionMixin._render_stats_totals).
         timeline_title_row = QHBoxLayout()
+        title_left_box = QWidget()
+        title_left = QHBoxLayout(title_left_box)
+        title_left.setContentsMargins(0, 0, 0, 0)
+        title_right_box = QWidget()
+        title_right = QHBoxLayout(title_right_box)
+        title_right.setContentsMargins(0, 0, 0, 0)
+        pane._stats_title_boxes = (title_left_box, title_right_box)
+        pane._stats_title_box_layouts = (title_left, title_right)
 
         timeline_title_label = QLabel("Statistics view")
         timeline_title_label.setStyleSheet("font-weight: bold;")
-        timeline_title_row.addWidget(timeline_title_label)
-        timeline_title_row.addSpacing(10)
+        title_left.addWidget(timeline_title_label)
+        title_left.addSpacing(10)
 
         # Reset View, retitled "Reset" and moved up here from the
         # footer row below the chart (see _build_statistics_panel) --
@@ -570,7 +582,7 @@ class PaneBuilderMixin:
         zoom_sel_button.setFixedHeight(uniform_h)
         zoom_sel_button.setStyleSheet(_bevel_button_stylesheet(*self._stats_button_color_for("zoom_to")))
         pane.tl_zoom_sel_button = zoom_sel_button
-        timeline_title_row.addSpacing(10)
+        title_left.addSpacing(10)
 
         timeline_mode_group = QButtonGroup(self)
         timeline_mode_group.setExclusive(True)
@@ -596,19 +608,22 @@ class PaneBuilderMixin:
         timeline_mode_group.addButton(folders_mode_button)
         pane.tl_files_mode_button = files_mode_button
         pane.tl_folders_mode_button = folders_mode_button
-        timeline_title_row.addWidget(files_mode_button)
-        timeline_title_row.addWidget(folders_mode_button)
-        timeline_title_row.addSpacing(10)
+        title_left.addWidget(files_mode_button)
+        title_left.addWidget(folders_mode_button)
+        title_left.addStretch(1)
 
         timeline_totals_label = QLabel("")
         timeline_totals_label.setTextFormat(Qt.TextFormat.RichText)
+        timeline_totals_label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         pane.tl_totals_label = timeline_totals_label
-        timeline_title_row.addWidget(timeline_totals_label)
         pane._stats_atoms = []
         pane._stats_title_row = timeline_title_row
-        timeline_title_row.addStretch(1)
-        timeline_title_row.addWidget(zoom_sel_button)
-        timeline_title_row.addWidget(reset_button)
+        title_right.addStretch(1)
+        title_right.addWidget(zoom_sel_button)
+        title_right.addWidget(reset_button)
+        timeline_title_row.addWidget(title_left_box, 1)
+        timeline_title_row.addWidget(timeline_totals_label, 0)
+        timeline_title_row.addWidget(title_right_box, 1)
         stats_layout.addLayout(timeline_title_row)
         # Stashed so the Copy-->/Move--> buttons (built further below,
         # once the pane_splitter/stats_widget this row already lives in
@@ -698,6 +713,8 @@ class PaneBuilderMixin:
         mirror_this_row = (not is_left) and self._symmetrical_buttons
         if mirror_this_row:
             pane.tl_title_row.setDirection(QBoxLayout.RightToLeft)
+            for box_layout in pane._stats_title_box_layouts:
+                box_layout.setDirection(QBoxLayout.RightToLeft)
 
         # --------------------------------------------------- Select group
         select_group = QGroupBox("Select")

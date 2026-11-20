@@ -1799,172 +1799,60 @@ def is_unnatural_scrolling_enabled() -> bool:
     return _unnatural_scrolling_enabled
 
 
-class CascadeFlowLayout(QLayout):
-    """A short, ordered run of sub-blocks that belong together (e.g.
-    Statistics View Colors' Graph/Info/Buttons, or File List View
-    Colors' Default/Comparison tables): side by side in one row while
-    there's room for all of them (see sizeHint -- the preferred size is
-    that one full row); as the width available narrows, an item that no
-    longer fits to the right of the previous column stacks directly
-    below it INSTEAD of starting a whole new row at the block's own left
-    edge -- a new column only starts when there's room for one to the
-    right of the current rightmost column. Only once even a single
-    column (every item stacked, at the width of the widest one -- see
-    minimumSize) doesn't fit does this whole block hand back to its own
-    container's FlowLayout, which then wraps the block onto its own
-    line -- where it re-tries this same cascade at whatever width that
-    line now has.
-
-    Unlike FlowLayout, item order and grouping matters here (later
-    items stack under whichever column has room for them), so this
-    isn't a drop-in replacement for it -- see
-    SettingsTabMixin._settings_subsection_cascade, used only for a
-    couple of tightly-related same-topic sub-blocks, not a whole
-    section's worth of independent ones."""
-
-    def __init__(self, parent=None, h_spacing: int = 16, v_spacing: int = 12):
-        super().__init__(parent)
-        self._items = []
-        self._h_spacing = h_spacing
-        self._v_spacing = v_spacing
-        self.setContentsMargins(0, 0, 0, 0)
-
-    def addItem(self, item):
-        self._items.append(item)
-
-    def count(self):
-        return len(self._items)
-
-    def itemAt(self, index):
-        return self._items[index] if 0 <= index < len(self._items) else None
-
-    def takeAt(self, index):
-        return self._items.pop(index) if 0 <= index < len(self._items) else None
-
-    def expandingDirections(self):
-        return Qt.Orientation(0)
-
-    def hasHeightForWidth(self):
-        return True
-
-    def heightForWidth(self, width):
-        return self._do_layout(QRect(0, 0, width, 0), apply=False)
-
-    def setGeometry(self, rect):
-        super().setGeometry(rect)
-        self._do_layout(rect, apply=True)
-
-    def sizeHint(self):
-        # The preferred size is everything in one row -- the widest
-        # this block ever wants to be; used by the containing
-        # FlowLayout to decide whether the whole block still fits next
-        # to whatever precedes it.
-        width = height = count = 0
-        for item in self._items:
-            if item.isEmpty():
-                continue
-            hint = item.sizeHint().expandedTo(item.minimumSize())
-            width += hint.width()
-            height = max(height, hint.height())
-            count += 1
-        if count > 1:
-            width += self._h_spacing * (count - 1)
-        margins = self.contentsMargins()
-        return QSize(width + margins.left() + margins.right(), height + margins.top() + margins.bottom())
-
-    def minimumSize(self):
-        # The narrowest this block can ever be: every item in one
-        # column, stacked -- width is its widest single item, height
-        # the sum of all of them.
-        width = height = 0
-        for item in self._items:
-            if item.isEmpty():
-                continue
-            size = item.minimumSize()
-            width = max(width, size.width())
-            height += size.height()
-        if self.count():
-            height += self._v_spacing * (self.count() - 1)
-        margins = self.contentsMargins()
-        return QSize(width + margins.left() + margins.right(), height + margins.top() + margins.bottom())
-
-    def _do_layout(self, rect, apply: bool) -> int:
-        margins = self.contentsMargins()
-        area = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
-        columns = []  # [x, width, bottom_y] per column, left to right
-        for item in self._items:
-            if item.isEmpty():  # a hidden widget takes no room
-                continue
-            size = item.sizeHint().expandedTo(item.minimumSize())
-            if columns:
-                last = columns[-1]
-                new_x = last[0] + last[1] + self._h_spacing
-                fits_new_column = new_x + size.width() <= area.right() + 1
-            else:
-                new_x, fits_new_column = area.x(), True
-            if fits_new_column:
-                # A new column, top-aligned with the whole block, to
-                # the right of every column so far.
-                if apply:
-                    item.setGeometry(QRect(new_x, area.y(), size.width(), size.height()))
-                columns.append([new_x, size.width(), area.y() + size.height()])
-            else:
-                # Doesn't fit beside the last column: stack below its
-                # last item instead, in that same column.
-                x, y = last[0], last[2] + self._v_spacing
-                if apply:
-                    item.setGeometry(QRect(x, y, size.width(), size.height()))
-                last[1] = max(last[1], size.width())
-                last[2] = y + size.height()
-        bottom = max((c[2] for c in columns), default=area.y())
-        return bottom - rect.y() + margins.bottom()
-
-
 class FlowLayout(QLayout):
-    """Lays its items out left to right, top-aligned, going onto a new
-    line (or into free space further down) when the next one doesn't fit
-    in the width it's given -- so blocks sit side by side when there's
-    room and stack when there isn't, following the window as it is
-    resized (it reports a height for a given width, which QVBoxLayout/
-    QScrollArea use).
+    """The Settings tab's one layout engine ("Tetris" packer), used at
+    every level -- a section's Level 2 blocks, and a Level 2 block's
+    Level 3 blocks alike: items sit side by side when there's room and
+    stack when there isn't, following the window as it is resized (it
+    reports a height for a given width, which QVBoxLayout/QScrollArea
+    use). Blocks can't rotate, but they can move: each width gets
+    whichever arrangement uses the least vertical space, then the least
+    width, then departs least from the original order.
 
     Placement (see _pack): each item, in turn, goes where its bottom edge
     ends up highest -- ties to the higher, then the more leftward spot --
     either beside the items already placed, or down in the free space
     below a shorter one (e.g. a small block tucked in under a short block
     on the left, beside a tall one on its right, rather than on a new
-    line below both). An item that can reflow (one holding a nested Flow/
-    CascadeFlowLayout -- see _item_info) may be narrowed for that, down
-    to its own minimum, which makes it taller.
+    line below both; or two small blocks side by side under one wide one).
+    An item that can reflow (one holding a nested FlowLayout -- see
+    _item_info) may be narrowed for that, down to its own minimum, which
+    makes it taller; that is the recursion -- a nested layout is asked for
+    its height at the width the outer one is trying.
 
-    With `reorder` on, every order of the items is tried as well, and the
-    lowest overall result wins, as long as nothing goes below its minimum
-    width. What an order may NOT do is swap blocks that end up side by
-    side at the same height: those always keep the original left-to-right
-    order -- a block only comes before an earlier one by moving down,
-    below something. Among equally low results: the original order (the
-    fewest blocks moved out of it), then everything as far up and left as
-    possible.
+    With `reorder` on, the order of the items is tried in every
+    permutation as well, and the lowest overall result wins, as long as
+    nothing goes below its minimum width. What an order may NOT do is
+    swap blocks that end up side by side at the same height: those always
+    keep the original left-to-right order -- a block only comes before an
+    earlier one by moving down, below something. With `pin_first` on (the
+    default) the FIRST item is never moved: it stays top-left at its
+    preferred width, whatever the others do (so "Theme" is always the
+    first block of Global Settings). Among equally low results: the
+    narrowest, then the original order (the fewest blocks moved out of
+    it), then everything as far up and left as possible.
 
     Its preferred size is everything on one line and its minimum width
     that of its widest item, so it only ever pushes the page wider than
     the window for a single block that is itself too wide.
 
-    The Settings tab uses one per section for that section's Level 2
-    blocks (and one per Level 2 block that has Level 3 blocks) -- see
-    SettingsTabMixin._settings_subsection_flow."""
+    See SettingsTabMixin._settings_subsection_flow."""
 
     # Above this many items only the original order is tried (still with
     # the gap-filling placement) -- n! orders grow fast, and every
     # Settings-tab flow is well below it.
     _MAX_REORDER_ITEMS = 5
 
-    def __init__(self, parent=None, h_spacing: int = 16, v_spacing: int = 0, reorder: bool = True):
+    def __init__(
+        self, parent=None, h_spacing: int = 16, v_spacing: int = 0, reorder: bool = True,
+        pin_first: bool = True,
+    ):
         super().__init__(parent)
         self._items = []
         self._h_spacing = h_spacing
         self._v_spacing = v_spacing
         self._reorder = reorder
+        self._pin_first = pin_first
         # width -> best arrangement, and (item index, width) -> height;
         # both only valid until the layout is next invalidated (an item
         # added/removed/shown/hidden, or a size hint somewhere inside
@@ -2034,8 +1922,8 @@ class FlowLayout(QLayout):
 
     def _item_info(self):
         """(item index, preferred width, minimum width, reflows) for each
-        visible item. An item that can reflow (one with a nested Flow/
-        CascadeFlowLayout inside it -- Qt propagates hasHeightForWidth up
+        visible item. An item that can reflow (one with a nested
+        FlowLayout inside it -- Qt propagates hasHeightForWidth up
         through the QVBoxLayouts/QGroupBoxes in between) may be narrowed
         down to its own minimum; one that can't (a plain table/frame)
         always gets its preferred width."""
@@ -2138,7 +2026,12 @@ class FlowLayout(QLayout):
         from itertools import permutations
         entries = tuple(self._item_info())
         if self._reorder and 1 < len(entries) <= self._MAX_REORDER_ITEMS:
-            orders = permutations(entries)
+            if self._pin_first:
+                # The first item stays first (and so top-left); only the
+                # rest are permuted.
+                orders = (entries[:1] + rest for rest in permutations(entries[1:]))
+            else:
+                orders = permutations(entries)
         else:
             orders = (entries,)
         best_key, best = None, ([], 0)
@@ -2151,6 +2044,7 @@ class FlowLayout(QLayout):
                 continue
             key = (
                 height,
+                max(px + pw for _e, px, _py, pw, _ph in placed),
                 self._inversions([e[0] for e in order]),
                 sum(py for _e, _px, py, _pw, _ph in placed),
                 sum(px for _e, px, _py, _pw, _ph in placed),

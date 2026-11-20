@@ -913,20 +913,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
     def _fit_range_stylesheet(self, enabled: bool) -> str:
         """Stylesheet for a Statistics view's Fit Range button, in its
         own color (Statistics View -> Buttons -> "Fit Range"). It sits
-        disabled for as long as Auto Range is on, and
-        _bevel_button_stylesheet's own :disabled rule keeps the enabled
-        color by design -- so the disabled look is a separate stylesheet:
-        the button's color faded toward the window background, same blend
-        _cancel_button_stylesheet uses. Swapped in by Auto Range's toggle
-        (see _build_statistics_panel)."""
+        disabled for as long as Auto Range is on; the disabled look is
+        _bevel_button_stylesheet's own :disabled rule (the same one the
+        Hash button gets), so `enabled` no longer changes the sheet. The
+        parameter stays so the existing call sites keep working."""
         bg, fg = self._stats_button_color_for("fit_range")
-        if enabled:
-            return _bevel_button_stylesheet(bg, fg)
-        theme_bg = getattr(self, "_theme_window_color", None) or self.palette().color(QPalette.Window)
-        return _bevel_button_stylesheet(
-            _press_blend(bg, theme_bg.name(), 0.65).name(),
-            (theme_bg.lighter(160) if theme_bg.lightness() < 128 else theme_bg.darker(160)).name(),
-        )
+        return _bevel_button_stylesheet(bg, fg)
 
     def _apply_stats_button_colors(self):
         """Re-applies self._stats_button_colors to the live Statistics-

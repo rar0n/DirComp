@@ -101,9 +101,10 @@ class PaneBuilderMixin:
         snapshot_info_label = ElidedLabel("")
         pane.snapshot_info_label = snapshot_info_label
         self._update_snapshot_label(pane)
-        upper_row = QHBoxLayout()
-        upper_row.setContentsMargins(0, 0, 0, 0)
-        file_list_layout.addLayout(upper_row)
+        # The status line itself is not part of this pane's layout: it
+        # sits in the Main tab's shared top row, either side of the
+        # Duplicate finder / Swap pane / Compare Folders buttons (see
+        # UiBuilderMixin._build_main_tab_top_row).
         file_list_layout.addWidget(entry)
         pane.entry = entry
         # Repopulate the freshly built combo's dropdown from this pane's
@@ -345,11 +346,10 @@ class PaneBuilderMixin:
         pane.save_snapshot_button = save_snapshot_button
 
         # Empties this pane's directory/tree/timeline entirely -- see
-        # clear_pane_view. Placed at the outer edge of this row, right
-        # next to (but the opposite end from) Select Directory -- right-
-        # aligned by default like everything else that follows
-        # layout_left, mirrored to the left edge for the right pane
-        # while Symmetrical GUI is on.
+        # clear_pane_view. Placed in the count row below the list, at the
+        # outer edge opposite Expand/Collapse All -- right-aligned by
+        # default like everything else that follows layout_left, mirrored
+        # to the left edge for the right pane while Symmetrical GUI is on.
         clear_view_button = QPushButton("Clear view")
         clear_view_button.setToolTip("Empty this pane's file list and timeline, as if starting over.")
         clear_view_button.setFixedHeight(uniform_h)
@@ -359,7 +359,8 @@ class PaneBuilderMixin:
 
         # Hashes this pane's files for the Hash value / Fingerprint
         # comparison types -- see HashOpsMixin._hash_pane. Only enabled
-        # while one of those types is selected.
+        # while one of those types is selected. Sits at the outer edge of
+        # the toolbar row, next to this pane's Refresh.
         hash_button = QPushButton("Hash")
         hash_button.setToolTip(
             "Compute hashes for this pane's files (Hash value / Fingerprint comparison types). "
@@ -389,18 +390,10 @@ class PaneBuilderMixin:
         pane_refresh_button.clicked.connect(lambda checked=False, p=pane: self._refresh_pane(p))
         pane.pane_refresh_button = pane_refresh_button
 
-        # Upper status line: text, then Hash at the end (mirrored with the
-        # pane's button order, like the toolbar below).
-        upper_row.addWidget(snapshot_info_label, 1)
-        # (see the "Duplicate Finder" title added after this row below)
-        if layout_left:
-            upper_row.addWidget(hash_button)
-        else:
-            upper_row.insertWidget(0, hash_button)
-
         # Duplicate Finder mode: the right pane is the Duplicate Finder.
-        # A big centered title takes the place of its status line, Hash button
-        # and folder entry (see DuplicateFinderMixin._dup_sync_right).
+        # A big centered title takes the place of its folder entry; its
+        # status line and toolbar buttons are hidden (see
+        # DuplicateFinderMixin._dup_sync_right).
         pane.dup_title_label = None
         if pane is self.right and not self._dual_pane_enabled:
             title = QLabel("Duplicate Finder")
@@ -409,9 +402,9 @@ class PaneBuilderMixin:
             title_font.setBold(True)
             title.setFont(title_font)
             title.setAlignment(Qt.AlignCenter)
-            title.setFixedHeight(entry.sizeHint().height() + uniform_h + file_list_layout.spacing())
+            title.setFixedHeight(entry.sizeHint().height())
             file_list_layout.insertWidget(0, title)
-            for widget in (snapshot_info_label, hash_button, entry):
+            for widget in (snapshot_info_label, entry):
                 widget.setVisible(False)
             pane.dup_title_label = title
 
@@ -457,9 +450,9 @@ class PaneBuilderMixin:
             toolbar_layout.addWidget(free_space_label)
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(pane_refresh_button)
-            toolbar_layout.addWidget(clear_view_button)
+            toolbar_layout.addWidget(hash_button)
         else:
-            toolbar_layout.addWidget(clear_view_button)
+            toolbar_layout.addWidget(hash_button)
             toolbar_layout.addWidget(pane_refresh_button)
             toolbar_layout.addStretch(1)
             toolbar_layout.addWidget(free_space_label)
@@ -529,7 +522,9 @@ class PaneBuilderMixin:
             count_row.addStretch(1)
             count_row.addWidget(count_label)
             count_row.addStretch(1)
+            count_row.addWidget(clear_view_button)
         else:
+            count_row.addWidget(clear_view_button)
             count_row.addStretch(1)
             count_row.addWidget(count_label)
             count_row.addStretch(1)

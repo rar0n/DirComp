@@ -36,7 +36,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QPalette, QFontMetrics
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
-    QComboBox, QGroupBox, QSplitter, QFileDialog, QProgressBar, QSpinBox, QTabWidget,
+    QComboBox, QGroupBox, QSplitter, QFileDialog, QProgressBar, QSpinBox, QTabWidget, QButtonGroup, QSizePolicy,
 )
 
 # Project-module imports below that this file itself no longer uses are kept
@@ -54,7 +54,7 @@ from custom_widgets import (
     _DEFAULT_SELECT_COLORS, _SCROLLBAR_COLORS,
     _DEFAULT_MAIN_BUTTON_COLORS, _MAIN_BUTTON_ICON_KINDS,
     _STATS_BUTTON_KEYS, _THEME_DEFAULT_MAIN_BUTTON_KEYS,
-    _press_blend, _darken_hex, _bevel_edge_colors, _bevel_button_stylesheet,
+    _press_blend, _darken_hex, _bevel_edge_colors, _bevel_button_stylesheet, _mode_button_stylesheet,
     InvertButton, _SelectionColorDelegate, _ThemedScrollBar, _SelectionMarkerScrollBar,
     install_wrapped_tooltips, set_unnatural_scrolling, is_unnatural_scrolling_enabled,
 )
@@ -63,7 +63,7 @@ from custom_widgets import (
 # re-imported here so `from ui_builder import X` keeps working elsewhere. The two
 # date-column ones moved into responsive_layout.py, their only user.
 from constants import (  # noqa: F401
-    PANE_TIMELINE_HEIGHT, MINIMUM_WINDOW_WIDTH, _PANE_GAP, _CLUSTER_V_GAP,
+    PANE_TIMELINE_HEIGHT, MINIMUM_WINDOW_WIDTH, _PANE_GAP, _PANE_SIDE_MARGIN, _CLUSTER_V_GAP,
     _DISABLED_CHECKBOX_STYLE, _CLUSTER_GROUP_GAP, _TABLE_HEADER_STYLE, _SECTION_HEADER_PT,
     _SECTION_HEADER_STYLE, _SUBTITLE_PT, _SUBTITLE_STYLE, _SUBSUBTITLE_PT, _SUBSUBTITLE_STYLE,
     _SUBSECTION_GAP, _DISABLED_SPINBOX_STYLE, _DEFAULT_TREE_INDENTATION, _MIN_TREE_INDENTATION,
@@ -443,6 +443,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         panes_layout = EqualSplitLayout(panes_row, _PANE_GAP)
         left_widget = self._build_directory_widgets(self.left)
         right_widget = self._build_directory_widgets(self.right)
+        # Above both panes: each pane's status line either side of the
+        # centered Duplicate finder / Swap pane / Compare Folders buttons
+        # (built after the panes, which create the status labels).
+        main_layout.addWidget(self._build_main_tab_top_row())
         panes_layout.addWidget(left_widget)
         panes_layout.addWidget(right_widget)
         # Duplicate Finder mode shows it too: it lists the duplicates found
@@ -477,6 +481,114 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         main_layout.addWidget(self._build_status_line())
 
         return central
+
+    def _mode_button_sheet(self) -> str:
+        """Stylesheet of the two mode-switch buttons: Settings tab ->
+        Misc Buttons -> "Mode switch (unpressed)" / "(pressed)"."""
+        bg, fg = self._main_button_color_for("mode_unpressed")
+        pressed_bg, pressed_fg = self._main_button_color_for("mode_pressed")
+        return _mode_button_stylesheet(bg, fg, pressed_bg, pressed_fg)
+
+    def _build_main_tab_top_row(self) -> QWidget:
+        """The row above both panes (where each pane's Hash button used to
+        sit): its left half holds the left pane's status line, its right
+        half the right pane's, and centered between them the mode switch --
+        [Duplicate finder] [Swap pane] [Compare Folders] -- which is not
+        mirrored by Symmetrical GUI. The two mode buttons behave like radio
+        buttons (exactly one is pressed in, always the current mode) and
+        share one width, wide enough for the longer title; clicking the
+        other one switches mode, same as the "Compare folders" checkbox
+        on the Settings tab (self.dual_pane_cb, which stays the real
+        setting -- see _build_global_options_group). Swap pane trades the
+        two panes' folders, histories and view state -- see
+        SwapOpsMixin._swap_panes."""
+        _uniform_w, uniform_h = self._uniform_button_size()
+        row = QWidget()
+        grid = QGridLayout(row)
+        # Same side inset as each pane's own contents, so the status lines
+        # line up with the folder entries below them.
+        grid.setContentsMargins(_PANE_SIDE_MARGIN, 0, _PANE_SIDE_MARGIN, 0)
+        grid.setSpacing(6)
+
+        cluster = QWidget()
+        cluster_layout = QHBoxLayout(cluster)
+        cluster_layout.setContentsMargins(0, 0, 0, 0)
+        cluster_layout.setSpacing(6)
+
+        metrics = QFontMetrics(self.font())
+        mode_w = max(metrics.horizontalAdvance("Duplicate finder"),
+                     metrics.horizontalAdvance("Compare Folders")) + 2 * (8 + 2) + 16
+
+        mode_group = QButtonGroup(cluster)
+        mode_group.setExclusive(True)
+
+        self.mode_duplicate_button = QPushButton("Duplicate finder", cluster)
+        self.mode_duplicate_button.setToolTip(
+            "Duplicate Finder mode: the left pane is searched for duplicate files, "
+            "listed in the right pane."
+        )
+        self.mode_compare_button = QPushButton("Compare Folders", cluster)
+        self.mode_compare_button.setToolTip(
+            "Compare Folders mode: the two panes' folders are compared with each other."
+        )
+        for button in (self.mode_duplicate_button, self.mode_compare_button):
+            button.setCheckable(True)
+            button.setFixedSize(mode_w, uniform_h)
+            mode_group.addButton(button)
+        self.mode_compare_button.setChecked(self._dual_pane_enabled)
+        self.mode_duplicate_button.setChecked(not self._dual_pane_enabled)
+        # clicked, not toggled: only a real click on the *other* button
+        # changes mode (the exclusive group already keeps the current
+        # one pressed in); the checkbox's own handler does the rebuild.
+        self.mode_duplicate_button.clicked.connect(lambda checked=False: self._request_mode(False))
+        self.mode_compare_button.clicked.connect(lambda checked=False: self._request_mode(True))
+
+        self.swap_pane_button = QPushButton("Swap pane", cluster)
+        self.swap_pane_button.setToolTip(
+            "Swap the two panes: their folders and folder histories (and what is expanded "
+            "and selected in them). In Duplicate Finder mode the left pane swaps with the "
+            "folder the right pane has in Compare Folders mode."
+        )
+        self.swap_pane_button.setFixedSize(self._uniform_button_size()[0], uniform_h)
+        self.swap_pane_button.clicked.connect(lambda checked=False: self._swap_panes())
+
+        cluster_layout.addWidget(self.mode_duplicate_button)
+        cluster_layout.addWidget(self.swap_pane_button)
+        cluster_layout.addWidget(self.mode_compare_button)
+
+        self._apply_mode_button_colors()
+
+        for pane, column in ((self.left, 0), (self.right, 2)):
+            label = pane.snapshot_info_label
+            label.setParent(row)
+            # Ignored: the label's own text length must not shift the
+            # centered cluster -- both halves stay equal, the text elides.
+            label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            grid.addWidget(label, 0, column)
+        grid.addWidget(cluster, 0, 1, Qt.AlignCenter)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 0)
+        grid.setColumnStretch(2, 1)
+        return row
+
+    def _apply_mode_button_colors(self):
+        """Restyle the mode switch and Swap pane buttons from the Settings
+        tab's Misc Buttons colors (also called by _apply_main_button_colors)."""
+        mode_sheet = self._mode_button_sheet()
+        for attr in ("mode_duplicate_button", "mode_compare_button"):
+            button = getattr(self, attr, None)
+            if button is not None:
+                button.setStyleSheet(mode_sheet)
+        swap = getattr(self, "swap_pane_button", None)
+        if swap is not None:
+            swap.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("swap_pane")))
+
+    def _request_mode(self, compare_folders: bool):
+        """A mode button was clicked: switch to that mode if it isn't the
+        current one (through the Compare folders setting, so the Settings
+        tab's checkbox follows)."""
+        if compare_folders != self._dual_pane_enabled:
+            self.dual_pane_cb.setChecked(compare_folders)
 
     # ------------------------------------------------------- Rebuild/state
 
@@ -871,6 +983,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         refresh = getattr(self, "refresh_button", None)
         if refresh is not None:
             refresh.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("refresh")))
+        self._apply_mode_button_colors()
         for pane in (self.left, self.right):
             across = getattr(pane, "_across_buttons", {})
             buttons = {
@@ -1346,7 +1459,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row1 = QHBoxLayout()
         row2 = QHBoxLayout()
 
-        self.dual_pane_cb = QCheckBox("Compare folders")
+        # Not shown on the Main tab any more (the mode switch buttons above
+        # the panes replace it -- see _build_main_tab_top_row), but still the
+        # real, live setting: the Settings tab's "Compare folders" checkbox
+        # is linked to it, and so are the mode buttons.
+        self.dual_pane_cb = QCheckBox("Compare folders", group)
         self.dual_pane_cb.setToolTip(
             "On: both panes shown side by side and compared, as normal. Off: Duplicate "
             "Finder mode -- only the left pane is shown, and files are no longer "
@@ -1361,7 +1478,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # TransferMixin._set_operation_controls_enabled -- and the app's
         # palette doesn't visibly grey a disabled checkbox on its own.
         self.dual_pane_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
-        row1.addWidget(self.dual_pane_cb)
+        self.dual_pane_cb.hide()
 
         # Recursive Folder Selections and Refresh aren't added to row1
         # yet -- both are constructed here (so their own signal wiring
@@ -1471,7 +1588,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row2.addWidget(self.expand_matching_cb)
         row2.addStretch(1)
 
-        row1.addSpacing(16)
         row1.addWidget(self.recursive_folder_contents_cb)
         row1.addStretch(1)
         row1.addWidget(self.main_comparison_type_combo)

@@ -23,6 +23,7 @@ settings_tab.py        - 2,343 - Settings tab construction and helpers
 snapshot_ops.py        -   420 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   858
 statistics_widget.py   - 2,394
+swap_ops.py            -   105 - Main-tab Swap pane button: swaps root folders + histories (SwapOpsMixin)
 sync_views.py          -   704
 theme_ops.py           - 1,244 - color/theme handlers, palette, color sets
 transfer_ops.py        - 1,238

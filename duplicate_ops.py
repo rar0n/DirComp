@@ -373,7 +373,7 @@ class DuplicateFinderMixin:
         # so both panes stay aligned).
         from PySide6.QtWidgets import QSizePolicy
         for name in ("up_button", "select_button", "save_snapshot_button", "clear_view_button",
-                     "pane_refresh_button"):
+                     "pane_refresh_button", "hash_button"):
             widget = getattr(right, name, None)
             if widget is not None:
                 policy = widget.sizePolicy()
@@ -382,9 +382,8 @@ class DuplicateFinderMixin:
                 widget.setVisible(False)
         title = getattr(right, "dup_title_label", None)
         if title is not None and self.left.entry.height() > 0:
-            # As tall as the left pane's status row + folder entry + gap.
-            title.setFixedHeight(self.left.entry.height() + self.left.hash_button.height()
-                                 + title.parentWidget().layout().spacing() if title.parentWidget().layout() else 0)
+            # As tall as the left pane's folder entry.
+            title.setFixedHeight(self.left.entry.height())
         left_toolbar = getattr(self.left, "_toolbar_layout", None)
         right_toolbar = getattr(right, "_toolbar_layout", None)
         if left_toolbar is not None and right_toolbar is not None and not getattr(right, "_dup_row_spacer", False):

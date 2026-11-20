@@ -23,6 +23,7 @@ file:
   selection_ops.py - SelectionMixin: the Select group's buttons + search
   transfer_ops.py  - TransferMixin: Clipboard group, Move/Copy, New Folder
   sync_views.py    - SyncMixin: "Synchronize Views"
+  swap_ops.py      - SwapOpsMixin: the Main tab's "Swap pane" button
   statistics_ops.py  - TimelineOpsMixin: feeds each pane's embedded
                       TimelineWidget from its snapshot, syncs selection
                       with that pane's tree
@@ -51,6 +52,7 @@ from listing_ops import ListingMixin
 from selection_ops import SelectionMixin
 from transfer_ops import TransferMixin
 from sync_views import SyncMixin
+from swap_ops import SwapOpsMixin
 from statistics_ops import TimelineOpsMixin
 from settings_ops import SettingsMixin
 from context_menu_ops import ContextMenuMixin
@@ -64,6 +66,7 @@ class DirectoryComparisonApp(
     SelectionMixin,
     TransferMixin,
     SyncMixin,
+    SwapOpsMixin,
     DiffEngineMixin,
     HashOpsMixin,
     DuplicateFinderMixin,

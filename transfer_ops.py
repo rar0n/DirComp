@@ -152,6 +152,12 @@ class TransferMixin:
         group = getattr(self, "global_options_group", None)
         if group is not None:
             group.setEnabled(enabled)
+        # The Main tab's mode switch and Swap pane button: a mode change
+        # rebuilds the UI, a swap relists both panes.
+        for attr in ("mode_duplicate_button", "mode_compare_button", "swap_pane_button"):
+            button = getattr(self, attr, None)
+            if button is not None:
+                button.setEnabled(enabled)
         for pane in (getattr(self, "left", None), getattr(self, "right", None)):
             if pane is None:
                 continue

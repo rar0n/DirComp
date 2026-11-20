@@ -169,6 +169,9 @@ _DEFAULT_MAIN_BUTTON_COLORS = {
     "paste_folders": ["#6E6694", "#F5F5F5"],
     "new_folder": ["#3355DD", "black"],
     "delete": ["#C0392B", "#F5F5F5"],
+    # Main tab's Duplicate finder / Compare Folders mode switch, while
+    # that mode is the active ("pressed in") one -- see _mode_button_stylesheet.
+    "mode_pressed": ["#2F6DB5", "#F5F5F5"],
 }
 # kind passed to _make_icon for whichever of the above (or "rename",
 # which has none) also draws an icon -- so a color change updates the
@@ -185,6 +188,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "past
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
     "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "pane_refresh", "save_snapshot",
+    "mode_unpressed", "swap_pane",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->
@@ -330,6 +334,37 @@ def _bevel_button_stylesheet(bg: str, fg: str) -> str:
         f" border-top-color: {dis_light}; border-left-color: {dis_light};"
         f" border-bottom-color: {dis_dark}; border-right-color: {dis_dark};"
         f" padding: 4px 8px;"
+        f"}}"
+    )
+
+
+def _mode_button_stylesheet(bg: str, fg: str, pressed_bg: str, pressed_fg: str) -> str:
+    """Stylesheet for a checkable, radio-like mode-switch button (the
+    Main tab's "Duplicate finder" / "Compare Folders" pair): the normal
+    raised bevel in (bg, fg) while released, and while checked ("pressed
+    in") its OWN colors (pressed_bg, pressed_fg) with the sunken bevel --
+    unlike _bevel_button_stylesheet, whose checked state is merely a
+    darkened version of the released color. A momentary mouse-down on a
+    released button still darkens that button's own color (the base
+    sheet's :pressed rule), a checked-and-disabled button fades its
+    pressed colors the same way a disabled one fades its own."""
+    base = _bevel_button_stylesheet(bg, fg)
+    light_edge, dark_edge = _bevel_edge_colors(pressed_bg)
+    dis_bg = _press_blend(pressed_bg, _DISABLED_FADE_TARGET, 0.6).name()
+    dis_fg = _press_blend(pressed_fg, _DISABLED_FADE_TARGET, 0.6).name()
+    dis_light, dis_dark = _bevel_edge_colors(dis_bg, 30)
+    return base + (
+        f"QPushButton:checked {{"
+        f" background-color: {pressed_bg}; color: {pressed_fg};"
+        f" border-width: 2px; border-style: solid; border-radius: 3px;"
+        f" border-top-color: {dark_edge}; border-left-color: {dark_edge};"
+        f" border-bottom-color: {light_edge}; border-right-color: {light_edge};"
+        f" padding: 4px 8px;"
+        f"}}"
+        f"QPushButton:checked:disabled {{"
+        f" background-color: {dis_bg}; color: {dis_fg};"
+        f" border-top-color: {dis_dark}; border-left-color: {dis_dark};"
+        f" border-bottom-color: {dis_light}; border-right-color: {dis_light};"
         f"}}"
     )
 

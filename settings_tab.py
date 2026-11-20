@@ -854,6 +854,19 @@ class SettingsTabMixin:
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
+        # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
+        # colors of the Main tab's mode switch (Duplicate finder / Compare
+        # Folders -- released and pressed-in, i.e. the active mode) and its
+        # Swap pane button. Same Item | Fg | Bg swatch table as the other
+        # button tables; kept per theme in self._main_button_colors. The
+        # released/Swap rows start at the theme's default button colors. ----
+        misc_buttons_group = self._main_button_color_table([
+            ("mode_unpressed", "Mode switch (released)"),
+            ("mode_pressed", "Mode switch (pressed)"),
+            ("swap_pane", "Swap pane"),
+        ])
+        global_settings_flow.addWidget(self._settings_subsection("Misc Buttons", misc_buttons_group))
+
         # ---- File List View (Settings-tab only -- no Main-tab copy,
         # unlike everything else in this section) ----
         date_col_group = QGroupBox("")

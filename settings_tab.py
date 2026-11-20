@@ -28,7 +28,7 @@ from constants import (
 )
 from custom_widgets import (
     _DEFAULT_SELECT_COLORS, _INVERT_BUTTON_COLORS, _SCROLLBAR_COLORS, _SCROLLBAR_HANDLE_STYLES,
-    _SCROLLBAR_STYLE, CascadeFlowLayout, FlowLayout,
+    _SCROLLBAR_STYLE, FlowLayout,
     _SELECT_KEY_TO_TAG_COLOR_KEYS, _bevel_button_stylesheet, _press_blend,
     SliderDoubleSpinBox, SliderSpinBox, SpinSlider,
     spin_slider_inline,
@@ -147,8 +147,9 @@ class SettingsTabMixin:
         block lowest (see FlowLayout). With `reorder` on (the default)
         that may also change which block comes first, so a block that
         stacks up when squeezed next to a wide neighbour can move to a
-        line where it has room to spread out; turn it off for blocks
-        whose order means something (Left pane / Right pane). `blocks`
+        line where it has room to spread out -- except the FIRST block,
+        which always stays top-left; turn reorder off for blocks whose
+        order means something (Left pane / Right pane). `blocks`
         are added right away; more can be added later with addWidget,
         in the order they should appear when nothing's gained by moving
         them. Add the returned layout to the section's own frame, which
@@ -159,18 +160,7 @@ class SettingsTabMixin:
             flow.addWidget(block)
         return flow
 
-    def _settings_subsection_cascade(self, *blocks: QWidget) -> CascadeFlowLayout:
-        """Like _settings_subsection_flow, but for a short ordered run
-        of sub-blocks that read as one topic split in two or three
-        (e.g. Statistics View Colors' Graph/Info/Buttons, or File List
-        View Colors' Default/Comparison tables): an item that doesn't
-        fit next to the previous one stacks below it instead of
-        starting a whole new row -- see CascadeFlowLayout. `blocks` are
-        added right away, in the order they should cascade."""
-        cascade = CascadeFlowLayout(h_spacing=_SUBSECTION_GAP)
-        for block in blocks:
-            cascade.addWidget(block)
-        return cascade
+
     def _build_settings_tab(self) -> QWidget:
         """Settings tab: a scrollable stack of Level 1 sections, each
         with its title on a line of its own at the left and its frame
@@ -1669,7 +1659,7 @@ class SettingsTabMixin:
         # (Comparison Type Colors stacks below Default / Misc colors,
         # rather than the whole "File List View Colors" block wrapping
         # to a new line, once the two no longer fit side by side --
-        # see CascadeFlowLayout).
+        # see FlowLayout).
         # Flat and zero-margin: this box exists only to give "File List
         # View Colors" its Level 2 frame; it holds nothing of its own,
         # just the two Level 3 blocks below (each already framed on its
@@ -1679,7 +1669,7 @@ class SettingsTabMixin:
         flv_colors_super_outer = QVBoxLayout(flv_colors_super_group)
         flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
         flv_colors_super_outer.addLayout(
-            self._settings_subsection_cascade(
+            self._settings_subsection_flow(
                 flv_default_misc_block, comparison_colors_block, dup_summary_block, flv_buttons_block,
             )
         )
@@ -2152,7 +2142,7 @@ class SettingsTabMixin:
         buttons_block = self._settings_subsubsection("Buttons", stats_buttons_table)
 
         stats_colors_outer.addLayout(
-            self._settings_subsection_cascade(graph_colors_block, info_colors_block, buttons_block)
+            self._settings_subsection_flow(graph_colors_block, info_colors_block, buttons_block)
         )
 
         stats_flow.addWidget(self._settings_subsection("Colors (both panes)", stats_colors_group))

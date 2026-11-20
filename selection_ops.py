@@ -982,25 +982,14 @@ class SelectionMixin:
                 sep = metrics.horizontalAdvance(" - ")
                 widths = [metrics.horizontalAdvance(plain) for plain, _html in atoms]
                 row = pane._stats_title_row
-                # Totals sit at the pane's center: the two outer boxes take
-                # the same width (the wider one's), so the room left for the
-                # totals is the pane minus two of those and two row gaps.
+                # Totals sit centered between the Folders and Zoom to
+                # buttons: the room for them is the pane minus the two
+                # button boxes and the row's four gaps.
                 boxes = getattr(pane, "_stats_title_boxes", ())
-                side = max((box.layout().sizeHint().width() for box in boxes), default=0)
                 total = self._shared_width_for(pane, pane._stats_widget)
                 margins = pane._stats_widget.layout().contentsMargins()
                 total -= margins.left() + margins.right()
-                others = 2 * side + 2 * max(0, row.spacing())
-                avail = total - others
-                # Too narrow to keep the totals centered (it would push the
-                # right-hand buttons out of the pane): stop forcing equal
-                # boxes and let each take just what it needs.
-                forced = side if avail >= max(widths, default=0) else 0  # even the 2-line form must fit
-                for box in boxes:
-                    if box.minimumWidth() != forced:
-                        box.setMinimumWidth(forced)
-                if not forced:
-                    avail = total - sum(box.layout().sizeHint().width() for box in boxes) - 2 * max(0, row.spacing())
+                avail = total - sum(box.layout().sizeHint().width() for box in boxes) - 4 * max(0, row.spacing())
                 one_line = sum(widths) + sep * max(0, len(widths) - 1)
                 needed = 1 if (not widths or one_line <= avail) else len(widths)
                 plans.append((pane, atoms, needed, metrics.height()))

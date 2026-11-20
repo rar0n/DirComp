@@ -539,10 +539,9 @@ class PaneBuilderMixin:
         # TimelineOpsMixin._on_timeline_mode_changed), and the live
         # file/folder counts -- always both, regardless of which one is
         # currently plotted (see _update_timeline_totals_label).
-        # Three parts so the Files/Folders totals sit at the exact center
-        # of the pane: [title + mode buttons] <totals> [Zoom to + Reset],
-        # the two outer boxes stretching equally (and held to the same
-        # minimum width in SelectionMixin._render_stats_totals).
+        # Three parts so the Files/Folders totals sit centered between the
+        # nearest buttons on each side: [title + Files/Folders] <totals>
+        # [Zoom to + Reset], equal stretches on both sides of the totals.
         timeline_title_row = QHBoxLayout()
         title_left_box = QWidget()
         title_left = QHBoxLayout(title_left_box)
@@ -621,9 +620,11 @@ class PaneBuilderMixin:
         title_right.addStretch(1)
         title_right.addWidget(zoom_sel_button)
         title_right.addWidget(reset_button)
-        timeline_title_row.addWidget(title_left_box, 1)
+        timeline_title_row.addWidget(title_left_box, 0)
+        timeline_title_row.addStretch(1)
         timeline_title_row.addWidget(timeline_totals_label, 0)
-        timeline_title_row.addWidget(title_right_box, 1)
+        timeline_title_row.addStretch(1)
+        timeline_title_row.addWidget(title_right_box, 0)
         stats_layout.addLayout(timeline_title_row)
         # Stashed so the Copy-->/Move--> buttons (built further below,
         # once the pane_splitter/stats_widget this row already lives in

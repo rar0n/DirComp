@@ -17,6 +17,10 @@ finally:
 ```
 Used for: full listing rebuild, expand/collapse all, Select All/Matching/Invert, and restoring expanded folders after a rebuild.
 
+`_restore_expanded_paths` applies this itself (not only its `update_listing` caller). A call site that did not hide the tree (flipping Compare folders with everything expanded) took ~290 s for ~800 folders / ~12k files, against ~2 s hidden. Any new bulk caller gets the guard for free that way.
+
+**Recoloring only? Block the model's signals.** `_apply_tag` makes 12 brush setter calls per row and each emits `dataChanged`. For a pure recolor walk (`_retag_listing_tree`), `tree.model().blockSignals(True)` around the walk plus one `tree.viewport().update()` afterwards cut ~12.6 s to ~0.7 s for 12.5k rows. Hiding the tree did not help there. Only safe when nothing changes size/text/position, and nothing listens to `itemChanged`/`dataChanged` (true today).
+
 **Lazy population.** Folders get a placeholder child (the expand arrow) and are populated on expand. In bulk expand, populate directly and untracked instead of relying on `setExpanded(True)` to trigger it.
 
 **Guard flags so per-item listeners stand down during a bulk operation:**

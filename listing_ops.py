@@ -725,6 +725,37 @@ class ListingMixin:
         pane = self._pane_for_tree(tree)
         date_field = self._pane_diff_date_field(pane)
         date_col = _DATE_FIELD_TO_COLUMN[date_field]
+        # setForeground/setBackground/setData cost orders of magnitude
+        # more per call while the tree is visible (measured: ~13 s for
+        # ~37k rows of a mostly-expanded tree, ~10x less when hidden) --
+        # same bulk-populate rule as _set_all_folders_state. Skipped when
+        # the caller already hid the tree (update_listing's rebuild).
+        rebuilding = pane is not None and getattr(pane, "_tree_rebuild_pending", False)
+        was_visible = (not rebuilding) and tree.isVisible()
+        scroll_value = tree.verticalScrollBar().value()
+        if was_visible:
+            tree.setVisible(False)
+        if not rebuilding:
+            tree.setUpdatesEnabled(False)
+        # Colors only -- nothing here changes a row's size, text or
+        # position -- so the model's per-setData dataChanged emissions
+        # (12 brush setters per row in _apply_tag) are pure overhead;
+        # blocked for the walk, one repaint after it.
+        model = tree.model()
+        model_was_blocked = model.blockSignals(True)
+        try:
+            self._retag_listing_items(tree, other_dir, date_field, date_col)
+        finally:
+            model.blockSignals(model_was_blocked)
+            tree.viewport().update()
+            if not rebuilding:
+                tree.setUpdatesEnabled(True)
+            if was_visible:
+                tree.setVisible(True)
+                tree.verticalScrollBar().setValue(scroll_value)
+
+    def _retag_listing_items(self, tree, other_dir, date_field, date_col):
+        """The walk itself -- see _retag_listing_tree."""
         stack = [(tree.topLevelItem(i), other_dir) for i in range(tree.topLevelItemCount())]
         while stack:
             item, item_other_dir = stack.pop()
@@ -1654,8 +1685,36 @@ class ListingMixin:
         return expanded
 
     def _restore_expanded_paths(self, tree, expanded_paths: set):
+        """Re-expand `expanded_paths` (see _collect_expanded_paths).
+        Each setExpanded(True) populates that folder synchronously, so
+        for a big, mostly-expanded tree this is a genuinely bulk populate
+        -- done on a VISIBLE tree, every QTreeWidgetItem.setData() costs
+        orders of magnitude more (measured: ~280 s instead of ~2 s for
+        ~800 folders / ~12k files, e.g. flipping Compare folders with
+        everything expanded). So, exactly like _set_all_folders_state
+        (Expand All), the tree is hidden with updates off for the
+        duration, and -- with Recursive Folder Selections off -- the
+        per-folder count/timeline listeners stand down
+        (pane._bulk_expand_pending) and are caught up once at the end.
+        update_listing, which already hid the tree and drives its own
+        refresh (pane._tree_rebuild_pending), gets none of this extra
+        work."""
         if not expanded_paths:
             return
+        pane = next((p for p in (self.left, self.right) if p.tree is tree), None)
+        owns = not (pane is not None and getattr(pane, "_tree_rebuild_pending", False))
+        was_visible = owns and tree.isVisible()
+        if owns:
+            if was_visible:
+                tree.setVisible(False)
+            tree.setUpdatesEnabled(False)
+        own_bulk = (
+            owns and pane is not None
+            and not self._recursive_folder_contents_enabled()
+            and not getattr(pane, "_bulk_expand_pending", False)
+        )
+        if own_bulk:
+            pane._bulk_expand_pending = True
 
         def walk(item):
             if item.data(0, PATH_ROLE) in expanded_paths:
@@ -1663,8 +1722,19 @@ class ListingMixin:
                 for i in range(item.childCount()):
                     walk(item.child(i))
 
-        for i in range(tree.topLevelItemCount()):
-            walk(tree.topLevelItem(i))
+        try:
+            for i in range(tree.topLevelItemCount()):
+                walk(tree.topLevelItem(i))
+        finally:
+            if owns:
+                tree.setUpdatesEnabled(True)
+                if was_visible:
+                    tree.setVisible(True)
+            if own_bulk:
+                pane._bulk_expand_pending = False
+                self._refresh_pane_timeline(pane)
+                self.update_type_counts(pane)
+                self._dup_schedule_regroup(pane)
 
     def _collect_selected_paths(self, tree) -> set:
         """Full paths of every currently-selected item, so a full rebuild

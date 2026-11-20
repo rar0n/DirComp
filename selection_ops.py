@@ -1131,6 +1131,13 @@ class SelectionMixin:
                 or item.data(0, Qt.UserRole) == "diff_content_file"
             )
             return collector, predicate, True, False
+        if type_key in ("dup_sel", "dup_sel_extra"):
+            # Fixed at press time (see _dup_prepare_selection_select), so
+            # the release deselects exactly what the press selected.
+            chosen = getattr(pane, "_dup_sel_cache", {}).get(type_key, set())
+            collector = lambda root, other, progress, c=chosen: sorted(c)
+            predicate = lambda item, c=chosen: os.path.normpath(item.data(0, PATH_ROLE) or "") in c
+            return collector, predicate, False, False
         if type_key in ("dup_all", "dup_extra"):
             extra_only = type_key == "dup_extra"
             collector = lambda root, other, progress, pn=pane, ex=extra_only: self._dup_select_paths(pn, ex)
@@ -1180,6 +1187,8 @@ class SelectionMixin:
         themselves) independently against the other pane -- which, for
         Missing/Matching/Diff Folders, selected that pane's own,
         genuinely different result set rather than mirroring this one."""
+        if select and type_key in ("dup_sel", "dup_sel_extra"):
+            self._dup_prepare_selection_select(pane, type_key)
         collector, predicate, require_other_root, select_subtree = self._select_type_plan(type_key, pane)
         count = self._run_select(
             pane, collector, predicate,

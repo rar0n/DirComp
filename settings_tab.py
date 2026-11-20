@@ -2150,6 +2150,7 @@ class SettingsTabMixin:
             "newer": "Newer", "smaller": "Smaller", "matching": "Matching",
             "older": "Older", "larger": "Larger", "diff_folders": "Diff Items",
             "dup_all": "Duplicates", "dup_extra": "Extra copies",
+            "dup_sel": "Duplicates of selection", "dup_sel_extra": "Extra copies of selection",
             "file_parent": "Item Parent", "all_parents": "All Parents",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)

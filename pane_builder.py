@@ -819,6 +819,15 @@ class PaneBuilderMixin:
              "left alone is set under Settings -> Options -> \"Extra copies keep\". "
              "Not available with the two name-only options (a shared name does not "
              "make files identical)."),
+            ("Sel. dups", "dup_sel",
+             "Duplicates of selection: of the files already selected (a selected folder "
+             "counts for the files in it), select every copy in their groups of identical "
+             "files -- the whole set of each group, same as \"Duplicates\"."),
+            ("Sel. extras", "dup_sel_extra",
+             "Extra copies of selection: for the groups of identical files the current "
+             "selection touches, select all copies but one -- the one left alone is the "
+             "same as for \"Extra copies\" (Settings -> Options -> \"Extra copies keep\") "
+             "and ends up unselected even if it was selected before."),
         ):
             btn = QPushButton(text)
             btn.setCheckable(True)

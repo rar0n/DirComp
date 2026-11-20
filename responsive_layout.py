@@ -145,10 +145,10 @@ class ResponsiveLayoutMixin:
             st = pane.select_toggle_buttons
             if getattr(pane, "dup_layout", False):
                 # Duplicate Finder mode: the compare buttons give way to
-                # Duplicates / Extra copies (None = empty cell).
+                # the Duplicates / Extra copies pairs (None = empty cell).
                 return [
-                    sp["select_all"], st["dup_all"], sp["all_parents"], sp["file_parent"],
-                    pane.invert_button, st["dup_extra"], None, None,
+                    sp["select_all"], st["dup_all"], st["dup_sel"], sp["all_parents"],
+                    pane.invert_button, st["dup_extra"], st["dup_sel_extra"], sp["file_parent"],
                     sp["clear"], None, None, None,
                 ]
             return [

@@ -274,6 +274,57 @@ class DuplicateFinderMixin:
     def _dup_select_paths(self, pane, extra_only: bool) -> list:
         return sorted(self._dup_select_set(pane, extra_only))
 
+    def _dup_selection_groups(self, pane) -> list:
+        """The duplicate groups (lists of nodes) the pane's current
+        selection touches: a group counts when one of its files is selected
+        or lies inside a selected folder."""
+        info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
+        if not info:
+            return []
+        selected = [os.path.normpath(i.data(0, PATH_ROLE))
+                    for i in pane.tree.selectedItems() if i.data(0, PATH_ROLE)]
+        if not selected:
+            return []
+        files = set(selected)
+        prefixes = tuple(p + os.sep for p in selected)
+        groups = []
+        for nodes in info["groups"].values():
+            for node in nodes:
+                path = os.path.normpath(node["full_path"])
+                if path in files or path.startswith(prefixes):
+                    groups.append(nodes)
+                    break
+        return groups
+
+    def _dup_prepare_selection_select(self, pane, type_key: str):
+        """Press of "Sel. dups" / "Sel. extras": works out (and remembers
+        in pane._dup_sel_cache, for the release that undoes it) which files
+        get selected -- every copy in the touched groups, or all but the
+        one "Extra copies" would leave alone. For the extras variant that
+        one is also unselected here if it was selected."""
+        extra_only = type_key == "dup_sel_extra"
+        paths, keep_paths = set(), set()
+        for nodes in self._dup_selection_groups(pane):
+            keep = self._dup_survivor_node(nodes) if extra_only else None
+            for node in nodes:
+                norm = os.path.normpath(node["full_path"])
+                if node is keep:
+                    keep_paths.add(norm)
+                else:
+                    paths.add(norm)
+        if not hasattr(pane, "_dup_sel_cache"):
+            pane._dup_sel_cache = {}
+        pane._dup_sel_cache[type_key] = paths
+        if keep_paths:
+            guard, bulk = getattr(self, "_select_group_guard", False), getattr(self, "_bulk_select_guard", False)
+            self._select_group_guard = self._bulk_select_guard = True
+            try:
+                for item in pane.tree.selectedItems():
+                    if os.path.normpath(item.data(0, PATH_ROLE) or "") in keep_paths:
+                        item.setSelected(False)
+            finally:
+                self._select_group_guard, self._bulk_select_guard = guard, bulk
+
     def _dup_buttons_state(self, pane):
         """(duplicates enabled, extra copies enabled) for the pane's two
         Duplicate Finder buttons. Hash value / Fingerprint need the scanned
@@ -292,7 +343,8 @@ class DuplicateFinderMixin:
         """Enable/disable (and un-press, if now disabled) the two buttons."""
         buttons = getattr(pane, "select_toggle_buttons", None) or {}
         enabled = self._dup_buttons_state(pane) if self._duplicate_mode_active() else (False, False)
-        for key, on in zip(("dup_all", "dup_extra"), enabled):
+        enabled = (enabled[0], enabled[1], enabled[0], enabled[1])
+        for key, on in zip(("dup_all", "dup_extra", "dup_sel", "dup_sel_extra"), enabled):
             btn = buttons.get(key)
             if btn is None:
                 continue

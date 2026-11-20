@@ -147,6 +147,9 @@ _DEFAULT_SELECT_COLORS = {
     # Duplicate Finder mode's two search buttons (DuplicateFinderMixin).
     "dup_all": ("black", "#F0D080"),
     "dup_extra": ("black", "#E58E8E"),
+    # ...and their "from selection" variants (same colors, lightly shifted).
+    "dup_sel": ("black", "#E6C46A"),
+    "dup_sel_extra": ("black", "#D97C7C"),
     "file_parent": ("white", "#3355DD"),
     "all_parents": ("white", "#1A237E"),
 }

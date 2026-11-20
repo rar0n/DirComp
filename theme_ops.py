@@ -1207,7 +1207,7 @@ class ThemeOpsMixin:
         place since other modules hold references to those very
         objects. Doesn't repaint anything by itself: callers follow up
         with a rebuild or _refresh_color_dependent_widgets."""
-        self._select_colors = {k: tuple(v) for k, v in cs["select_colors"].items()}
+        self._select_colors = {**_DEFAULT_SELECT_COLORS, **{k: tuple(v) for k, v in cs["select_colors"].items()}}
         self._summary_colors = dict(cs.get("summary_colors", self._summary_colors))
         self._folder_color = tuple(cs["folder_color"])
         self._progress_bar_colors = dict(cs["progress_bar_colors"])

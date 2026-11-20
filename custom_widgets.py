@@ -410,6 +410,14 @@ class InvertButton(QPushButton):
 
         # Define an inset for the left/right sides so the diagonal
         # doesn't touch the vertical corners, creating a "floating" look.
+        enabled = self.isEnabled()
+        if not enabled:
+            # Same fade the shared :disabled rule gives every other button
+            # (see _bevel_button_stylesheet): both fills toward the GUI
+            # background.
+            black = _press_blend(black.name(), _DISABLED_FADE_TARGET, 0.6)
+            white = _press_blend(white.name(), _DISABLED_FADE_TARGET, 0.6)
+
         inset_ratio = 0.25
         inset = w * inset_ratio  # Calculate absolute pixel value from ratio
 
@@ -507,7 +515,8 @@ class InvertButton(QPushButton):
         # single rounded stroke -- at this button's small size and 3px
         # corner radius the difference is imperceptible, and it keeps
         # the two-tone split simple.
-        light_edge, dark_edge = _bevel_edge_colors("#808080")
+        light_edge, dark_edge = (_bevel_edge_colors("#808080") if enabled else _bevel_edge_colors(
+            _press_blend("#808080", _DISABLED_FADE_TARGET, 0.6).name(), 30))
         top_left_color = dark_edge if pressed else light_edge
         bottom_right_color = light_edge if pressed else dark_edge
         pen = QPen()

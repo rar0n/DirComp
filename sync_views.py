@@ -274,18 +274,6 @@ class SyncMixin:
         stem_mode = self._stem_mode() != 0
         if node is None or node["is_dir"] or not (hash_mode or stem_mode) or self._ignored_kind(node):
             return exact
-        if (hash_mode and getattr(self, "_multi_select_matching", True)
-                and not getattr(self, "_multi_select_same_folder", True)):
-            # Pane-wide multi select: matches anywhere in the other pane.
-            digest = self._node_hash(node)
-            if digest is not None:
-                other_pane = self.right if self._pane_for_tree(tree) is self.left else self.left
-                found = [c["full_path"] for c in self._hash_groups_index(other_pane).get(digest, [])]
-                if found and not self._recursive_folder_contents_enabled():
-                    shown = self._shown_paths(other_pane)
-                    found = [p for p in found if os.path.normpath(p) in shown]
-                if found:
-                    return found
         parent = self._snapshot_lookup(os.path.dirname(cp))
         if parent is None or not parent["is_dir"]:
             return []

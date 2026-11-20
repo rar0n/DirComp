@@ -106,11 +106,9 @@ from / extends the plan above:
    option (mutually exclusive with "Ignore file extensions").
  - Synchronize Views mirrors file selection by the comparison: by content for hash
    types, by name stem for the two name options; several matches are all selected.
- - Settings > Options (was Global Options; block placed after Theme): "Multi Select
-   matching files in same pane" (hash types) selects identical files when a file
-   is selected by hand (click, Ctrl/Shift-click, drag); "Same folder only" limits
-   that to the file's folder, else pane-wide (and mirrored pane-wide in the other
-   pane). Both persisted, default on.
+ - (Removed 2026-11-21) The "Multi Select matching files in same pane" and "Same folder
+   only" options and their hand-selection behavior: Duplicate Finder mode covers it.
+   Synchronize Views still mirrors by content within the counterpart folder.
  - Snapshot hashes made with other settings than the current ones (or no hashes
    at all), with a hash type selected: NOTHING is compared (no fall-back to
    name/size/date any more). Items show the "Hashed, not compared" colors (new

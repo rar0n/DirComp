@@ -580,33 +580,6 @@ class SettingsTabMixin:
         ignore_ext_row.addStretch(1)
         global_grid.addLayout(ignore_ext_row, 13, 0, 1, 7)
 
-        multi_row = QHBoxLayout()
-        multi_row.setContentsMargins(0, 0, 0, 0)
-        multi_row.addSpacing(20)
-        self.multi_select_matching_cb = QCheckBox("Multi Select matching files in same pane")
-        self.multi_select_matching_cb.setChecked(self._multi_select_matching)
-        self.multi_select_matching_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
-        self.multi_select_matching_cb.setToolTip(
-            "Hash value / Fingerprint only: selecting a hashed file (click, "
-            "Ctrl-click, Shift-click or drag) also selects the other files "
-            "in this pane with identical content."
-        )
-        multi_row.addWidget(self.multi_select_matching_cb)
-        multi_row.addSpacing(20)
-        self.multi_select_same_folder_cb = QCheckBox("Same folder only")
-        self.multi_select_same_folder_cb.setChecked(self._multi_select_same_folder)
-        self.multi_select_same_folder_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
-        self.multi_select_same_folder_cb.setToolTip(
-            "Only select identical files in the same folder as the one "
-            "selected. Off: the whole pane (only what is shown, unless "
-            "Recursive Folder Selections is on)."
-        )
-        multi_row.addWidget(self.multi_select_same_folder_cb)
-        multi_row.addStretch(1)
-        global_grid.addLayout(multi_row, 15, 0, 1, 7)
-        self.multi_select_matching_cb.toggled.connect(self._on_multi_select_setting_changed)
-        self.multi_select_same_folder_cb.toggled.connect(self._on_multi_select_setting_changed)
-
         # Row 18: files left out of every comparison (DiffEngineMixin.
         # _ignored_kind), in both Dual Pane and single pane mode and with
         # every comparison type.

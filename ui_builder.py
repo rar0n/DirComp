@@ -265,8 +265,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._cmp_chunk_end_kb = DEFAULT_FINGERPRINT_CHUNK_KB
             self._cmp_ignore_ext = False
             self._cmp_first_name = False
-            self._multi_select_matching = True
-            self._multi_select_same_folder = True
             self._cmp_applied_key = None
             # Settings tab -> Options -> "Ignore empty files" / "Ignore hard
             # links" (see DiffEngineMixin._ignored_kind): off by default.

@@ -25,7 +25,9 @@ from constants import PATH_ROLE, IS_DIR_ROLE, OTHER_DIR_ROLE, POPULATED_ROLE, TA
 
 # Column indices, named for clarity everywhere a specific column matters
 # (sorting, tag coloring, item construction) instead of a bare int.
-COL_NAME, COL_SIZE, COL_TYPE, COL_MODIFIED, COL_CHANGED, COL_ACCESSED = range(6)
+COL_NAME, COL_SIZE, COL_TYPE, COL_MODIFIED, COL_CHANGED, COL_ACCESSED, COL_COUNT = range(7)
+# COL_COUNT ("Count") is only shown by the Duplicate Finder's "Unique files
+# only" list: how many copies the file has.
 COLUMN_COUNT = 6
 from panes import DirectoryPane
 
@@ -1333,6 +1335,7 @@ class ListingMixin:
                 break
             child = node["children"][name]
             full_path = child["full_path"]
+            name = child["name"]
             date_str = datetime.datetime.fromtimestamp(child["mtime"]).strftime("%Y-%m-%d %H:%M:%S")
             # st_ctime is "Created" on Windows, "metadata changed" on
             # POSIX -- see constants.CHANGED_FIELD_LABEL. st_atime
@@ -1364,6 +1367,7 @@ class ListingMixin:
                     changed_str=changed_str, accessed_str=accessed_str,
                     size_raw=child["size"], date_raw=child["mtime"],
                     changed_raw=child["ctime"], accessed_raw=child["atime"],
+                    dup_count=child.get("dup_count"),
                 ))
         return entries
 
@@ -1522,6 +1526,10 @@ class ListingMixin:
             item.setData(COL_MODIFIED, Qt.UserRole, e["date_raw"])
             item.setData(COL_CHANGED, Qt.UserRole, e["changed_raw"])
             item.setData(COL_ACCESSED, Qt.UserRole, e["accessed_raw"])
+            if e.get("dup_count") is not None:
+                item.setText(COL_COUNT, str(e["dup_count"]))
+                item.setData(COL_COUNT, Qt.UserRole, e["dup_count"])
+                item.setTextAlignment(COL_COUNT, Qt.AlignRight | Qt.AlignVCenter)
             item.setData(0, PATH_ROLE, e["full_path"])
             item.setData(0, IS_DIR_ROLE, e["is_dir"])
             self._apply_tag(item, tag)

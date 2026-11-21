@@ -662,6 +662,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         swap = getattr(self, "swap_pane_button", None)
         if swap is not None:
             swap.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("swap_pane")))
+        for button in getattr(getattr(self, "right", None), "dup_list_buttons", None) or []:
+            try:
+                button.setStyleSheet(mode_sheet)
+            except RuntimeError:
+                pass  # replaced by a UI rebuild
 
     def _request_mode(self, compare_folders: bool):
         """A mode button was clicked: switch to that mode if it isn't the

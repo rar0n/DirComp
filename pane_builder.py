@@ -120,10 +120,13 @@ class PaneBuilderMixin:
         # Built before the toolbar so Expand/Collapse All can reference it;
         # actually added to `layout` further down, after the toolbar row.
         tree = DirDropTreeWidget()
-        tree.setColumnCount(6)
+        tree.setColumnCount(7)
         tree.setHeaderLabels([
-            "Name", "Size", "Type", "Modified Date", CHANGED_FIELD_LABEL, "Accessed Date",
+            "Name", "Size", "Type", "Modified Date", CHANGED_FIELD_LABEL, "Accessed Date", "Count",
         ])
+        # "Count" is for the Duplicate Finder's "Unique files only" list
+        # (see DuplicateFinderMixin._dup_style_right_pane); hidden otherwise.
+        tree.setColumnHidden(6, True)
         tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         tree.setRootIsDecorated(True)
         tree.setSortingEnabled(False)
@@ -152,6 +155,7 @@ class PaneBuilderMixin:
         tree.setColumnWidth(3, 130)
         tree.setColumnWidth(4, 130)
         tree.setColumnWidth(5, 130)
+        tree.setColumnWidth(6, 70)
         # A strong, deliberately un-theme-like default for selection
         # (see self._selection_tint_color), kept even when the tree
         # isn't focused (Qt would otherwise dim it to the "inactive"
@@ -463,6 +467,36 @@ class PaneBuilderMixin:
             toolbar_layout.addWidget(select_button)
             toolbar_layout.addWidget(up_button)
 
+        if pane is self.right and not self._dual_pane_enabled:
+            # Duplicate Finder: the list's two modes, at the toolbar's inner
+            # end (the other end has Save Snapshot).
+            list_group = QButtonGroup(tree)
+            list_group.setExclusive(True)
+            pane.dup_list_group = list_group
+            pane.dup_list_buttons = []
+            unique = bool(getattr(self, "_dup_unique_only", False))
+            for text, is_unique, tip in (
+                ("Include paths", False,
+                 "List every copy of every duplicate, in its folder."),
+                ("Unique files only", True,
+                 "List one file per group of duplicates (the copy \"Extra copies keep\" "
+                 "leaves alone), no folders, with a Count column of how many copies it has."),
+            ):
+                button = QPushButton(text)
+                button.setCheckable(True)
+                button.setToolTip(tip)
+                button.setFixedHeight(uniform_h)
+                button.setChecked(is_unique == unique)
+                button.setStyleSheet(self._mode_button_sheet())
+                list_group.addButton(button)
+                button.clicked.connect(lambda checked=False, u=is_unique: self._on_dup_list_mode(u))
+                pane.dup_list_buttons.append(button)
+            if layout_left:
+                for button in pane.dup_list_buttons:
+                    toolbar_layout.addWidget(button)
+            else:
+                for button in reversed(pane.dup_list_buttons):
+                    toolbar_layout.insertWidget(0, button)
         file_list_layout.addLayout(toolbar_layout)
         file_list_layout.addWidget(tree, stretch=1)
 

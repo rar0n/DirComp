@@ -397,6 +397,20 @@ class DuplicateFinderMixin:
             ensure_dir(os.path.dirname(norm))["children"][node["name"]] = node
             return node
 
+        if getattr(self, "_dup_unique_only", False):
+            # "Unique files only": a flat list, one file per group (the one
+            # "Extra copies keep" leaves alone) with its number of copies;
+            # keyed by path since names can repeat.
+            for nodes in info["groups"].values():
+                real = self._dup_survivor_node(nodes)
+                node = dict(real)
+                node.pop("_stems", None)
+                node["dup_count"] = len(nodes)
+                root["children"][os.path.normpath(real["full_path"])] = node
+                index[os.path.normpath(real["full_path"])] = node
+                root["size"] += real["size"] or 0
+            return root, index
+
         for nodes in info["groups"].values():
             for real in nodes:
                 node = dict(real)
@@ -446,6 +460,12 @@ class DuplicateFinderMixin:
             from PySide6.QtWidgets import QSpacerItem
             right_toolbar.addItem(QSpacerItem(0, left_toolbar.sizeHint().height(), _SP.Fixed, _SP.Fixed))
             right._dup_row_spacer = True
+        # "Count" column only in the "Unique files only" list.
+        right.tree.setColumnHidden(6, not getattr(self, "_dup_unique_only", False))
+        header = right.tree.header()
+        if header.visualIndex(6) != 2:
+            header.moveSection(header.visualIndex(6), 2)  # right after Size, so it stays in view
+        right.tree.setColumnWidth(6, 55)
         cluster = getattr(right, "cluster_container", None)
         if cluster is not None:
             cluster.setVisible(False)
@@ -481,9 +501,12 @@ class DuplicateFinderMixin:
             return
         self.update_listing(left_dir, right, None, progress=progress,
                             refresh_snapshot=False, retag_only=False)
-        sort_column = getattr(left.tree, "_sort_column", None)
+        sort_src = left.tree
+        if getattr(right.tree, "_sort_column", None) == 6 and getattr(self, "_dup_unique_only", False):
+            sort_src = right.tree  # sorted by Count here: keep that
+        sort_column = getattr(sort_src, "_sort_column", None)
         if sort_column is not None:
-            asc = getattr(left.tree, "_sort_ascending", True)
+            asc = getattr(sort_src, "_sort_ascending", True)
             right.tree._sort_column, right.tree._sort_ascending = sort_column, asc
             self._apply_sort(right.tree, sort_column, asc)
         timeline = getattr(right, "timeline", None)
@@ -494,6 +517,18 @@ class DuplicateFinderMixin:
         groups = len(info["groups"])
         wasted = self.format_size(info["wasted"])
         right._dup_sel_prev = self._dup_files_of(right, right.tree.selectedItems())
+
+    def _on_dup_list_mode(self, unique: bool):
+        """The Duplicate Finder's "Include paths" / "Unique files only"
+        buttons: rebuild the right pane's list in the chosen mode."""
+        if bool(getattr(self, "_dup_unique_only", False)) == unique:
+            return
+        self._dup_unique_only = unique
+        if not self._duplicate_mode_active():
+            return
+        for button, is_unique in zip(getattr(self.right, "dup_list_buttons", None) or [], (False, True)):
+            button.setChecked(is_unique == unique)
+        self._dup_sync_right()
 
     def _dup_clear_right(self):
         """No duplicate scan (nothing loaded, or a Hash type not hashed yet

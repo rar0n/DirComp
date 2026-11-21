@@ -276,6 +276,12 @@ class HashOpsMixin:
                 return key, digest
         return None
 
+    def _copy_text(self, pane, path, text, what):
+        """Context menu "Copy Metadata" entry: `text` to the clipboard, and
+        a note on the pane's upper status line."""
+        QApplication.clipboard().setText(text)
+        self._set_upper_status(pane, f"Copied {what} of {os.path.basename(path)}")
+
     def _copy_digest(self, pane, path, kind, info):
         """Context menu "Copy Hash" / "Copy Fingerprint": put the digest on
         the clipboard as text and say on the pane's upper status line which

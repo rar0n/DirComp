@@ -505,6 +505,14 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         pressed_bg, pressed_fg = self._main_button_color_for("mode_pressed")
         return _mode_button_stylesheet(bg, fg, pressed_bg, pressed_fg)
 
+    def _dup_list_button_sheet(self) -> str:
+        """Stylesheet of the Duplicate Finder's list-mode switch (Include
+        paths / Unique files only): Settings tab -> File List View ->
+        Duplicate Finder Buttons."""
+        bg, fg = self._main_button_color_for("dup_list_unpressed")
+        pressed_bg, pressed_fg = self._main_button_color_for("dup_list_pressed")
+        return _mode_button_stylesheet(bg, fg, pressed_bg, pressed_fg)
+
     def _build_main_tab_top_row(self) -> QWidget:
         """The row above both panes (where each pane's Hash button used to
         sit): its left half holds the left pane's status line, its right
@@ -664,7 +672,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             swap.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("swap_pane")))
         for button in getattr(getattr(self, "right", None), "dup_list_buttons", None) or []:
             try:
-                button.setStyleSheet(mode_sheet)
+                button.setStyleSheet(self._dup_list_button_sheet())
             except RuntimeError:
                 pass  # replaced by a UI rebuild
 

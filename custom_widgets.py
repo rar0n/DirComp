@@ -175,6 +175,9 @@ _DEFAULT_MAIN_BUTTON_COLORS = {
     # Main tab's Duplicate finder / Compare Folders mode switch, while
     # that mode is the active ("pressed in") one -- see _mode_button_stylesheet.
     "mode_pressed": ["#2F6DB5", "#F5F5F5"],
+    # Duplicate Finder's "Include paths" / "Unique files only" list-mode
+    # switch, while its mode is the active one -- same look as mode_pressed.
+    "dup_list_pressed": ["#2F6DB5", "#F5F5F5"],
 }
 # kind passed to _make_icon for whichever of the above (or "rename",
 # which has none) also draws an icon -- so a color change updates the
@@ -191,7 +194,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "past
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
     "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "pane_refresh", "save_snapshot",
-    "mode_unpressed", "swap_pane",
+    "mode_unpressed", "swap_pane", "dup_list_unpressed",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->

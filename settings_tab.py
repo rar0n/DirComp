@@ -1649,6 +1649,16 @@ class SettingsTabMixin:
         dup_summary_outer.addWidget(dup_summary_table)
         dup_summary_block = self._settings_subsubsection("Duplicate Finder Summary Colors", dup_summary_group)
 
+        # ---- Duplicate Finder Buttons (Level 3, after the summary colors):
+        # buttons only that mode has -- for now the Include paths / Unique
+        # files only list-mode switch (released and pressed-in = the active
+        # list mode). Kept per theme in self._main_button_colors. ----
+        dup_buttons_group = self._main_button_color_table([
+            ("dup_list_unpressed", "List mode (released)"),
+            ("dup_list_pressed", "List mode (pressed)"),
+        ])
+        dup_buttons_block = self._settings_subsubsection("Duplicate Finder Buttons", dup_buttons_group)
+
         # ---- Button Colors (Level 3, after Comparison Type Colors): the
         # buttons around each pane's File List View. They start at the
         # theme's default button colors -- see _main_button_color_for. ----
@@ -1676,7 +1686,7 @@ class SettingsTabMixin:
         flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
         flv_colors_super_outer.addLayout(
             self._settings_subsection_flow(
-                flv_default_misc_block, comparison_colors_block, dup_summary_block, flv_buttons_block,
+                flv_default_misc_block, comparison_colors_block, dup_summary_block, dup_buttons_block, flv_buttons_block,
             )
         )
         flv_flow.addWidget(self._settings_subsection("File List View Colors", flv_colors_super_group))

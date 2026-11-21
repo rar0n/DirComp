@@ -487,7 +487,7 @@ class PaneBuilderMixin:
                 button.setToolTip(tip)
                 button.setFixedHeight(uniform_h)
                 button.setChecked(is_unique == unique)
-                button.setStyleSheet(self._mode_button_sheet())
+                button.setStyleSheet(self._dup_list_button_sheet())
                 list_group.addButton(button)
                 button.clicked.connect(lambda checked=False, u=is_unique: self._on_dup_list_mode(u))
                 pane.dup_list_buttons.append(button)

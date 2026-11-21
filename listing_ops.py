@@ -28,7 +28,7 @@ from constants import PATH_ROLE, IS_DIR_ROLE, OTHER_DIR_ROLE, POPULATED_ROLE, TA
 COL_NAME, COL_SIZE, COL_TYPE, COL_MODIFIED, COL_CHANGED, COL_ACCESSED, COL_COUNT = range(7)
 # COL_COUNT ("Count") is only shown by the Duplicate Finder's "Unique files
 # only" list: how many copies the file has.
-COLUMN_COUNT = 6
+COLUMN_COUNT = 7
 from panes import DirectoryPane
 
 # Which tree column shows a given snapshot date field (mtime/ctime/

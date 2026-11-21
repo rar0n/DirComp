@@ -592,7 +592,13 @@ class DuplicateFinderMixin:
             native = self._dup_files_of(pane, pane.tree.selectedItems())
             previous = getattr(pane, "_dup_sel_prev", None) or set()
             if ctrl:
-                result = (previous - with_groups(previous - native)) | with_groups(native - previous)
+                # Compare with what this list can show: in "Unique files
+                # only" a group's other copies are never in the list, so
+                # they must not count as deselected.
+                listed = set(pane.snapshot_index or {})
+                previous_listed = previous & listed
+                result = ((previous - with_groups(previous_listed - native))
+                          | with_groups(native - previous_listed))
             else:
                 result = with_groups(native)
             pane._dup_sel_prev = result

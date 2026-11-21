@@ -405,6 +405,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
+        if not self._dual_pane_enabled:
+            self._fill_comparison_copy_holder()
 
         # Apply the right button-group arrangement and date-column
         # visibility for the window's actual current width --
@@ -450,6 +452,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # Duplicate Finder mode shows it too: it lists the duplicates found
         # in the left pane (DuplicateFinderMixin._dup_sync_right).
         right_widget.setVisible(True)
+        if not self._dual_pane_enabled:
+            # Duplicate Finder mode: the right pane looks right from the
+            # start, with or without a folder loaded.
+            self._dup_style_right_pane()
         self._panes_row = panes_row
         main_layout.addWidget(panes_row, stretch=1)
         # Under the panes: each pane's Select/File Op/Clipboard cluster
@@ -574,14 +580,21 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         layout.setContentsMargins(_PANE_SIDE_MARGIN, 0, _PANE_SIDE_MARGIN, 0)
         layout.addWidget(self.left.cluster_container)
         layout.addWidget(self._build_folder_op_group())
-        layout.addWidget(self.right.cluster_container)
-        # Duplicate Finder mode: the right pane is only a list of the
-        # duplicates, so its button groups are not shown (and never get
-        # arranged -- see _update_responsive_layout). Hidden right away, not
-        # only once a folder has been listed (DuplicateFinderMixin.
-        # _dup_sync_right), or they'd sit there empty and stacked.
-        if not self._dual_pane_enabled:
+        if self._dual_pane_enabled:
+            layout.addWidget(self.right.cluster_container)
+        else:
+            # Duplicate Finder mode: the right pane is only a list of the
+            # duplicates, so its button groups are not shown (and never get
+            # arranged -- see _update_responsive_layout). In their place: a
+            # copy of the Settings tab's Comparison Options, filled in once
+            # that tab exists (see ComparisonCopyMixin).
+            self.right.cluster_container.setParent(row)
             self.right.cluster_container.setVisible(False)
+            holder = QWidget()
+            holder.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            QHBoxLayout(holder).setContentsMargins(0, 0, 0, 0)
+            self._cmp_copy_holder = holder
+            layout.addWidget(holder)
         self._cluster_row = row
         self._cluster_row_layout = layout
         self._apply_mode_button_colors()
@@ -1556,6 +1569,14 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.main_comparison_type_combo.activated.connect(self._on_main_comparison_type_activated)
 
+        # Duplicate Finder mode (Compare folders off): one line only --
+        # Recursive Folder Selections, Symmetrical GUI and Expand To
+        # Selection from the left, Refresh at the right end. Synchronize
+        # Views (disabled in this mode anyway) and the comparison type
+        # drop-down (the Comparison Options copy below the right pane has
+        # one) stay as live widgets, just not shown.
+        one_line = not self._dual_pane_enabled
+
         row2.addSpacing(20)
 
         self.synchronize_views_cb = QCheckBox("Synchronize Views")
@@ -1570,7 +1591,13 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.synchronize_views_cb.setEnabled(self._dual_pane_enabled)
         self.dual_pane_cb.toggled.connect(self.synchronize_views_cb.setEnabled)
         self.synchronize_views_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
-        row2.addWidget(self.synchronize_views_cb)
+        if one_line:
+            self.synchronize_views_cb.setParent(group)
+            self.synchronize_views_cb.hide()
+            self.main_comparison_type_combo.setParent(group)
+            self.main_comparison_type_combo.hide()
+        else:
+            row2.addWidget(self.synchronize_views_cb)
         self.synchronize_views_cb.stateChanged.connect(self._on_synchronize_views_changed)
         # Keeps both panes' Statistics-view Metric combos in step the
         # moment Synchronize Views is switched on (copies left's Metric
@@ -1600,7 +1627,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # hidden in Duplicate Finder mode, but its layout still mirrors).
         self.symmetrical_buttons_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.symmetrical_buttons_cb.stateChanged.connect(self._on_symmetrical_buttons_changed)
-        row2.addWidget(self.symmetrical_buttons_cb)
+        if not one_line:
+            row2.addWidget(self.symmetrical_buttons_cb)
 
         self.expand_matching_cb = QCheckBox("Expand To Selection")
         self.expand_matching_cb.setToolTip(
@@ -1615,21 +1643,31 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.recursive_folder_contents_cb.toggled.connect(self.expand_matching_cb.setEnabled)
         self.expand_matching_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
-        # Recursive Folder Selections now sits close to Dual Pane (no longer
-        # pushed over Expand To Selection, which is indented by its own
-        # amount below it).
-        _recursive_indent, expand_extra_indent = self._global_options_row_indents(row1, row2)
-        row2.addSpacing(expand_extra_indent)
-        row2.addWidget(self.expand_matching_cb)
-        row2.addStretch(1)
+        if one_line:
+            row1.addWidget(self.recursive_folder_contents_cb)
+            row1.addSpacing(20)
+            row1.addWidget(self.symmetrical_buttons_cb)
+            row1.addSpacing(20)
+            row1.addWidget(self.expand_matching_cb)
+            row1.addStretch(1)
+            row1.addWidget(self.refresh_button)
+            outer.addLayout(row1)
+        else:
+            # Recursive Folder Selections now sits close to Dual Pane (no longer
+            # pushed over Expand To Selection, which is indented by its own
+            # amount below it).
+            _recursive_indent, expand_extra_indent = self._global_options_row_indents(row1, row2)
+            row2.addSpacing(expand_extra_indent)
+            row2.addWidget(self.expand_matching_cb)
+            row2.addStretch(1)
 
-        row1.addWidget(self.recursive_folder_contents_cb)
-        row1.addStretch(1)
-        row1.addWidget(self.main_comparison_type_combo)
-        row1.addWidget(self.refresh_button)
+            row1.addWidget(self.recursive_folder_contents_cb)
+            row1.addStretch(1)
+            row1.addWidget(self.main_comparison_type_combo)
+            row1.addWidget(self.refresh_button)
 
-        outer.addLayout(row1)
-        outer.addLayout(row2)
+            outer.addLayout(row1)
+            outer.addLayout(row2)
 
         # ---- Not shown on the Main tab, but still real/live -- see
         # this method's docstring. ----

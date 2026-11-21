@@ -413,22 +413,20 @@ class DuplicateFinderMixin:
                     ancestor = os.path.dirname(ancestor)
         return root, index
 
-    def _dup_sync_right(self, progress=None):
-        """Duplicate Finder mode: rebuild the right pane's snapshot from the
-        left pane's duplicate scan and list it (same colors, the left pane's
-        sort order), feed its Statistics View, and report the wasted space on
-        its upper status line. Called after every left-pane listing."""
-        left, right = self.left, self.right
-        left_dir = left.entry.text()
-        root, index = self._dup_build_right_snapshot()
-        right.snapshot_root, right.snapshot_index = root, index
-        if root is None:
-            right.snapshot_root, right.snapshot_index = None, {}
+    def _dup_style_right_pane(self):
+        """Duplicate Finder mode: the right pane is only a list of the
+        duplicates, so what belongs to a folder is taken away from it. Safe
+        to call any number of times; called when the Main tab is built (so
+        the pane looks right before any folder is loaded) and after every
+        left-pane listing."""
+        right = self.right
         # The right pane is a read-only view of the left one's duplicates:
-        # its folder entry and toolbar buttons are hidden (their space kept,
-        # so both panes stay aligned).
+        # its folder entry and toolbar buttons are hidden, except Save
+        # Snapshot (a snapshot of the listed duplicates can be taken). They
+        # keep no room, so Save Snapshot sits at the pane's outer edge --
+        # right for a mirrored pane (Symmetrical GUI), left otherwise.
         from PySide6.QtWidgets import QSizePolicy
-        for name in ("up_button", "select_button", "save_snapshot_button", "clear_view_button",
+        for name in ("up_button", "select_button", "clear_view_button",
                      "pane_refresh_button", "hash_button"):
             widget = getattr(right, name, None)
             if widget is not None:
@@ -465,6 +463,19 @@ class DuplicateFinderMixin:
             for i in range(toolbar.count()):
                 if toolbar.itemAt(i).widget() is None and toolbar.itemAt(i).spacerItem() is not None:
                     toolbar.setStretch(i, 0 if i == far else 1)
+
+    def _dup_sync_right(self, progress=None):
+        """Duplicate Finder mode: rebuild the right pane's snapshot from the
+        left pane's duplicate scan and list it (same colors, the left pane's
+        sort order), feed its Statistics View, and report the wasted space on
+        its upper status line. Called after every left-pane listing."""
+        left, right = self.left, self.right
+        left_dir = left.entry.text()
+        root, index = self._dup_build_right_snapshot()
+        right.snapshot_root, right.snapshot_index = root, index
+        if root is None:
+            right.snapshot_root, right.snapshot_index = None, {}
+        self._dup_style_right_pane()
         if root is None:
             self._dup_clear_right()
             return

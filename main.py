@@ -53,6 +53,7 @@ from selection_ops import SelectionMixin
 from transfer_ops import TransferMixin
 from sync_views import SyncMixin
 from swap_ops import SwapOpsMixin
+from comparison_copy import ComparisonCopyMixin
 from statistics_ops import TimelineOpsMixin
 from settings_ops import SettingsMixin
 from context_menu_ops import ContextMenuMixin
@@ -67,6 +68,7 @@ class DirectoryComparisonApp(
     TransferMixin,
     SyncMixin,
     SwapOpsMixin,
+    ComparisonCopyMixin,
     DiffEngineMixin,
     HashOpsMixin,
     DuplicateFinderMixin,

@@ -175,6 +175,9 @@ _DEFAULT_MAIN_BUTTON_COLORS = {
     # Main tab's Duplicate finder / Compare Folders mode switch, while
     # that mode is the active ("pressed in") one -- see _mode_button_stylesheet.
     "mode_pressed": ["#2F6DB5", "#F5F5F5"],
+    # Duplicate Finder's "Include paths" / "Unique files only" list-mode
+    # switch, while its mode is the active one -- same look as mode_pressed.
+    "dup_list_pressed": ["#2F6DB5", "#F5F5F5"],
 }
 # kind passed to _make_icon for whichever of the above (or "rename",
 # which has none) also draws an icon -- so a color change updates the
@@ -191,7 +194,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "past
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
     "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "pane_refresh", "save_snapshot",
-    "mode_unpressed", "swap_pane",
+    "mode_unpressed", "swap_pane", "dup_list_unpressed",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->
@@ -2201,3 +2204,87 @@ class EqualSplitLayout(QLayout):
         for index, item in enumerate(visible):
             item.setGeometry(QRect(x, area.y(), width, area.height()))
             x += width + self._gap + (leftover if index == count - 2 else 0)
+
+
+class CenterSplitLayout(QLayout):
+    """Three cells in a row: left | center | right. The center item keeps
+    its own (size hint) width and sits exactly in the middle; the left and
+    right items share all the remaining width equally, so the two sides
+    always match. The center item is top-aligned at its natural height, the
+    side items get the full row height. A hidden side item keeps its cell
+    (so a hidden right cluster does not make the left one grow); the center
+    item is always expected to be visible. Used for the row of button groups
+    below the two panes (Select/File Op/Clipboard of each pane either side
+    of the central Folder Op group), see ui_builder._build_cluster_row."""
+
+    def __init__(self, parent=None, spacing: int = 6):
+        super().__init__(parent)
+        self._items = []  # [left, center, right]
+        self._gap = spacing
+        # Width of the row as of the last setGeometry, set before the cells'
+        # own geometry is -- so whoever is notified by a cell's resize reads
+        # a width that already agrees with it (see side_width).
+        self.total_width = 0
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):
+        self._items.append(item)
+        self.invalidate()
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self._items):
+            item = self._items.pop(index)
+            self.invalidate()
+            return item
+        return None
+
+    def expandingDirections(self):
+        return Qt.Horizontal
+
+    def center_width(self) -> int:
+        if len(self._items) < 3:
+            return 0
+        return self._items[1].sizeHint().width()
+
+    def side_width(self, total_width: int) -> int:
+        """Width each side cell gets when the whole row is `total_width`
+        wide -- what the arrangement of the side clusters is chosen for."""
+        margins = self.contentsMargins()
+        inner = total_width - margins.left() - margins.right()
+        return max(0, (inner - self.center_width() - 2 * self._gap) // 2)
+
+    def _height(self, size_of) -> int:
+        return max((size_of(item).height() for item in self._items if not item.isEmpty()), default=0)
+
+    def sizeHint(self):
+        margins = self.contentsMargins()
+        width = self.center_width() + 2 * self._gap + margins.left() + margins.right()
+        return QSize(width, self._height(lambda item: item.sizeHint()) + margins.top() + margins.bottom())
+
+    def minimumSize(self):
+        margins = self.contentsMargins()
+        width = self.center_width() + 2 * self._gap + margins.left() + margins.right()
+        return QSize(width, self._height(lambda item: item.minimumSize()) + margins.top() + margins.bottom())
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self.total_width = rect.width()
+        if len(self._items) < 3:
+            return
+        margins = self.contentsMargins()
+        area = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
+        left, center, right = self._items
+        side = self.side_width(rect.width())
+        center_w = self.center_width()
+        # Odd leftover pixels go into the gap before the right cell.
+        leftover = max(0, area.width() - 2 * side - center_w - 2 * self._gap)
+        left.setGeometry(QRect(area.x(), area.y(), side, area.height()))
+        center_x = area.x() + side + self._gap
+        center.setGeometry(QRect(center_x, area.y(), center_w, min(area.height(), center.sizeHint().height())))
+        right.setGeometry(QRect(center_x + center_w + self._gap + leftover, area.y(), side, area.height()))

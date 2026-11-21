@@ -397,6 +397,20 @@ class DuplicateFinderMixin:
             ensure_dir(os.path.dirname(norm))["children"][node["name"]] = node
             return node
 
+        if getattr(self, "_dup_unique_only", False):
+            # "Unique files only": a flat list, one file per group (the one
+            # "Extra copies keep" leaves alone) with its number of copies;
+            # keyed by path since names can repeat.
+            for nodes in info["groups"].values():
+                real = self._dup_survivor_node(nodes)
+                node = dict(real)
+                node.pop("_stems", None)
+                node["dup_count"] = len(nodes)
+                root["children"][os.path.normpath(real["full_path"])] = node
+                index[os.path.normpath(real["full_path"])] = node
+                root["size"] += real["size"] or 0
+            return root, index
+
         for nodes in info["groups"].values():
             for real in nodes:
                 node = dict(real)
@@ -413,22 +427,20 @@ class DuplicateFinderMixin:
                     ancestor = os.path.dirname(ancestor)
         return root, index
 
-    def _dup_sync_right(self, progress=None):
-        """Duplicate Finder mode: rebuild the right pane's snapshot from the
-        left pane's duplicate scan and list it (same colors, the left pane's
-        sort order), feed its Statistics View, and report the wasted space on
-        its upper status line. Called after every left-pane listing."""
-        left, right = self.left, self.right
-        left_dir = left.entry.text()
-        root, index = self._dup_build_right_snapshot()
-        right.snapshot_root, right.snapshot_index = root, index
-        if root is None:
-            right.snapshot_root, right.snapshot_index = None, {}
+    def _dup_style_right_pane(self):
+        """Duplicate Finder mode: the right pane is only a list of the
+        duplicates, so what belongs to a folder is taken away from it. Safe
+        to call any number of times; called when the Main tab is built (so
+        the pane looks right before any folder is loaded) and after every
+        left-pane listing."""
+        right = self.right
         # The right pane is a read-only view of the left one's duplicates:
-        # its folder entry and toolbar buttons are hidden (their space kept,
-        # so both panes stay aligned).
+        # its folder entry and toolbar buttons are hidden, except Save
+        # Snapshot (a snapshot of the listed duplicates can be taken). They
+        # keep no room, so Save Snapshot sits at the pane's outer edge --
+        # right for a mirrored pane (Symmetrical GUI), left otherwise.
         from PySide6.QtWidgets import QSizePolicy
-        for name in ("up_button", "select_button", "save_snapshot_button", "clear_view_button",
+        for name in ("up_button", "select_button", "clear_view_button",
                      "pane_refresh_button", "hash_button"):
             widget = getattr(right, name, None)
             if widget is not None:
@@ -448,6 +460,15 @@ class DuplicateFinderMixin:
             from PySide6.QtWidgets import QSpacerItem
             right_toolbar.addItem(QSpacerItem(0, left_toolbar.sizeHint().height(), _SP.Fixed, _SP.Fixed))
             right._dup_row_spacer = True
+        # "Count" column only in the "Unique files only" list.
+        header = right.tree.header()
+        right.tree.setColumnHidden(6, False)  # Qt mis-lays-out a section moved while hidden
+        if header.visualIndex(6) != 1:
+            header.moveSection(header.visualIndex(6), 1)  # right after Name, so it stays in view
+        # Hide/show last: resizing a section can bring a hidden one back.
+        right.tree.setColumnWidth(6, 55)
+        right.tree.setColumnHidden(6, not getattr(self, "_dup_unique_only", False))
+        right.tree._fit_name_column()  # Name takes (or gives back) the column's room
         cluster = getattr(right, "cluster_container", None)
         if cluster is not None:
             cluster.setVisible(False)
@@ -465,14 +486,30 @@ class DuplicateFinderMixin:
             for i in range(toolbar.count()):
                 if toolbar.itemAt(i).widget() is None and toolbar.itemAt(i).spacerItem() is not None:
                     toolbar.setStretch(i, 0 if i == far else 1)
+
+    def _dup_sync_right(self, progress=None):
+        """Duplicate Finder mode: rebuild the right pane's snapshot from the
+        left pane's duplicate scan and list it (same colors, the left pane's
+        sort order), feed its Statistics View, and report the wasted space on
+        its upper status line. Called after every left-pane listing."""
+        left, right = self.left, self.right
+        left_dir = left.entry.text()
+        root, index = self._dup_build_right_snapshot()
+        right.snapshot_root, right.snapshot_index = root, index
+        if root is None:
+            right.snapshot_root, right.snapshot_index = None, {}
+        self._dup_style_right_pane()
         if root is None:
             self._dup_clear_right()
             return
         self.update_listing(left_dir, right, None, progress=progress,
                             refresh_snapshot=False, retag_only=False)
-        sort_column = getattr(left.tree, "_sort_column", None)
+        sort_src = left.tree
+        if getattr(right.tree, "_sort_column", None) == 6 and getattr(self, "_dup_unique_only", False):
+            sort_src = right.tree  # sorted by Count here: keep that
+        sort_column = getattr(sort_src, "_sort_column", None)
         if sort_column is not None:
-            asc = getattr(left.tree, "_sort_ascending", True)
+            asc = getattr(sort_src, "_sort_ascending", True)
             right.tree._sort_column, right.tree._sort_ascending = sort_column, asc
             self._apply_sort(right.tree, sort_column, asc)
         timeline = getattr(right, "timeline", None)
@@ -483,6 +520,18 @@ class DuplicateFinderMixin:
         groups = len(info["groups"])
         wasted = self.format_size(info["wasted"])
         right._dup_sel_prev = self._dup_files_of(right, right.tree.selectedItems())
+
+    def _on_dup_list_mode(self, unique: bool):
+        """The Duplicate Finder's "Include paths" / "Unique files only"
+        buttons: rebuild the right pane's list in the chosen mode."""
+        if bool(getattr(self, "_dup_unique_only", False)) == unique:
+            return
+        self._dup_unique_only = unique
+        if not self._duplicate_mode_active():
+            return
+        for button, is_unique in zip(getattr(self.right, "dup_list_buttons", None) or [], (False, True)):
+            button.setChecked(is_unique == unique)
+        self._dup_sync_right()
 
     def _dup_clear_right(self):
         """No duplicate scan (nothing loaded, or a Hash type not hashed yet
@@ -546,7 +595,13 @@ class DuplicateFinderMixin:
             native = self._dup_files_of(pane, pane.tree.selectedItems())
             previous = getattr(pane, "_dup_sel_prev", None) or set()
             if ctrl:
-                result = (previous - with_groups(previous - native)) | with_groups(native - previous)
+                # Compare with what this list can show: in "Unique files
+                # only" a group's other copies are never in the list, so
+                # they must not count as deselected.
+                listed = set(pane.snapshot_index or {})
+                previous_listed = previous & listed
+                result = ((previous - with_groups(previous_listed - native))
+                          | with_groups(native - previous_listed))
             else:
                 result = with_groups(native)
             pane._dup_sel_prev = result

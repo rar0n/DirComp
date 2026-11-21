@@ -57,6 +57,7 @@ class DirectoryPane:
         self.snapshot_full_root = None
         self.snapshot_full_index = None
         self.snapshot_hash_key = None
+        self.snapshot_has_counts = False
         self.snapshot_info_label: QLabel | None = None  # the pane's upper status line
         # (text, tooltip) shown there while no snapshot is loaded: hash cache
         # read/write messages -- see SnapshotOpsMixin._set_upper_status.

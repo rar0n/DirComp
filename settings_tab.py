@@ -171,11 +171,13 @@ class SettingsTabMixin:
         wrap below each other when it isn't -- each section has a
         FlowLayout for them (see _settings_subsection_flow).
 
-        - Global Settings: three Level 2 blocks --
+        - Global Settings: Level 2 blocks --
           - Theme: a Dark/Light switch.
-          - Global Options: synced copies of the Main tab's checkboxes
-            (via _link_checkboxes) -- same settings, just also
-            reachable here.
+          - Options: synced copies of the Main tab's (Quick Options)
+            checkboxes (via _link_checkboxes) -- same settings, just also
+            reachable here -- plus the options that only exist here.
+          - Comparison Options: the comparison type and everything that
+            follows from it (hashing, ignore options, hash cache, ...).
           - Misc Colors: GUI, default button, progress and busy bar
             colors.
         - Statistics View (common): Font size / Nice bins / Bin count /
@@ -306,6 +308,11 @@ class SettingsTabMixin:
         global_grid = QGridLayout()
         global_grid.setColumnMinimumWidth(1, 20)
         global_grid.setColumnStretch(6, 1)
+        # The comparison type options: built into this grid, shown in their
+        # own group (comparison_group, below).
+        comparison_grid = QGridLayout()
+        comparison_grid.setColumnMinimumWidth(1, 20)
+        comparison_grid.setColumnStretch(6, 1)
 
         def _add_synced(primary, label, row, col, indent=0):
             secondary = QCheckBox(label)
@@ -353,7 +360,7 @@ class SettingsTabMixin:
         # primary: these two only exist here. "Scan expanded folders" sits
         # under Expand To Selection (its sibling dependent of Recursive
         # Folder Selections, but enabled when that is OFF); "Hash only
-        # same-size files" sits in List Directories' column, unindented.
+        # same-size files" is placed in the Comparison Options group.
         self.scan_expanded_cb = QCheckBox("Scan expanded folders")
         self.scan_expanded_cb.setChecked(self._scan_expanded)
         self.scan_expanded_cb.setToolTip(
@@ -375,6 +382,7 @@ class SettingsTabMixin:
 
         self.hash_same_size_cb = QCheckBox("Hash only same-size files")
         self.hash_same_size_cb.setChecked(self._hash_same_size)
+        self.hash_same_size_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.hash_same_size_cb.setToolTip(
             "Duplicate Finder mode with Hash value / Fingerprint: files with a "
             "size no other file in the search has cannot be duplicates, so they "
@@ -382,7 +390,8 @@ class SettingsTabMixin:
             "folders. Off: every file in the search is hashed.\n"
             "Compare folders mode always hashes every file in view."
         )
-        global_grid.addWidget(self.hash_same_size_cb, 2, 3)
+        # Shown in the Comparison Options group (it only matters for the hash
+        # types), to the right of the hash algorithm.
         self.scan_expanded_cb.toggled.connect(self._on_dup_scope_option_changed)
         self.hash_same_size_cb.toggled.connect(self._on_dup_scope_option_changed)
 
@@ -487,10 +496,6 @@ class SettingsTabMixin:
         # Main-tab primary. The state lives in self._cmp_* (so it
         # survives a UI rebuild); these widgets are built from it and
         # write back through _on_comparison_setting_changed.
-        comparison_gap = QWidget()
-        comparison_gap.setFixedHeight(6)
-        global_grid.addWidget(comparison_gap, 11, 0, 1, 7)
-
         comparison_type_row = QHBoxLayout()
         comparison_type_row.setContentsMargins(0, 0, 0, 0)
         comparison_type_row.addWidget(QLabel("Comparison type:"))
@@ -511,7 +516,7 @@ class SettingsTabMixin:
         )
         comparison_type_row.addWidget(self.comparison_type_combo)
         comparison_type_row.addStretch(1)
-        global_grid.addLayout(comparison_type_row, 12, 0, 1, 7)
+        comparison_grid.addLayout(comparison_type_row, 12, 0, 1, 7)
 
         hash_row = QHBoxLayout()
         hash_row.setContentsMargins(0, 0, 0, 0)
@@ -523,8 +528,10 @@ class SettingsTabMixin:
         self.hash_algorithm_combo.setCurrentIndex(self._cmp_algorithm)
         self.hash_algorithm_combo.setToolTip("The hash function used by the Hash value and Fingerprint types.")
         hash_row.addWidget(self.hash_algorithm_combo)
+        hash_row.addSpacing(10)
+        hash_row.addWidget(self.hash_same_size_cb)
         hash_row.addStretch(1)
-        global_grid.addLayout(hash_row, 14, 0, 1, 7)
+        comparison_grid.addLayout(hash_row, 14, 0, 1, 7)
 
         def _chunk_row(attr, label_text, value, tip):
             row = QHBoxLayout()
@@ -554,8 +561,8 @@ class SettingsTabMixin:
                   self.fingerprint_end_label.sizeHint().width())
         self.fingerprint_start_label.setFixedWidth(_lw)
         self.fingerprint_end_label.setFixedWidth(_lw)
-        global_grid.addLayout(fp_start_row, 16, 0, 1, 7)
-        global_grid.addLayout(fp_end_row, 17, 0, 1, 7)
+        comparison_grid.addLayout(fp_start_row, 16, 0, 1, 7)
+        comparison_grid.addLayout(fp_end_row, 17, 0, 1, 7)
 
         ignore_ext_row = QHBoxLayout()
         ignore_ext_row.setContentsMargins(0, 0, 0, 0)
@@ -584,7 +591,7 @@ class SettingsTabMixin:
         )
         ignore_ext_row.addWidget(self.first_name_only_cb)
         ignore_ext_row.addStretch(1)
-        global_grid.addLayout(ignore_ext_row, 13, 0, 1, 7)
+        comparison_grid.addLayout(ignore_ext_row, 13, 0, 1, 7)
 
         # Row 18: files left out of every comparison (DiffEngineMixin.
         # _ignored_kind), in both Dual Pane and single pane mode and with
@@ -613,7 +620,7 @@ class SettingsTabMixin:
         )
         ignore_row.addWidget(self.ignore_hard_links_cb)
         ignore_row.addStretch(1)
-        global_grid.addLayout(ignore_row, 18, 0, 1, 7)
+        comparison_grid.addLayout(ignore_row, 18, 0, 1, 7)
         self.ignore_empty_files_cb.toggled.connect(self._on_comparison_setting_changed)
         self.ignore_hard_links_cb.toggled.connect(self._on_comparison_setting_changed)
 
@@ -642,7 +649,7 @@ class SettingsTabMixin:
         clear_cache_button.clicked.connect(self._on_clear_hash_cache)
         cache_row.addWidget(clear_cache_button)
         cache_row.addStretch(1)
-        global_grid.addLayout(cache_row, 19, 0, 1, 7)
+        comparison_grid.addLayout(cache_row, 19, 0, 1, 7)
         self.cache_hashed_folders_cb.toggled.connect(self._on_cache_hashed_folders_toggled)
 
         # Row 20: which copy "Extra copies" leaves alone in every group of
@@ -666,7 +673,7 @@ class SettingsTabMixin:
         )
         keep_row.addWidget(self.extra_copies_keep_combo)
         keep_row.addStretch(1)
-        global_grid.addLayout(keep_row, 20, 0, 1, 7)
+        comparison_grid.addLayout(keep_row, 20, 0, 1, 7)
         self.extra_copies_keep_combo.currentIndexChanged.connect(self._on_dup_survivor_changed)
 
         self._update_comparison_controls_enabled()
@@ -682,6 +689,12 @@ class SettingsTabMixin:
             lambda checked: self._on_name_match_option_toggled(self.ignore_file_extensions_cb, checked))
 
         global_outer.addLayout(global_grid)
+
+        # The comparison type options (from "Comparison type:" down) are a
+        # group of their own, beside/after Options in the Global Settings flow.
+        comparison_group = QGroupBox("")
+        comparison_outer = QVBoxLayout(comparison_group)
+        comparison_outer.addLayout(comparison_grid)
 
         # ---- Default / Out-of-Group Colors -- a real QTableWidget (see
         # _style_table_widget/_size_table_to_contents), not the
@@ -802,7 +815,7 @@ class SettingsTabMixin:
             "until you pick one."
         )
         default_colors_table.item(7, 0).setToolTip(
-            "The Refresh button under Global Options on the Main tab. Uses the "
+            "The Refresh button under Quick Options on the Main tab. Uses the "
             "theme's default button colors until you pick one."
         )
         default_colors_table.item(8, 0).setToolTip(
@@ -829,8 +842,9 @@ class SettingsTabMixin:
         default_colors_group_outer = QVBoxLayout(default_colors_group)
         default_colors_group_outer.addWidget(default_colors_table)
 
-        # Level 2 blocks of Global Settings: Theme, Options, Misc Colors.
+        # Level 2 blocks of Global Settings: Theme, Options, Comparison Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
+        global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
@@ -1635,6 +1649,16 @@ class SettingsTabMixin:
         dup_summary_outer.addWidget(dup_summary_table)
         dup_summary_block = self._settings_subsubsection("Duplicate Finder Summary Colors", dup_summary_group)
 
+        # ---- Duplicate Finder Buttons (Level 3, after the summary colors):
+        # buttons only that mode has -- for now the Include paths / Unique
+        # files only list-mode switch (released and pressed-in = the active
+        # list mode). Kept per theme in self._main_button_colors. ----
+        dup_buttons_group = self._main_button_color_table([
+            ("dup_list_unpressed", "List mode (released)"),
+            ("dup_list_pressed", "List mode (pressed)"),
+        ])
+        dup_buttons_block = self._settings_subsubsection("Duplicate Finder Buttons", dup_buttons_group)
+
         # ---- Button Colors (Level 3, after Comparison Type Colors): the
         # buttons around each pane's File List View. They start at the
         # theme's default button colors -- see _main_button_color_for. ----
@@ -1662,7 +1686,7 @@ class SettingsTabMixin:
         flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
         flv_colors_super_outer.addLayout(
             self._settings_subsection_flow(
-                flv_default_misc_block, comparison_colors_block, dup_summary_block, flv_buttons_block,
+                flv_default_misc_block, comparison_colors_block, dup_summary_block, dup_buttons_block, flv_buttons_block,
             )
         )
         flv_flow.addWidget(self._settings_subsection("File List View Colors", flv_colors_super_group))

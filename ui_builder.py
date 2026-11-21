@@ -575,6 +575,13 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         layout.addWidget(self.left.cluster_container)
         layout.addWidget(self._build_folder_op_group())
         layout.addWidget(self.right.cluster_container)
+        # Duplicate Finder mode: the right pane is only a list of the
+        # duplicates, so its button groups are not shown (and never get
+        # arranged -- see _update_responsive_layout). Hidden right away, not
+        # only once a folder has been listed (DuplicateFinderMixin.
+        # _dup_sync_right), or they'd sit there empty and stacked.
+        if not self._dual_pane_enabled:
+            self.right.cluster_container.setVisible(False)
         self._cluster_row = row
         self._cluster_row_layout = layout
         self._apply_mode_button_colors()
@@ -1479,7 +1486,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         Settings-tab copies (and for settings_ops.py's persistence) --
         the full set is reachable from the Settings tab's own Global
         Options section instead of cluttering this quick-access row."""
-        group = QGroupBox("Global Options")
+        group = QGroupBox("Quick Options")
         self.global_options_group = group
         outer = QVBoxLayout(group)
         row1 = QHBoxLayout()

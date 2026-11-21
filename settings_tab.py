@@ -171,11 +171,13 @@ class SettingsTabMixin:
         wrap below each other when it isn't -- each section has a
         FlowLayout for them (see _settings_subsection_flow).
 
-        - Global Settings: three Level 2 blocks --
+        - Global Settings: Level 2 blocks --
           - Theme: a Dark/Light switch.
-          - Global Options: synced copies of the Main tab's checkboxes
-            (via _link_checkboxes) -- same settings, just also
-            reachable here.
+          - Options: synced copies of the Main tab's (Quick Options)
+            checkboxes (via _link_checkboxes) -- same settings, just also
+            reachable here -- plus the options that only exist here.
+          - Comparison Type: the comparison type and everything that
+            follows from it (hashing, ignore options, hash cache, ...).
           - Misc Colors: GUI, default button, progress and busy bar
             colors.
         - Statistics View (common): Font size / Nice bins / Bin count /
@@ -306,6 +308,11 @@ class SettingsTabMixin:
         global_grid = QGridLayout()
         global_grid.setColumnMinimumWidth(1, 20)
         global_grid.setColumnStretch(6, 1)
+        # The comparison type options: built into this grid, shown in their
+        # own group (comparison_group, below).
+        comparison_grid = QGridLayout()
+        comparison_grid.setColumnMinimumWidth(1, 20)
+        comparison_grid.setColumnStretch(6, 1)
 
         def _add_synced(primary, label, row, col, indent=0):
             secondary = QCheckBox(label)
@@ -487,10 +494,6 @@ class SettingsTabMixin:
         # Main-tab primary. The state lives in self._cmp_* (so it
         # survives a UI rebuild); these widgets are built from it and
         # write back through _on_comparison_setting_changed.
-        comparison_gap = QWidget()
-        comparison_gap.setFixedHeight(6)
-        global_grid.addWidget(comparison_gap, 11, 0, 1, 7)
-
         comparison_type_row = QHBoxLayout()
         comparison_type_row.setContentsMargins(0, 0, 0, 0)
         comparison_type_row.addWidget(QLabel("Comparison type:"))
@@ -511,7 +514,7 @@ class SettingsTabMixin:
         )
         comparison_type_row.addWidget(self.comparison_type_combo)
         comparison_type_row.addStretch(1)
-        global_grid.addLayout(comparison_type_row, 12, 0, 1, 7)
+        comparison_grid.addLayout(comparison_type_row, 12, 0, 1, 7)
 
         hash_row = QHBoxLayout()
         hash_row.setContentsMargins(0, 0, 0, 0)
@@ -524,7 +527,7 @@ class SettingsTabMixin:
         self.hash_algorithm_combo.setToolTip("The hash function used by the Hash value and Fingerprint types.")
         hash_row.addWidget(self.hash_algorithm_combo)
         hash_row.addStretch(1)
-        global_grid.addLayout(hash_row, 14, 0, 1, 7)
+        comparison_grid.addLayout(hash_row, 14, 0, 1, 7)
 
         def _chunk_row(attr, label_text, value, tip):
             row = QHBoxLayout()
@@ -554,8 +557,8 @@ class SettingsTabMixin:
                   self.fingerprint_end_label.sizeHint().width())
         self.fingerprint_start_label.setFixedWidth(_lw)
         self.fingerprint_end_label.setFixedWidth(_lw)
-        global_grid.addLayout(fp_start_row, 16, 0, 1, 7)
-        global_grid.addLayout(fp_end_row, 17, 0, 1, 7)
+        comparison_grid.addLayout(fp_start_row, 16, 0, 1, 7)
+        comparison_grid.addLayout(fp_end_row, 17, 0, 1, 7)
 
         ignore_ext_row = QHBoxLayout()
         ignore_ext_row.setContentsMargins(0, 0, 0, 0)
@@ -584,7 +587,7 @@ class SettingsTabMixin:
         )
         ignore_ext_row.addWidget(self.first_name_only_cb)
         ignore_ext_row.addStretch(1)
-        global_grid.addLayout(ignore_ext_row, 13, 0, 1, 7)
+        comparison_grid.addLayout(ignore_ext_row, 13, 0, 1, 7)
 
         # Row 18: files left out of every comparison (DiffEngineMixin.
         # _ignored_kind), in both Dual Pane and single pane mode and with
@@ -613,7 +616,7 @@ class SettingsTabMixin:
         )
         ignore_row.addWidget(self.ignore_hard_links_cb)
         ignore_row.addStretch(1)
-        global_grid.addLayout(ignore_row, 18, 0, 1, 7)
+        comparison_grid.addLayout(ignore_row, 18, 0, 1, 7)
         self.ignore_empty_files_cb.toggled.connect(self._on_comparison_setting_changed)
         self.ignore_hard_links_cb.toggled.connect(self._on_comparison_setting_changed)
 
@@ -642,7 +645,7 @@ class SettingsTabMixin:
         clear_cache_button.clicked.connect(self._on_clear_hash_cache)
         cache_row.addWidget(clear_cache_button)
         cache_row.addStretch(1)
-        global_grid.addLayout(cache_row, 19, 0, 1, 7)
+        comparison_grid.addLayout(cache_row, 19, 0, 1, 7)
         self.cache_hashed_folders_cb.toggled.connect(self._on_cache_hashed_folders_toggled)
 
         # Row 20: which copy "Extra copies" leaves alone in every group of
@@ -666,7 +669,7 @@ class SettingsTabMixin:
         )
         keep_row.addWidget(self.extra_copies_keep_combo)
         keep_row.addStretch(1)
-        global_grid.addLayout(keep_row, 20, 0, 1, 7)
+        comparison_grid.addLayout(keep_row, 20, 0, 1, 7)
         self.extra_copies_keep_combo.currentIndexChanged.connect(self._on_dup_survivor_changed)
 
         self._update_comparison_controls_enabled()
@@ -682,6 +685,12 @@ class SettingsTabMixin:
             lambda checked: self._on_name_match_option_toggled(self.ignore_file_extensions_cb, checked))
 
         global_outer.addLayout(global_grid)
+
+        # The comparison type options (from "Comparison type:" down) are a
+        # group of their own, beside/after Options in the Global Settings flow.
+        comparison_group = QGroupBox("")
+        comparison_outer = QVBoxLayout(comparison_group)
+        comparison_outer.addLayout(comparison_grid)
 
         # ---- Default / Out-of-Group Colors -- a real QTableWidget (see
         # _style_table_widget/_size_table_to_contents), not the
@@ -802,7 +811,7 @@ class SettingsTabMixin:
             "until you pick one."
         )
         default_colors_table.item(7, 0).setToolTip(
-            "The Refresh button under Global Options on the Main tab. Uses the "
+            "The Refresh button under Quick Options on the Main tab. Uses the "
             "theme's default button colors until you pick one."
         )
         default_colors_table.item(8, 0).setToolTip(
@@ -829,8 +838,9 @@ class SettingsTabMixin:
         default_colors_group_outer = QVBoxLayout(default_colors_group)
         default_colors_group_outer.addWidget(default_colors_table)
 
-        # Level 2 blocks of Global Settings: Theme, Options, Misc Colors.
+        # Level 2 blocks of Global Settings: Theme, Options, Comparison Type, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
+        global_settings_flow.addWidget(self._settings_subsection("Comparison Type", comparison_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):

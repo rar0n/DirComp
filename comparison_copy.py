@@ -148,7 +148,7 @@ class ComparisonCopyMixin:
             chunk_row = row()
             label = self._mirror_label(label_source)
             labels.append(label)
-            spin, slider = self._mirror_spin(spin_source, slider_width=90)
+            spin, slider = self._mirror_spin(spin_source)
             chunk_row.addWidget(spin_slider_inline(label, spin, slider, spacing=6), 0, Qt.AlignVCenter)
             chunk_row.addStretch(1)
             outer.addLayout(chunk_row)

@@ -475,7 +475,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         holder_layout.setContentsMargins(0, 0, 0, 0)
         global_options = self._build_global_options_group()
         holder_layout.addWidget(global_options)
-        holder_layout.setAlignment(global_options, Qt.AlignRight)
+        if self._dual_pane_enabled:
+            holder_layout.setAlignment(global_options, Qt.AlignRight)
+        # (Duplicate Finder mode: the group fills the whole right half.)
         bottom_row.addWidget(options_holder)
         main_layout.addLayout(bottom_row)
         self._bottom_row_layout = bottom_row
@@ -1570,9 +1572,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.main_comparison_type_combo.activated.connect(self._on_main_comparison_type_activated)
 
-        # Duplicate Finder mode (Compare folders off): Quick Options becomes
-        # a column next to the Comparison Options copy (_quick_options_outer
-        # below). Synchronize
+        # Duplicate Finder mode (Compare folders off): Quick Options is laid
+        # out differently (_quick_options_outer below). Synchronize
         # Views (disabled in this mode anyway) and the comparison type
         # drop-down (the Comparison Options copy below the right pane has
         # one) stay as live widgets, just not shown.
@@ -1645,9 +1646,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.expand_matching_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         if one_line:
-            # Filled in (as a column, next to the Comparison Options copy,
-            # and moved out of the bottom row) once the Settings tab exists
-            # -- see ComparisonCopyMixin._fill_comparison_copy_holder.
+            # Filled in once the Settings tab exists (it needs a copy of one
+            # of its checkboxes) -- see ComparisonCopyMixin.
             self._quick_options_outer = outer
         else:
             # Recursive Folder Selections now sits close to Dual Pane (no longer

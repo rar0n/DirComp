@@ -360,7 +360,7 @@ class SettingsTabMixin:
         # primary: these two only exist here. "Scan expanded folders" sits
         # under Expand To Selection (its sibling dependent of Recursive
         # Folder Selections, but enabled when that is OFF); "Hash only
-        # same-size files" sits in List Directories' column, unindented.
+        # same-size files" is placed in the Comparison Options group.
         self.scan_expanded_cb = QCheckBox("Scan expanded folders")
         self.scan_expanded_cb.setChecked(self._scan_expanded)
         self.scan_expanded_cb.setToolTip(
@@ -389,7 +389,14 @@ class SettingsTabMixin:
             "folders. Off: every file in the search is hashed.\n"
             "Compare folders mode always hashes every file in view."
         )
-        global_grid.addWidget(self.hash_same_size_cb, 2, 3)
+        # Shown in the Comparison Options group (it only matters for the hash
+        # types), under the hash algorithm.
+        hash_same_row = QHBoxLayout()
+        hash_same_row.setContentsMargins(0, 0, 0, 0)
+        hash_same_row.addSpacing(20)
+        hash_same_row.addWidget(self.hash_same_size_cb)
+        hash_same_row.addStretch(1)
+        comparison_grid.addLayout(hash_same_row, 15, 0, 1, 7)
         self.scan_expanded_cb.toggled.connect(self._on_dup_scope_option_changed)
         self.hash_same_size_cb.toggled.connect(self._on_dup_scope_option_changed)
 

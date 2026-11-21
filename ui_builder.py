@@ -1570,9 +1570,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.main_comparison_type_combo.activated.connect(self._on_main_comparison_type_activated)
 
-        # Duplicate Finder mode (Compare folders off): one line only --
-        # Symmetrical GUI, Recursive Folder Selections and Expand To
-        # Selection (which depends on the one before it) from the left, Refresh at the right end. Synchronize
+        # Duplicate Finder mode (Compare folders off): Quick Options becomes
+        # a column next to the Comparison Options copy (_quick_options_outer
+        # below). Synchronize
         # Views (disabled in this mode anyway) and the comparison type
         # drop-down (the Comparison Options copy below the right pane has
         # one) stay as live widgets, just not shown.
@@ -1645,14 +1645,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.expand_matching_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         if one_line:
-            row1.addWidget(self.symmetrical_buttons_cb)
-            row1.addSpacing(20)
-            row1.addWidget(self.recursive_folder_contents_cb)
-            row1.addSpacing(20)
-            row1.addWidget(self.expand_matching_cb)
-            row1.addStretch(1)
-            row1.addWidget(self.refresh_button)
-            outer.addLayout(row1)
+            # Filled in (as a column, next to the Comparison Options copy,
+            # and moved out of the bottom row) once the Settings tab exists
+            # -- see ComparisonCopyMixin._fill_comparison_copy_holder.
+            self._quick_options_outer = outer
         else:
             # Recursive Folder Selections now sits close to Dual Pane (no longer
             # pushed over Expand To Selection, which is indented by its own

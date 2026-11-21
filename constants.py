@@ -246,7 +246,17 @@ _MIN_TREE_INDENTATION, _MAX_TREE_INDENTATION = 4, 100
 # (hashing is a later step), so they currently behave exactly like
 # CMP_NAME_SIZE_DATE -- see DiffEngineMixin._comparison_key.
 CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT = 0, 1, 2
-COMPARISON_TYPES = ("Name, size and date", "Hash value", "Fingerprint")
+# Added later, so their ids come after the saved ones (settings and
+# snapshots store the id, not the position in the drop-down):
+CMP_NAME_SIZE, CMP_NAME = 3, 4
+# (id, label) in the order the drop-downs show them.
+COMPARISON_TYPE_ITEMS = (
+    (CMP_NAME_SIZE_DATE, "Name, size and date"),
+    (CMP_NAME_SIZE, "Name and size"),
+    (CMP_NAME, "Name"),
+    (CMP_HASH, "Hash value"),
+    (CMP_FINGERPRINT, "Fingerprint"),
+)
 # Same rule for the algorithm combo (index saved). SHA-256 is the default.
 HASH_ALGORITHMS = ("MD5", "SHA-1", "SHA-256", "BLAKE2b")
 DEFAULT_HASH_ALGORITHM = 2

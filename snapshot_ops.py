@@ -390,7 +390,9 @@ class SnapshotOpsMixin:
     def _adopt_comparison_settings(self, comparison):
         """Put the snapshot's comparison settings into the Settings-tab
         controls (which re-tags through the usual change handler)."""
-        self.comparison_type_combo.setCurrentIndex(int(comparison.get("type", self._cmp_type)))
+        idx = self.comparison_type_combo.findData(int(comparison.get("type", self._cmp_type)))
+        if idx >= 0:
+            self.comparison_type_combo.setCurrentIndex(idx)
         self.hash_algorithm_combo.setCurrentIndex(int(comparison.get("algorithm", self._cmp_algorithm)))
         self.fingerprint_start_spin.setValue(int(comparison.get("chunk_start_kb", self._cmp_chunk_start_kb)))
         self.fingerprint_end_spin.setValue(int(comparison.get("chunk_end_kb", self._cmp_chunk_end_kb)))

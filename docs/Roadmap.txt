@@ -464,3 +464,16 @@ Status note (Duplicate Finder tweaks):
 - Duplicate Finder: no title tooltip (summary is under the lists); Copy/Move across buttons disabled; right progress bar/Cancel removed, left bar spans the full width with Cancel at its right end.
 - Duplicate Finder summary: "Groups - Duplicate files - Folders - Wasted space", each with its own color (Settings > File List View Colors > "Duplicate Finder Summary Colors", per theme, stored in summary_colors). Right pane: no "Free:" figure, "Total:" centered, rows aligned with the left pane.
 - Refresh in Duplicate Finder mode now behaves like Compare mode with a hash comparison type: after confirmation it discards the stored hashes and rehashes. "Clear cache" (Settings) asks for confirmation first.
+
+Comparison types: Name and size / Name (2026-11-21)
+ - Drop-down order: Name, size and date / Name and size / Name / Hash value / Fingerprint.
+   Settings and snapshots store a stable type id (0 NSD, 1 hash, 2 fingerprint, 3 name+size,
+   4 name), not the drop-down position.
+ - "Ignore file extensions" / "Only first part of file name" now only say how the NAME is
+   matched, for all three name-based types; what else must agree follows the type
+   (DiffEngineMixin._compare_axes). Behavior change: with Name, size and date, these two
+   options used to ignore size and date; they now still compare them (use "Name" for that).
+ - Newer/Older are disabled when dates are not compared, Larger/Smaller when sizes are not.
+ - Duplicate Finder groups by the same key; Extra copies / Sel. extras stay off for plain Name.
+ - Sel. dups / Sel. extras unselect selected files that have no duplicate.
+

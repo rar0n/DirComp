@@ -39,7 +39,7 @@ import os
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
-from constants import DUP_SUMMARY_TYPES, PATH_ROLE, TAG_COLORS
+from constants import DUP_SUMMARY_TYPES, IS_DIR_ROLE, PATH_ROLE, TAG_COLORS
 
 
 class DuplicateFinderMixin:
@@ -179,7 +179,7 @@ class DuplicateFinderMixin:
         hashing = self._hash_type_selected()
         # A different way of grouping (comparison type, name options) starts
         # the numbering over; within one way the colors stay put.
-        grouping = (hashing, self._comparison_key() if hashing else self._stem_mode())
+        grouping = (hashing, self._comparison_key())
         if getattr(pane, "_dup_grouping", None) != grouping:
             pane._dup_grouping = grouping
             self._dup_reset_colors(pane)
@@ -201,11 +201,13 @@ class DuplicateFinderMixin:
                     groups.setdefault(digest, []).append(node)
         else:
             stem_mode = self._stem_mode()
+            use_size, use_date = self._compare_axes()
             for node in files:
-                if stem_mode:
-                    key = self._name_stem(node["name"])
-                else:
-                    key = (node["name"], node["size"], int(node["mtime"]))
+                key = (self._name_stem(node["name"]) if stem_mode else node["name"],)
+                if use_size:
+                    key += (node["size"],)
+                if use_date:
+                    key += (int(node["mtime"]),)
                 groups.setdefault(key, []).append(node)
         groups = {k: v for k, v in groups.items() if len(v) > 1}
 
@@ -315,28 +317,32 @@ class DuplicateFinderMixin:
         if not hasattr(pane, "_dup_sel_cache"):
             pane._dup_sel_cache = {}
         pane._dup_sel_cache[type_key] = paths
-        if keep_paths:
-            guard, bulk = getattr(self, "_select_group_guard", False), getattr(self, "_bulk_select_guard", False)
-            self._select_group_guard = self._bulk_select_guard = True
-            try:
-                for item in pane.tree.selectedItems():
-                    if os.path.normpath(item.data(0, PATH_ROLE) or "") in keep_paths:
-                        item.setSelected(False)
-            finally:
-                self._select_group_guard, self._bulk_select_guard = guard, bulk
+        # Selected files with no duplicate at all (as the comparison type
+        # judges it) are unselected too -- they have no extra copies, and
+        # must not stay selected for a following delete. Folders are left.
+        group_of = pane._dup_info["group_of"]
+        guard, bulk = getattr(self, "_select_group_guard", False), getattr(self, "_bulk_select_guard", False)
+        self._select_group_guard = self._bulk_select_guard = True
+        try:
+            for item in pane.tree.selectedItems():
+                norm = os.path.normpath(item.data(0, PATH_ROLE) or "")
+                if norm in keep_paths or (not item.data(0, IS_DIR_ROLE) and norm not in group_of):
+                    item.setSelected(False)
+        finally:
+            self._select_group_guard, self._bulk_select_guard = guard, bulk
 
     def _dup_buttons_state(self, pane):
         """(duplicates enabled, extra copies enabled) for the pane's two
         Duplicate Finder buttons. Hash value / Fingerprint need the scanned
         files hashed first (nothing left unhashed or changed); "Extra copies"
-        is off for the two name-only options, where a shared name does not
+        is off for the plain "Name" type, where a shared name does not
         mean identical content."""
         info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
         if not info:
             return False, False
         hashing = self._hash_type_selected()
         ready = not (hashing and (info["pending"] or info["changed"]))
-        name_only = (not hashing) and bool(self._stem_mode())
+        name_only = (not hashing) and not self._compare_axes()[0]
         return ready, ready and not name_only
 
     def _dup_update_buttons(self, pane):

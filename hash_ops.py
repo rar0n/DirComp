@@ -541,15 +541,17 @@ class HashOpsMixin:
     def _on_main_comparison_type_activated(self, index):
         """The Main tab's comparison type drop-down was used: hand the choice
         to the Settings tab's combo, whose change handler does everything."""
-        if self.comparison_type_combo.currentIndex() != index:
-            self.comparison_type_combo.setCurrentIndex(index)
+        type_id = self.main_comparison_type_combo.itemData(index)
+        target = self.comparison_type_combo.findData(type_id)
+        if target >= 0 and self.comparison_type_combo.currentIndex() != target:
+            self.comparison_type_combo.setCurrentIndex(target)
 
     def _sync_main_comparison_combo(self):
         """Settings tab's comparison type changed (or was loaded): show it in
         the Main tab's copy, without triggering it."""
         combo = getattr(self, "main_comparison_type_combo", None)
-        index = self.comparison_type_combo.currentIndex()
-        if combo is not None and combo.currentIndex() != index:
+        index = combo.findData(self.comparison_type_combo.currentData()) if combo is not None else -1
+        if combo is not None and index >= 0 and combo.currentIndex() != index:
             combo.blockSignals(True)
             combo.setCurrentIndex(index)
             combo.blockSignals(False)
@@ -614,6 +616,10 @@ class HashOpsMixin:
                 btn = (getattr(pane, "select_toggle_buttons", None) or {}).get(key)
                 if btn is not None:
                     off = key in keys and (blocked or self._hash_mode_active())
+                    # Larger/Smaller need the size compared, Newer/Older the date.
+                    use_size, use_date = self._compare_axes()
+                    off = off or (key in ("larger", "smaller") and not use_size) \
+                        or (key in ("newer", "older") and not use_date)
                     if off and btn.isChecked():
                         btn.blockSignals(True)
                         btn.setChecked(False)

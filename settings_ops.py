@@ -154,7 +154,10 @@ class SettingsMixin:
             # session (the combo's items don't change) and avoids caring
             # whether a given combo's data role holds a string, enum, or
             # something else.
-            return widget.currentIndex()
+            data = widget.itemData(widget.currentIndex())
+            # A combo with ids (the comparison type) is saved by id, so
+            # adding entries later does not shuffle saved settings.
+            return data if isinstance(data, int) else widget.currentIndex()
         if isinstance(widget, QLineEdit):
             return widget.text()
         if isinstance(widget, QButtonGroup):
@@ -175,6 +178,8 @@ class SettingsMixin:
             widget.setValue(float(value))
         elif isinstance(widget, QComboBox):
             index = int(value)
+            if widget.count() and isinstance(widget.itemData(0), int):
+                index = widget.findData(index)
             if 0 <= index < widget.count():
                 widget.setCurrentIndex(index)
         elif isinstance(widget, QLineEdit):
@@ -546,10 +551,10 @@ class SettingsMixin:
         """Which comparison controls apply to the chosen type: Ignore
         file extensions only to Name, size and date; the algorithm to
         both hash types; the chunk sizes to Fingerprint alone."""
-        ctype = self.comparison_type_combo.currentIndex()
+        ctype = self.comparison_type_combo.currentData()
         hashing = ctype in (CMP_HASH, CMP_FINGERPRINT)
-        self.ignore_file_extensions_cb.setEnabled(ctype == CMP_NAME_SIZE_DATE)
-        self.first_name_only_cb.setEnabled(ctype == CMP_NAME_SIZE_DATE)
+        self.ignore_file_extensions_cb.setEnabled(not hashing)
+        self.first_name_only_cb.setEnabled(not hashing)
         self.hash_algorithm_combo.setEnabled(hashing)
         self.hash_algorithm_label.setEnabled(hashing)
         for spin, label in ((self.fingerprint_start_spin, self.fingerprint_start_label),
@@ -574,7 +579,7 @@ class SettingsMixin:
         DiffEngineMixin._comparison_key) -- re-tag both panes in place from
         the snapshots already in memory (no disk rescan: nothing on disk
         changed, and update_listings' retag_only path just recolors)."""
-        self._cmp_type = self.comparison_type_combo.currentIndex()
+        self._cmp_type = self.comparison_type_combo.currentData()
         self._sync_main_comparison_combo()
         self._cmp_algorithm = self.hash_algorithm_combo.currentIndex()
         self._cmp_chunk_start_kb = self.fingerprint_start_spin.value()

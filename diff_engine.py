@@ -22,7 +22,7 @@ A future change to how dates are compared/typed, or to what counts as
 import os
 import datetime
 
-from constants import CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT
+from constants import CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT, CMP_NAME_SIZE, CMP_NAME, CMP_NAME_SIZE, CMP_NAME
 
 # Sentinel results of DiffEngineMixin._diff_axes for a file the Smaller/
 # Larger/Newer/Older axes can't describe: hash comparison with no hash
@@ -142,13 +142,14 @@ class DiffEngineMixin:
         return self._stem_mode() != 0
 
     def _stem_mode(self) -> int:
-        """How file names are matched in the name-based comparison type:
-        0 = full name (plus size and date), 1 = name without extension
-        ("Ignore file extensions"), 2 = only the part before the first dot
-        ("Only first part of file name"; handy for names with several
-        extensions). Modes 1 and 2 ignore size and dates, and exist only
-        for the name-based type."""
-        if getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE) != CMP_NAME_SIZE_DATE:
+        """How file names are matched in the name-based comparison types:
+        0 = full name, 1 = name without extension ("Ignore file
+        extensions"), 2 = only the part before the first dot ("Only first
+        part of file name"; handy for names with several extensions).
+        This is only how the name is matched; what else must agree (size,
+        date) follows the comparison type -- see _compare_axes. The hash
+        types always use 0."""
+        if self._hash_type_selected():
             return 0
         if getattr(self, "_cmp_first_name", False):
             return 2
@@ -178,7 +179,18 @@ class DiffEngineMixin:
         if ctype == CMP_FINGERPRINT:
             return (CMP_FINGERPRINT, getattr(self, "_cmp_algorithm", 2),
                     getattr(self, "_cmp_chunk_start_kb", 64), getattr(self, "_cmp_chunk_end_kb", 64))
-        return (CMP_NAME_SIZE_DATE, self._stem_mode())
+        return (ctype, self._stem_mode())
+
+    def _compare_axes(self) -> tuple:
+        """(size matters, date matters) for a file matched by name: Name,
+        size and date -> both; Name and size -> size only; Name -> neither.
+        (The hash types, when not yet hashed, fall back to the first.)"""
+        ctype = getattr(self, "_cmp_type", CMP_NAME_SIZE_DATE)
+        if ctype == CMP_NAME:
+            return False, False
+        if ctype == CMP_NAME_SIZE:
+            return True, False
+        return True, True
 
     def _hash_type_selected(self) -> bool:
         """The Settings tab's comparison type is Hash value / Fingerprint."""
@@ -619,9 +631,10 @@ class DiffEngineMixin:
         for a folder -- so what counts as "different" matches what's on
         screen.
 
-        With "Ignore file extensions" on, a file that has a counterpart
-        at all matches: size and dates are not compared."""
-        if not is_dir and self._ignore_extensions_active():
+        Which of size and date count follows the comparison type (see
+        _compare_axes): none of them for plain "Name"."""
+        use_size, use_date = self._compare_axes()
+        if not (use_size or use_date):
             return None, None
         other_date_str = datetime.datetime.fromtimestamp(other_node[date_field]).strftime("%Y-%m-%d %H:%M:%S")
         if is_dir:
@@ -630,10 +643,10 @@ class DiffEngineMixin:
             other_size_str = self.format_size(other_node["size"])
 
         date_direction = None
-        if date_str != other_date_str:
+        if use_date and date_str != other_date_str:
             date_direction = "newer" if date_str > other_date_str else "older"
         size_direction = None
-        if size_str != other_size_str:
+        if use_size and size_str != other_size_str:
             size_direction = "larger" if self.compare_size(size_str, other_size_str) > 0 else "smaller"
         return size_direction, date_direction
 
@@ -667,10 +680,9 @@ class DiffEngineMixin:
         _diff_tag) -- only falls back to the size comparison (rank 1)
         once the (truncated) dates actually agree. See _DIFF_RANK for
         the same priority applied to _diff_tag's own top-level compare."""
-        if self._ignore_extensions_active():
-            return 0, None
-        same_size = node_a["size"] == node_b["size"]
-        same_date = int(node_a[date_field]) == int(node_b[date_field])
+        use_size, use_date = self._compare_axes()
+        same_size = (not use_size) or node_a["size"] == node_b["size"]
+        same_date = (not use_date) or int(node_a[date_field]) == int(node_b[date_field])
         if same_size and same_date:
             return 0, None
         if not same_date:

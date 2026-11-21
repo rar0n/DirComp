@@ -806,7 +806,9 @@ class PaneBuilderMixin:
             btn.setStyleSheet(_bevel_button_stylesheet(bg, fg))
             pane.select_toggle_buttons[type_key] = btn
             if type_key in ("larger", "smaller", "newer", "older"):
-                btn.setEnabled(not self._hash_mode_active())
+                use_size, use_date = self._compare_axes()
+                axis_ok = use_size if type_key in ("larger", "smaller") else use_date
+                btn.setEnabled(axis_ok and not self._hash_mode_active())
 
         # Duplicate Finder mode (Compare folders off): these two take the
         # place of the six compare buttons above (see _group_buttons).
@@ -817,7 +819,7 @@ class PaneBuilderMixin:
             ("Extra copies", "dup_extra",
              "Select all copies but one in each group of identical files -- the one "
              "left alone is set under Settings -> Options -> \"Extra copies keep\". "
-             "Not available with the two name-only options (a shared name does not "
+             "Not available with the plain \"Name\" comparison (a shared name does not "
              "make files identical)."),
             ("Sel. dups", "dup_sel",
              "Duplicates of selection: of the files already selected (a selected folder "

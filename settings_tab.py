@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from constants import (
-    COMPARISON_TYPES, HASH_ALGORITHMS, CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT,
+    COMPARISON_TYPE_ITEMS, HASH_ALGORITHMS, CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT,
     MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB,
     DUP_SUMMARY_TYPES, TAG_COLORS, _DISABLED_CHECKBOX_STYLE, _DISABLED_SPINBOX_STYLE,
     _MAX_TREE_INDENTATION, _MIN_TREE_INDENTATION, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE,
@@ -495,12 +495,16 @@ class SettingsTabMixin:
         comparison_type_row.setContentsMargins(0, 0, 0, 0)
         comparison_type_row.addWidget(QLabel("Comparison type:"))
         self.comparison_type_combo = QComboBox()
-        self.comparison_type_combo.addItems(COMPARISON_TYPES)
-        self.comparison_type_combo.setCurrentIndex(self._cmp_type)
+        for type_id, label in COMPARISON_TYPE_ITEMS:
+            self.comparison_type_combo.addItem(label, type_id)
+        self.comparison_type_combo.setCurrentIndex(max(0, self.comparison_type_combo.findData(self._cmp_type)))
         self.comparison_type_combo.setToolTip(
             "How a file is judged to match its counterpart in the other pane.\n"
             "Name, size and date: same name, size and modification date (the "
             "classic comparison).\n"
+            "Name and size: same name and size; dates are not compared.\n"
+            "Name: same name only; size and dates are not compared (e.g. to see "
+            "which files belong together).\n"
             "Hash value / Fingerprint: compare file contents instead. Hashing "
             "is not available yet, so for now these two behave like "
             "Name, size and date."
@@ -560,10 +564,11 @@ class SettingsTabMixin:
         self.ignore_file_extensions_cb.setChecked(self._cmp_ignore_ext)
         self.ignore_file_extensions_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.ignore_file_extensions_cb.setToolTip(
-            "Name, size and date only: files match by name without the "
-            "extension (a.txt matches a.doc), and size and dates are not "
-            "compared. A file matches if any file in the other folder has "
-            "the same name minus extension. Folders still match by full name."
+            "Name-based comparison types only: files match by name without the "
+            "extension (a.txt matches a.doc); what else is compared (size, "
+            "date) follows the comparison type. A file matches if any file in "
+            "the other folder has the same name minus extension. Folders still "
+            "match by full name."
         )
         ignore_ext_row.addWidget(self.ignore_file_extensions_cb)
         ignore_ext_row.addSpacing(20)
@@ -571,10 +576,11 @@ class SettingsTabMixin:
         self.first_name_only_cb.setChecked(self._cmp_first_name)
         self.first_name_only_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.first_name_only_cb.setToolTip(
-            "Name, size and date only: files match by the part of the name "
-            "before the first dot (a.tar.gz matches a.txt and a.bak.zip), "
-            "so names with several extensions match too. Size and dates are "
-            "not compared. Cannot be combined with Ignore file extensions."
+            "Name-based comparison types only: files match by the part of the "
+            "name before the first dot (a.tar.gz matches a.txt and a.bak.zip), "
+            "so names with several extensions match too; what else is compared "
+            "(size, date) follows the comparison type. Cannot be combined with "
+            "Ignore file extensions."
         )
         ignore_ext_row.addWidget(self.first_name_only_cb)
         ignore_ext_row.addStretch(1)

@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
 # on purpose: other modules may still import them via ui_builder.
 from constants import IS_DIR_ROLE, CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, TAG_COLORS
 from constants import CMP_NAME_SIZE_DATE, DEFAULT_HASH_ALGORITHM, DEFAULT_FINGERPRINT_CHUNK_KB
-from constants import COMPARISON_TYPES
+from constants import COMPARISON_TYPE_ITEMS
 from panes import DirectoryPane
 from snapshot_ops import is_snapshot_file_name
 from dnd_widgets import DirDropLineEdit, DirDropTreeWidget
@@ -1501,8 +1501,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # step both ways; algorithm and chunk sizes stay in the Settings
         # tab). Sits before Refresh.
         self.main_comparison_type_combo = QComboBox()
-        self.main_comparison_type_combo.addItems(COMPARISON_TYPES)
-        self.main_comparison_type_combo.setCurrentIndex(getattr(self, "_cmp_type", 0))
+        for type_id, label in COMPARISON_TYPE_ITEMS:
+            self.main_comparison_type_combo.addItem(label, type_id)
+        self.main_comparison_type_combo.setCurrentIndex(
+            max(0, self.main_comparison_type_combo.findData(getattr(self, "_cmp_type", 0))))
         self.main_comparison_type_combo.setFixedHeight(self.refresh_button.height())
         self.main_comparison_type_combo.setToolTip(
             "How a file is judged to match its counterpart in the other pane "

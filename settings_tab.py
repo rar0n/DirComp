@@ -1194,9 +1194,37 @@ class SettingsTabMixin:
         track_opacity_row.addStretch(1)
         flv_colors_group_outer.addLayout(track_opacity_row)
 
+        # ---- Marker luminance difference threshold: a selection marker
+        # in the scrollbar track or handle whose luminance (0..255) is
+        # within this of the track's / handle's own gets its luminance
+        # inverted, so e.g. a black row on a dark track stays visible
+        # (custom_widgets._contrasting_marker_color). 0 = off. Per theme. ----
+        marker_luma_row = QHBoxLayout()
+        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference threshold:")
+        self.scrollbar_marker_luma_spin = SliderSpinBox()
+        self.scrollbar_marker_luma_spin.setRange(0, 255)
+        self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])
+        self.scrollbar_marker_luma_spin.setToolTip(
+            "Keeps selection markers visible in the scrollbar. If a marker's "
+            "luminance (0 = black ... 255 = white) differs from the track's -- or, "
+            "for the markers seen on the handle, the handle's -- by less than this, "
+            "the marker's luminance is inverted (a black marker on a dark track "
+            "turns light, a white one on a light track turns dark; if inverting "
+            "does not help, e.g. a mid-gray marker, black or white is used). "
+            "0 turns it off."
+        )
+        self.scrollbar_marker_luma_spin.valueChanged.connect(self._on_scrollbar_marker_luma_changed)
+        marker_luma_row.addWidget(spin_slider_inline(
+            self.scrollbar_marker_luma_label, self.scrollbar_marker_luma_spin,
+            SpinSlider(self.scrollbar_marker_luma_spin),
+        ), 0, Qt.AlignVCenter)
+        marker_luma_row.addStretch(1)
+        flv_colors_group_outer.addLayout(marker_luma_row)
+
         # Duplicate File Colors (built above) closes the Default / Misc colors block.
         flv_colors_group_outer.addWidget(self._settings_subsubsection("Duplicate File Colors", dup_group))
         self._aligned_option_rows.append((self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin))
+        self._aligned_option_rows.append((self.scrollbar_marker_luma_label, self.scrollbar_marker_luma_spin))
 
         # ---- Line colors (inside the Indentation Line subsection built
         # just below): nested at the bottom of File

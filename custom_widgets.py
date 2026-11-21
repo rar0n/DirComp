@@ -635,6 +635,14 @@ _SCROLLBAR_HANDLE_OPACITY = _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT / 100.0
 # View -> "Scrollbar track opacity"), alongside handle_opacity in
 # _SCROLLBAR_STYLE.
 _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
+# Marker luminance difference threshold (Settings tab -> File List View ->
+# "Marker luminance difference threshold"; per theme, like the two
+# opacities): a selection marker whose luminance (0..255) is closer than
+# this to the luminance of what it is drawn on -- the track for the
+# ordinary markers, the handle for the ones under the handle -- gets its
+# luminance inverted (see _contrasting_marker_color), so e.g. a black row
+# on a dark track stays visible. 0 = off.
+_DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD = 0
 # How the FLV scrollbar handle shows the selection markers beneath it
 # (Settings tab -> Global Options -> "Scrollbar handle style"). Unlike
 # the two opacities above this is NOT per theme -- it's a Global Option,
@@ -654,8 +662,38 @@ _DEFAULT_SCROLLBAR_HANDLE_STYLE = "fisheye"
 _SCROLLBAR_STYLE = {
     "handle_opacity": _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT,
     "track_opacity": _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT,
+    "marker_luma_threshold": _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD,
     "handle_style": _DEFAULT_SCROLLBAR_HANDLE_STYLE,
 }
+
+
+def _luma(color: QColor) -> float:
+    """Luminance of `color`, 0..255 (the same weights the Duplicate File
+    Colors' "Inverse luminance" text color uses)."""
+    return 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
+
+
+def _contrasting_marker_color(color: QColor, base: QColor) -> QColor:
+    """`color` (a selection marker) as it should be drawn on `base` (the
+    track or handle color): unchanged unless their luminances differ by
+    less than _SCROLLBAR_STYLE["marker_luma_threshold"], in which case the
+    marker's luminance is inverted (hue and saturation kept: HSL lightness
+    L -> 255 - L). A marker near mid-gray hardly changes that way, so if
+    the inverted color is still within the threshold, black or white is
+    used instead, whichever is farther from `base`."""
+    threshold = _SCROLLBAR_STYLE["marker_luma_threshold"]
+    if threshold <= 0:
+        return color
+    base_luma = _luma(base)
+    if abs(_luma(color) - base_luma) >= threshold:
+        return color
+    hsl = color.toHsl()
+    inverted = QColor.fromHsl(max(hsl.hslHue(), 0), hsl.hslSaturation(), 255 - hsl.lightness(), color.alpha())
+    if abs(_luma(inverted) - base_luma) >= threshold:
+        return inverted
+    extreme = QColor(0, 0, 0) if base_luma >= 128 else QColor(255, 255, 255)
+    extreme.setAlpha(color.alpha())
+    return extreme
 
 
 # Factor applied to the platform style's own minimum handle length
@@ -1120,6 +1158,8 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
             handle_style = self._magnifier_style
             plain = handle_style == "plain"
             window = None if plain else self._magnifier_window(groove_rect, handle_rect)
+            groove_color = QColor(_SCROLLBAR_COLORS["groove"])
+            handle_color = QColor(_SCROLLBAR_COLORS["handle"])
             mpen = QPen()
             mpen.setWidth(2)
             x1 = groove_rect.left() + 1
@@ -1149,7 +1189,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                 painter.setClipRegion(QRegion(groove_rect).subtracted(QRegion(handle_rect)))
             for fraction, color in self._markers:
                 y = groove_top + int(fraction * groove_height)
-                mpen.setColor(color)
+                mpen.setColor(_contrasting_marker_color(color, groove_color))
                 painter.setPen(mpen)
                 painter.drawLine(x1, y, x2, y)
             painter.restore()
@@ -1175,7 +1215,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                     # groove above).
                     for fraction, color in self._markers:
                         y = groove_top + int(fraction * groove_height)
-                        mpen.setColor(color)
+                        mpen.setColor(_contrasting_marker_color(color, handle_color))
                         painter.setPen(mpen)
                         painter.drawLine(x1, y, x2, y)
                 elif handle_style == "hard_cutoff":
@@ -1187,7 +1227,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                         y = self._hard_cutoff_row_to_y(row, offset, page, unit_per_row, handle_rect)
                         if y is None:
                             continue
-                        mpen.setColor(color)
+                        mpen.setColor(_contrasting_marker_color(color, handle_color))
                         painter.setPen(mpen)
                         painter.drawLine(x1, y, x2, y)
                 else:
@@ -1204,7 +1244,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                         if row < row_lo or row > row_hi:
                             continue
                         y = row_to_y(row, center_row, mag, row_lo, row_hi, handle_rect)
-                        mpen.setColor(color)
+                        mpen.setColor(_contrasting_marker_color(color, handle_color))
                         painter.setPen(mpen)
                         painter.drawLine(x1, y, x2, y)
                 painter.restore()

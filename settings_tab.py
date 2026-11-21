@@ -176,7 +176,7 @@ class SettingsTabMixin:
           - Options: synced copies of the Main tab's (Quick Options)
             checkboxes (via _link_checkboxes) -- same settings, just also
             reachable here -- plus the options that only exist here.
-          - Comparison Type: the comparison type and everything that
+          - Comparison Options: the comparison type and everything that
             follows from it (hashing, ignore options, hash cache, ...).
           - Misc Colors: GUI, default button, progress and busy bar
             colors.
@@ -838,9 +838,9 @@ class SettingsTabMixin:
         default_colors_group_outer = QVBoxLayout(default_colors_group)
         default_colors_group_outer.addWidget(default_colors_table)
 
-        # Level 2 blocks of Global Settings: Theme, Options, Comparison Type, Misc Colors.
+        # Level 2 blocks of Global Settings: Theme, Options, Comparison Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
-        global_settings_flow.addWidget(self._settings_subsection("Comparison Type", comparison_group))
+        global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):

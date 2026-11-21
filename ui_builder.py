@@ -401,12 +401,23 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
         self.setMinimumWidth(MINIMUM_WINDOW_WIDTH)
 
+        # A rebuild keeps the tab that was showing, and the new tab widget
+        # starts on it: any event pumping while the rest of the UI is built
+        # then never paints the Main tab (the flash).
+        try:
+            previous_tab = self.tabs.currentIndex()
+        except (AttributeError, RuntimeError):
+            previous_tab = 0
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
+        self.tabs.setCurrentIndex(previous_tab)
         if not self._dual_pane_enabled:
             self._fill_comparison_copy_holder()
+
+        self._apply_right_pane_drops()
+        self._dup_update_expand_buttons()
 
         # Apply the right button-group arrangement and date-column
         # visibility for the window's actual current width --
@@ -422,6 +433,20 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._widget_defaults = self._capture_theme_widget_values()
             for color_set in self._color_sets.values():
                 color_set["widgets"] = dict(self._widget_defaults)
+
+    def _apply_right_pane_drops(self):
+        """Dropping a folder on the right pane means nothing in Duplicate
+        Finder mode (it lists the left pane's duplicates), so its entry
+        field, file list and Statistics view only accept drops in Compare
+        folders mode."""
+        enabled = self._dual_pane_enabled
+        pane = self.right
+        for widget in (getattr(pane, "entry", None), getattr(pane, "tree", None)):
+            if widget is not None:
+                widget.setAcceptDrops(enabled)
+        timeline = getattr(pane, "timeline", None)
+        if timeline is not None:
+            timeline.set_drops_enabled(enabled)
 
     def _build_main_tab(self) -> QWidget:
         """Everything that used to be the whole central widget, before
@@ -585,7 +610,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
     def _build_cluster_row(self, filter_frame=None) -> QWidget:
         """The row under both panes: the left pane's button cluster, the
-        central "Folder Op" group (Swap; room for more folder-level
+        central "Both Panes" group (Swap; room for more folder-level
         actions later, e.g. a one-go synchronize), and the right pane's
         cluster. The two clusters share the width the central group leaves
         over equally (see CenterSplitLayout and
@@ -635,11 +660,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         return row
 
     def _build_folder_op_group(self) -> QGroupBox:
-        """The central "Folder Op" button group -- one button column for
+        """The central "Both Panes" button group -- one button column for
         now (self._folder_op_buttons, top to bottom; append further buttons
         there)."""
         uniform_w, uniform_h = self._uniform_button_size()
-        group = QGroupBox("Folder Op")
+        group = QGroupBox("Both Panes")
         grid = QGridLayout(group)
         margins = grid.contentsMargins()
         grid.setContentsMargins(_CLUSTER_GROUP_PAD, margins.top(), _CLUSTER_GROUP_PAD, margins.bottom())
@@ -898,8 +923,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         kept_selected = self._collect_selected_paths(left_tree) if left_tree is not None else set()
         current_tab = self.tabs.currentIndex() if getattr(self, "tabs", None) else 0
         self._build_ui()
-        self._restore_ui_state(state)
+        # Before _restore_ui_state, whose listing work can pump events and so
+        # paint the new tab widget's default tab (Main) -- see _rebuild_ui.
         self.tabs.setCurrentIndex(current_tab)
+        self._restore_ui_state(state)
         if kept_expanded or kept_selected:
             # Left pane only: with Synchronize Views the selection must not
             # be mirrored onto the right pane (whose own selection is gone).
@@ -1649,7 +1676,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # feature, for after this initial sync).
         self.synchronize_views_cb.stateChanged.connect(self._on_synchronize_views_toggled_for_metric)
 
-        self.symmetrical_buttons_cb = QCheckBox("Symmetrical GUI")
+        # Duplicate Finder mode has no real right-hand button groups to mirror, so
+        # the layout is only symmetrical-ish there.
+        self.symmetrical_buttons_cb = QCheckBox(
+            "Symmetrical (ish) GUI" if not self._dual_pane_enabled else "Symmetrical-ish GUI")
         self.symmetrical_buttons_cb.setToolTip(
             "When on, the right pane's Select/Clipboard groups and surrounding buttons "
             "mirror the left pane's around the vertical center, and the right pane's "

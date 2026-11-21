@@ -1,41 +1,18 @@
 """
-Directory Comparison App (PySide6 port)
+Directory Comparison App (PySide6)
 
-Ported from a Tkinter/tkinterdnd2 original. Adds native Qt drag-and-drop
-(no external dnd library needed) and a working Clipboard group:
-Copy / Cut / Paste, interoperable with GNOME/Nemo/Nautilus/Dolphin via the
-"x-special/gnome-copied-files" mime type (same approach used in the Timeline
-File Explorer project, which is incorporated as Statistics View here).
+Dual-pane directory comparison with a Duplicate Finder mode, hash/fingerprint
+comparison, folder snapshots and a Statistics View (the former Timeline
+Explorer). Ported from a Tkinter original.
 
 This file is the entry point. It composes DirectoryComparisonApp out of
-mixins that each own one concern, so a change usually only touches one
-file:
+mixins that each own one concern (see the base classes below), so a change
+usually only touches one file. docs/File-structure.txt lists every file with
+a short description.
 
-  constants.py     - MIME type, tree item data roles, tag colors, diff ranks
-  trash_compat.py  - optional send2trash dependency shim
-  dnd_widgets.py   - DirDropLineEdit / DirDropTreeWidget (drag-and-drop)
-  progress.py      - _CancellableProgress (progress bar + Cancel token)
-  panes.py         - DirectoryPane (one side's widgets/state)
-  diff_engine.py   - DiffEngineMixin: how two items are compared (tags,
-                      ranks, sizes, dates) -- e.g. a future change to how
-                      dates are compared/typed belongs here
-  listing_ops.py   - ListingMixin: populating/refreshing/sorting each tree
-  selection_ops.py - SelectionMixin: the Select group's buttons + search
-  transfer_ops.py  - TransferMixin: Clipboard group, Move/Copy, New Folder
-  sync_views.py    - SyncMixin: "Synchronize Views"
-  swap_ops.py      - SwapOpsMixin: the Main tab's "Swap pane" button
-  statistics_ops.py  - TimelineOpsMixin: feeds each pane's embedded
-                      TimelineWidget from its snapshot, syncs selection
-                      with that pane's tree
-  settings_ops.py  - SettingsMixin: Save Settings / Load Settings --
-                      persists every option/spinbox on the GUI
-  context_menu_ops.py - ContextMenuMixin: File List View right-click menu
-                      (Copy/Cut/Paste, Paste special, Open, Open with, Properties)
-  ui_builder.py     - UiBuilderMixin: all widget/layout construction
-
-Mixins are listed before QMainWindow in the class bases below so their
-methods (e.g. resizeEvent/showEvent) take precedence over QMainWindow's
-defaults in the MRO.
+Mixins are listed before QMainWindow in the class bases so their methods
+(e.g. resizeEvent/showEvent) take precedence over QMainWindow's defaults in
+the MRO.
 """
 
 import sys
@@ -59,6 +36,7 @@ from settings_ops import SettingsMixin
 from context_menu_ops import ContextMenuMixin
 from ui_builder import UiBuilderMixin, PANE_TIMELINE_HEIGHT
 from custom_widgets import install_spinbox_wheel_guard
+from constants import APP_VERSION
 
 
 class DirectoryComparisonApp(
@@ -80,7 +58,7 @@ class DirectoryComparisonApp(
 ):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Directory Comparison")
+        self.setWindowTitle(f"Directory Comparison {APP_VERSION}")
         # +PANE_TIMELINE_HEIGHT: since each pane grew a timeline panel of
         # roughly that height, start the window that much taller so it
         # doesn't eat into room the file list used to have.

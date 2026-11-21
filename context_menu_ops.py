@@ -1,7 +1,7 @@
 """
 ContextMenuMixin: the File List View's right-click menu.
 
-    Copy / Cut / Paste
+    Copy / Copy Metadata  >  name, size, dates, hash, fingerprint / Cut / Paste
     Paste special  >  Paste Folders
     ------------------
     Open
@@ -34,7 +34,7 @@ from PySide6.QtCore import QMimeDatabase, QStandardPaths, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox
 
-from constants import GNOME_COPIED_FILES_MIME, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
+from constants import CHANGED_FIELD_LABEL, CMP_FINGERPRINT, CMP_HASH, GNOME_COPIED_FILES_MIME, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
 from panes import DirectoryPane
 
 # The roadmap asks for a confirmation before launching files. Flip to
@@ -270,6 +270,35 @@ class ContextMenuMixin:
             return act
 
         add(menu, "Copy", lambda: self.copy_to_clipboard(pane), has_sel)
+        # Copy Metadata: the right-clicked item's name, size and dates (as
+        # listed in the file list), and a file's stored hash / fingerprint,
+        # as text. Each entry is enabled only if that value exists (the size
+        # and the digests only for files; the digests only if already known).
+        clicked_path = clicked.data(0, PATH_ROLE) if clicked is not None else None
+        node = self._snapshot_lookup(clicked_path, pane) if clicked_path else None
+        is_file = node is not None and not node["is_dir"]
+        file_digests = {}
+        if is_file:
+            file_digests = {kind: self._stored_digest_info(clicked_path, kind) for kind in (CMP_HASH, CMP_FINGERPRINT)}
+
+        def stamp(ts):
+            return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+
+        copy_metadata = menu.addMenu("Copy Metadata")
+        text_entries = [("Copy File Name", "file name", node["name"] if node else None)]
+        text_entries.append(("Copy File Size", "file size", str(node["size"]) if is_file else None))
+        for label, what, field in (("Copy Modified Date", "modified date", "mtime"),
+                                   (f"Copy {CHANGED_FIELD_LABEL}", "changed date", "ctime"),
+                                   ("Copy Accessed Date", "accessed date", "atime")):
+            text_entries.append((label, what, stamp(node[field]) if node else None))
+        for label, what, text in text_entries:
+            add(copy_metadata, label, lambda t=text, w=what: self._copy_text(pane, clicked_path, t, w),
+                text is not None)
+        copy_metadata.addSeparator()
+        for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
+            info = file_digests.get(kind)
+            add(copy_metadata, label, lambda k=kind, i=info: self._copy_digest(pane, clicked_path, k, i),
+                info is not None)
         add(menu, "Cut", lambda: self.cut_to_clipboard(pane), has_sel)
         add(menu, "Paste", lambda: self.paste_from_clipboard(pane, targets[0]),
             can_paste and len(targets) == 1)

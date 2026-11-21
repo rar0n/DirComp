@@ -1,34 +1,36 @@
-State of DirComp app file structure (pr. 2026.11.07 at 12:40)
+State of DirComp app file structure (pr. 2026.11.22)
 
 File                   - Lines - Comment
 --------------------------------------------------------------------------------------
-binning.py             -   512 - Pluggable "nice" binning strategies for TimelineWidget.
-constants.py           -   226 - 
-context_menu_ops.py    -   419 - File List View right-click menu
-custom_widgets.py      - 2,140 - now also holds the slider classes
-diff_engine.py         -   867 - comparison types, hash pairing, diff tags
-dircomp_settings.json  -   505 - The stored settings file.
-dnd_widgets.py         -   956
+binning.py             -   512 - Pluggable "nice" binning strategies for the Statistics View
+comparison_copy.py     -   234 - Main-tab copy of the Comparison Options group for Duplicate Finder mode (ComparisonCopyMixin)
+constants.py           -   269 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
+context_menu_ops.py    -   482 - File List View right-click menu (ContextMenuMixin)
+custom_widgets.py      - 2,337 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
+diff_engine.py         - 1,028 - comparison types, hash pairing, diff tags (DiffEngineMixin)
+dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)
+dnd_widgets.py         -   956 - drag-and-drop widgets: folder entry combo box, file list tree
+duplicate_ops.py       -   702 - Duplicate Finder mode: duplicate groups, colors, the right-pane list (DuplicateFinderMixin)
 hash_cache_store.py    -   384 - persistent hash cache: one SQLite file (HashCacheStore), no Qt
-hash_ops.py            -   623 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
-listing_ops.py         - 1,791
-main.py                -   153
-pane_builder.py        - 1,361 - one pane's widgets, Statistics panel, splitter
-panes.py               -   166 - a plain state holder for DirectoryPane
-progress.py            -   187
-responsive_layout.py   -   704 - wide/narrow layout switching
-selection_ops.py       - 2,090
-settings_ops.py        -   617
-settings_tab.py        - 2,343 - Settings tab construction and helpers
-snapshot_ops.py        -   420 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
-statistics_ops.py      -   858
-statistics_widget.py   - 2,394
-swap_ops.py            -   105 - Main-tab Swap pane button: swaps root folders + histories (SwapOpsMixin)
-sync_views.py          -   704
-theme_ops.py           - 1,244 - color/theme handlers, palette, color sets
-transfer_ops.py        - 1,238
-trash_compat.py        -    15
-ui_builder.py          - 1,806 - window skeleton, status line, filter and global options
+hash_ops.py            -   692 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
+listing_ops.py         - 1,962 - populating, refreshing and sorting each pane's file list (ListingMixin)
+main.py                -   138 - entry point: composes the app from the mixins
+pane_builder.py        - 1,451 - one pane's widgets, Statistics panel, splitter (PaneBuilderMixin)
+panes.py               -   169 - a plain state holder for DirectoryPane
+progress.py            -   187 - cancellable progress-bar helper
+responsive_layout.py   -   448 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
+selection_ops.py       - 2,242 - Select group buttons and the recursive search behind them (SelectionMixin)
+settings_ops.py        -   634 - Save / Load Settings to the JSON settings file (SettingsMixin)
+settings_tab.py        - 2,633 - Settings tab construction and helpers (SettingsTabMixin)
+snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
+statistics_ops.py      -   863 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
+statistics_widget.py   - 2,408 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
+swap_ops.py            -   105 - Main-tab Swap button: swaps root folders + histories (SwapOpsMixin)
+sync_views.py          -   693 - Synchronize Views: mirrors navigation, selection, expand and scroll (SyncMixin)
+theme_ops.py           - 1,386 - color/theme handlers, palette, color sets (ThemeOpsMixin)
+transfer_ops.py        - 1,256 - Clipboard group, Move/Copy, New Folder, transfers and the central progress bar (TransferMixin)
+trash_compat.py        -    15 - optional send2trash shim for Delete
+ui_builder.py          - 1,947 - window skeleton, status line, filter and global options (UiBuilderMixin)
 
 
 
@@ -53,6 +55,25 @@ width or alignment.
 A `BinAxis` knows nothing about files or `FileRecord` - it only deals in
 plain floats (a unix timestamp, or a byte count). That keeps it reusable
 for any other "plot a distribution of numeric values over a range" widget.
+
+
+
+
+
+comparison_copy.py
+----------------------
+ComparisonCopyMixin: a second copy of the Settings tab's "Comparison Options"
+group, shown on the Main tab in Duplicate Finder mode (below the right pane,
+where the button groups sit in Compare Folders mode; no title), together with
+that mode's Quick Options column beside it -- see
+UiBuilderMixin._build_cluster_row.
+
+The Settings tab's widgets (self.comparison_type_combo, ...) stay the real,
+live controls: everything that reads, saves or reacts to a comparison setting
+still goes through them. Each widget here only mirrors one of them, both ways
+(a change in the copy is handed to the original, whose own handlers do the
+rest), and follows the original's enabled state, so greying a control on the
+Settings tab greys its copy too.
 
 
 
@@ -121,6 +142,46 @@ A future change to how dates are compared/typed, or to what counts as
 
 
 
+duplicate_ops.py
+----------------------
+DuplicateFinderMixin: Duplicate Finder mode (Compare folders off) -- finds the
+sets of identical files in the left pane's folder and tells the rest of the
+app which color each one gets. No Qt widgets are created here; it reads the
+pane's snapshot (see DiffEngineMixin._build_snapshot) and the tree's expansion
+state, and leaves painting to ListingMixin._apply_tag.
+
+What is "identical" follows the comparison type (Settings -> Options):
+ - Name, size and date: same name, size and whole-second modified date; with
+   "Ignore file extensions" / "Only first part of file name" the (shortened)
+   name alone.
+ - Hash value / Fingerprint: same digest. Only files whose size is shared with
+   another file in scope can be duplicates, so only those are hashed (see
+   _dup_hash_nodes) -- unique-size files are never touched, and show the plain
+   file color.
+
+Scope: Recursive Folder Selections on = every file under the pane's root;
+off = the root's files plus the files of the folders expanded at the time of
+the scan. The Global File Filter / "List Files" limit the files considered,
+and ignored files (empty files / hard links, see DiffEngineMixin._ignored_kind)
+never take part.
+
+The result, pane._dup_info, is rebuilt by _dup_prepare at the start of every
+listing/re-tag (ListingMixin.update_listing) -- so after a Hash, a setting
+change or a Refresh -- and is what DiffEngineMixin._lone_tag reads:
+    "group_of"  {normalized path: color index} of every file that has a copy
+    "groups"    {group key: [file nodes]} (2 or more each), first appearance first
+    "pending"   hash types: files that need a hash and have none ("unhashed")
+    "changed"   hash types: files whose cached hash is out of date
+    "pending_dirs"/"changed_dirs"  the folders holding such files
+    "wasted"    bytes held by the extra copies
+A group's color index is remembered per group key in pane._dup_color_map until
+the folder changes or the pane's Refresh is pressed, so colors stay put while
+files are deleted or moved; new groups continue the numbering.
+
+
+
+
+
 dnd_widgets.py
 ----------------------
 Small custom Qt widgets shared by both panes: a QLineEdit that accepts a
@@ -172,7 +233,6 @@ Accessed Date -- see COL_* below. Diff coloring (_diff_tag) still only
 ever compares size and Modified Date, same as before; the two extra
 columns are informational, not part of what makes an item "differ" from
 its counterpart.
-"""
 
 
 
@@ -180,9 +240,7 @@ its counterpart.
 
 main.py
 ----------------------
-This file is the entry point. It composes DirectoryComparisonApp out of
-mixins that each own one concern, so a change usually only touches one
-file
+The entry point. It composes DirectoryComparisonApp out of mixins that each own one concern (see the base classes), so a change usually only touches one file. The mixins come before QMainWindow in the bases so their methods win in the MRO. This table lists every file; the sections below are the top comments of each.
 
 
 

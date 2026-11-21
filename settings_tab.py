@@ -343,7 +343,7 @@ class SettingsTabMixin:
         # their Main-tab primaries where they have one, just applied to
         # these secondary copies too (_link_checkboxes only mirrors
         # checked state, not enabled state).
-        symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical GUI", 1, 0, indent=20)
+        symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical (ish) GUI", 1, 0, indent=20)
         symmetrical_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         expand_secondary = _add_synced(self.expand_matching_cb, "Expand To Selection", 1, 2, indent=20)
@@ -510,9 +510,11 @@ class SettingsTabMixin:
             "Name and size: same name and size; dates are not compared.\n"
             "Name: same name only; size and dates are not compared (e.g. to see "
             "which files belong together).\n"
-            "Hash value / Fingerprint: compare file contents instead. Hashing "
-            "is not available yet, so for now these two behave like "
-            "Name, size and date."
+            "Hash value: same file contents (a hash of the whole file).\n"
+            "Fingerprint: same file size plus the first and last chunk of "
+            "the contents (much faster for big files).\n"
+            "Both need the files hashed first (the Hash button); files "
+            "that are not hashed yet cannot be compared by content."
         )
         comparison_type_row.addWidget(self.comparison_type_combo)
         comparison_type_row.addStretch(1)
@@ -1192,9 +1194,38 @@ class SettingsTabMixin:
         track_opacity_row.addStretch(1)
         flv_colors_group_outer.addLayout(track_opacity_row)
 
+        # ---- Marker luminance difference threshold: a selection marker
+        # in the scrollbar track or handle whose luminance (0..255) is
+        # within this of the track's / handle's own gets its luminance
+        # inverted, so e.g. a black row on a dark track stays visible
+        # (custom_widgets._contrasting_marker_color). 0 = off. Per theme. ----
+        marker_luma_row = QHBoxLayout()
+        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference threshold:")
+        self.scrollbar_marker_luma_spin = SliderSpinBox()
+        self.scrollbar_marker_luma_spin.setRange(0, 255)
+        self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])
+        self.scrollbar_marker_luma_spin.setToolTip(
+            "Keeps selection markers visible in the scrollbar. If a marker, as it is "
+            "actually seen, stands out from the track by less than this many luminance "
+            "steps (0 = black ... 255 = white), its luminance is inverted (a black marker "
+            "on a dark track turns light, a white one on a light track turns dark; if "
+            "inverting does not help, e.g. a mid-gray marker, black or white is used). "
+            "\"As seen\" counts the Scrollbar track opacity (and, for the markers under "
+            "the handle, the Scrollbar handle opacity): a marker faded to 50% differs only "
+            "half as much from the track as its own color does. 0 turns it off."
+        )
+        self.scrollbar_marker_luma_spin.valueChanged.connect(self._on_scrollbar_marker_luma_changed)
+        marker_luma_row.addWidget(spin_slider_inline(
+            self.scrollbar_marker_luma_label, self.scrollbar_marker_luma_spin,
+            SpinSlider(self.scrollbar_marker_luma_spin),
+        ), 0, Qt.AlignVCenter)
+        marker_luma_row.addStretch(1)
+        flv_colors_group_outer.addLayout(marker_luma_row)
+
         # Duplicate File Colors (built above) closes the Default / Misc colors block.
         flv_colors_group_outer.addWidget(self._settings_subsubsection("Duplicate File Colors", dup_group))
         self._aligned_option_rows.append((self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin))
+        self._aligned_option_rows.append((self.scrollbar_marker_luma_label, self.scrollbar_marker_luma_spin))
 
         # ---- Line colors (inside the Indentation Line subsection built
         # just below): nested at the bottom of File
@@ -1665,7 +1696,7 @@ class SettingsTabMixin:
         flv_buttons_group = self._main_button_color_table([
             ("up", "Up one folder"), ("select_dir", "Select Directory"),
             ("save_snapshot", "Save Snapshot"),
-            ("hash", "Hash"), ("pane_refresh", "Refresh"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
+            ("hash", "Hash new"), ("pane_refresh", "Refresh"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
             ("collapse_all", "Collapse (-)"),
         ])
         flv_buttons_block = self._settings_subsubsection("Button Colors", flv_buttons_group)
@@ -1885,14 +1916,14 @@ class SettingsTabMixin:
         stats_options_outer.addLayout(stats_week_row)
 
         stats_footer_row = QHBoxLayout()
-        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons and options in Symmetrical GUI")
+        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons and options in Symmetrical (ish) GUI")
         self.mirror_statistics_buttons_cb.setToolTip(
-            "Only while the main Symmetrical GUI setting is also on: mirror the right "
+            "Only while the main Symmetrical (ish) GUI setting is also on: mirror the right "
             "pane's Statistics view footer -- the buttons/options row(s) below the "
             "chart -- and its hover/selection text, horizontally -- same left/right "
-            "mirroring Symmetrical GUI already applies to the Select/Clipboard/File Op "
+            "mirroring Symmetrical (ish) GUI already applies to the Select/Clipboard/File Op "
             "groups. The Statistics view's own title line (above the chart) mirrors "
-            "whenever Symmetrical GUI is on, regardless of this setting. The axis and "
+            "whenever Symmetrical (ish) GUI is on, regardless of this setting. The axis and "
             "bins themselves are never mirrored, on either pane."
         )
         self.mirror_statistics_buttons_cb.setChecked(self._mirror_statistics_buttons)

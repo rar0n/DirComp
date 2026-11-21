@@ -521,6 +521,16 @@ class DuplicateFinderMixin:
         wasted = self.format_size(info["wasted"])
         right._dup_sel_prev = self._dup_files_of(right, right.tree.selectedItems())
 
+    def _dup_update_expand_buttons(self):
+        """The right pane's Expand All / Collapse All have nothing to work on
+        in the "Unique files only" list (a flat list of files, no folders);
+        in every other mode they are enabled."""
+        enabled = not (self._duplicate_mode_active() and getattr(self, "_dup_unique_only", False))
+        for name in ("expand_all_button", "collapse_all_button"):
+            button = getattr(self.right, name, None)
+            if button is not None:
+                button.setEnabled(enabled)
+
     def _on_dup_list_mode(self, unique: bool):
         """The Duplicate Finder's "Include paths" / "Unique files only"
         buttons: rebuild the right pane's list in the chosen mode."""
@@ -529,6 +539,7 @@ class DuplicateFinderMixin:
         self._dup_unique_only = unique
         if not self._duplicate_mode_active():
             return
+        self._dup_update_expand_buttons()
         for button, is_unique in zip(getattr(self.right, "dup_list_buttons", None) or [], (False, True)):
             button.setChecked(is_unique == unique)
         self._dup_sync_right()

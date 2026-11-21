@@ -19,6 +19,7 @@ from constants import IS_DIR_ROLE, PATH_ROLE, TAG_COLORS
 from custom_widgets import (
     SELECTION_HIGHLIGHT_COLOR, _DEFAULT_MAIN_BUTTON_COLORS, _DEFAULT_SELECT_COLORS,
     _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT, _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT,
+    _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD,
     _INVERT_BUTTON_COLORS, _SCROLLBAR_COLORS,
     _SCROLLBAR_HANDLE_STYLES, _SCROLLBAR_STYLE, _SELECT_KEY_TO_TAG_COLOR_KEYS,
     _STATS_BUTTON_KEYS, _THEME_DEFAULT_MAIN_BUTTON_KEYS,
@@ -243,6 +244,10 @@ class ThemeOpsMixin:
             self.scrollbar_track_opacity_spin.blockSignals(True)
             self.scrollbar_track_opacity_spin.setValue(_SCROLLBAR_STYLE["track_opacity"])
             self.scrollbar_track_opacity_spin.blockSignals(False)
+        if getattr(self, "scrollbar_marker_luma_spin", None):
+            self.scrollbar_marker_luma_spin.blockSignals(True)
+            self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])
+            self.scrollbar_marker_luma_spin.blockSignals(False)
         # Indentation Line Colors: color-1/color-2/hover swatches are
         # covered by _refresh_color_swatches above; steps/reverse/hover-
         # opacity are plain widgets, same reasoning as Selection
@@ -822,6 +827,10 @@ class ThemeOpsMixin:
         _SCROLLBAR_STYLE["track_opacity"] = int(value)
         self._repaint_all_scrollbars()
 
+    def _on_scrollbar_marker_luma_changed(self, value):
+        _SCROLLBAR_STYLE["marker_luma_threshold"] = int(value)
+        self._repaint_all_scrollbars()
+
     def _on_scrollbar_handle_style_toggled(self, style_id: int, checked: bool):
         """Settings tab -> Global Options -> "Scrollbar handle style"
         radio group (QButtonGroup.idToggled: fires for the button that
@@ -1081,6 +1090,7 @@ class ThemeOpsMixin:
             "selection_tint_opacity": 50,
             "scrollbar_handle_opacity": _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT,
             "scrollbar_track_opacity": _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT,
+            "scrollbar_marker_luma_threshold": _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD,
             "stats_selection_opacity": {"file": 35, "folder": 35},
             "indent_line_steps": 1,
             "indent_line_reverse": False,
@@ -1150,6 +1160,7 @@ class ThemeOpsMixin:
             "selection_tint_opacity": self._selection_tint_opacity,
             "scrollbar_handle_opacity": _SCROLLBAR_STYLE["handle_opacity"],
             "scrollbar_track_opacity": _SCROLLBAR_STYLE["track_opacity"],
+            "scrollbar_marker_luma_threshold": _SCROLLBAR_STYLE["marker_luma_threshold"],
             "stats_selection_opacity": {
                 mode: colors["selection_opacity"] for mode, colors in self._stats_colors.items()
             },
@@ -1244,6 +1255,9 @@ class ThemeOpsMixin:
         )
         _SCROLLBAR_STYLE["track_opacity"] = int(
             cs.get("scrollbar_track_opacity", _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT)
+        )
+        _SCROLLBAR_STYLE["marker_luma_threshold"] = int(
+            cs.get("scrollbar_marker_luma_threshold", _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD)
         )
         for mode, opacity in cs["stats_selection_opacity"].items():
             if mode in self._stats_colors:

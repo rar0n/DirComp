@@ -226,6 +226,7 @@ class ComparisonCopyMixin:
             return
         self._fill_quick_options()
         layout = holder.layout()
-        layout.addWidget(self._build_comparison_options_copy(), 0, Qt.AlignBottom)
-        layout.addStretch(1)
+        # Stretch 1: takes all the width left of Quick Options (bottom
+        # alignment only limits the height).
+        layout.addWidget(self._build_comparison_options_copy(), 1, Qt.AlignBottom)
         layout.addWidget(self.global_options_group)

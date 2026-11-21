@@ -557,6 +557,8 @@ class SettingsMixin:
         self.first_name_only_cb.setEnabled(not hashing)
         self.hash_algorithm_combo.setEnabled(hashing)
         self.hash_algorithm_label.setEnabled(hashing)
+        # Only hashed files can be skipped for having a unique size.
+        self.hash_same_size_cb.setEnabled(hashing)
         for spin, label in ((self.fingerprint_start_spin, self.fingerprint_start_label),
                             (self.fingerprint_end_spin, self.fingerprint_end_label)):
             spin.setEnabled(ctype == CMP_FINGERPRINT)

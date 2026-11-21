@@ -382,6 +382,7 @@ class SettingsTabMixin:
 
         self.hash_same_size_cb = QCheckBox("Hash only same-size files")
         self.hash_same_size_cb.setChecked(self._hash_same_size)
+        self.hash_same_size_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
         self.hash_same_size_cb.setToolTip(
             "Duplicate Finder mode with Hash value / Fingerprint: files with a "
             "size no other file in the search has cannot be duplicates, so they "

@@ -1525,8 +1525,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         Settings-tab copies (and for settings_ops.py's persistence) --
         the full set is reachable from the Settings tab's own Global
         Options section instead of cluttering this quick-access row."""
-        # Duplicate Finder mode: no title, to leave the lists more height.
-        group = QGroupBox("Quick Options" if self._dual_pane_enabled else "")
+        group = QGroupBox("Quick Options")
         self.global_options_group = group
         outer = QVBoxLayout(group)
         row1 = QHBoxLayout()

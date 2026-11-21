@@ -233,7 +233,6 @@ Accessed Date -- see COL_* below. Diff coloring (_diff_tag) still only
 ever compares size and Modified Date, same as before; the two extra
 columns are informational, not part of what makes an item "differ" from
 its counterpart.
-"""
 
 
 

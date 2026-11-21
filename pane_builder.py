@@ -77,9 +77,9 @@ class PaneBuilderMixin:
         # their own sub-layout/widget now, rather than being stacked
         # directly into `layout` -- see the QSplitter built near the end
         # of this method, which is what actually adds these two widgets
-        # to `layout`. Everything below the split (Copy/Move buttons,
-        # the Select/File Op/Clipboard cluster) is unaffected and still
-        # goes straight into `layout` as before.
+        # to `layout`. The Select/File Op/Clipboard cluster is not part of
+        # this widget: it is built here but placed in the row under both
+        # panes (UiBuilderMixin._build_cluster_row).
         file_list_layout = QVBoxLayout()
         file_list_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout = QVBoxLayout()
@@ -1051,7 +1051,9 @@ class PaneBuilderMixin:
         pane._cluster_applied = None
         pane._cluster_size_cache = {}
         pane._cluster_arrangement_cache = {}
-        layout.addWidget(cluster_container)
+        # Not added to this pane's own layout: the clusters of both panes
+        # sit in a row of their own under the panes, either side of the
+        # central Folder Op group (UiBuilderMixin._build_cluster_row).
 
         tree.itemSelectionChanged.connect(
             lambda t=tree, p=pane: self.update_selection_count(t, p)

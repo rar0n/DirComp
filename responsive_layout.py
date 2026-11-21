@@ -291,19 +291,17 @@ class ResponsiveLayoutMixin:
 
     def _cluster_available_width(self) -> int:
         """The width each pane's button cluster gets, computed from the
-        panes' shared row (not from either container's own current
+        cluster row's own width (not from either container's current
         width) so both panes always get the same value and re-arrange in
         the same pass, even when one of them is a pixel wider or has not
         received its own resize event yet."""
-        row = getattr(self, "_panes_row", None)
-        total = row.width() if row is not None else 0
+        layout = getattr(self, "_cluster_row_layout", None)
+        if layout is None:
+            return 150
+        total = layout.total_width
         if total < 300:
             total = self.width() - 20
-        half = (total - _PANE_GAP) // 2  # two panes in both modes
-        container = self.left.cluster_container.parentWidget()
-        margins = container.layout().contentsMargins() if container is not None else None
-        inner = (margins.left() + margins.right()) if margins is not None else 22
-        return max(150, half - inner)
+        return max(150, layout.side_width(total))
 
     def _relayout_all_clusters(self, force: bool = False):
         """Re-arranges every visible pane's cluster in one go -- called
@@ -314,7 +312,7 @@ class ResponsiveLayoutMixin:
         for pane in panes:
             self._relayout_pane_cluster(pane, force)
 
-    def _relayout_pane_cluster(self, pane: DirectoryPane, force: bool = False):
+    def _relayout_pane_cluster(self, pane: DirectoryPane, force: bool = False, _retry: bool = False):
         """Picks and (if it changed) applies the arrangement of one pane's
         button groups for the width its cluster container has right now.
         Cheap enough to run on every resize: the arrangement is cached per
@@ -348,6 +346,12 @@ class ResponsiveLayoutMixin:
             pane._cluster_applied = applied_key
         finally:
             pane._cluster_busy = False
+        # Applying an arrangement can itself change the container's size
+        # (and so the width this was chosen for) while the busy guard above
+        # swallows the resize notification -- check once more, so the pane
+        # never stays arranged for a stale width.
+        if not _retry and self._cluster_available_width() != avail:
+            self._relayout_pane_cluster(pane, False, _retry=True)
 
     def _apply_cluster_arrangement(self, pane: DirectoryPane, index: int, cols: dict, mirrored: bool):
         """Builds the container's row/stack layouts for arrangement

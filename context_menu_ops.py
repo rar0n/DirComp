@@ -1,7 +1,7 @@
 """
 ContextMenuMixin: the File List View's right-click menu.
 
-    Copy / Cut / Paste
+    Copy / Copy Special  >  Copy Hash, Copy Fingerprint / Cut / Paste
     Paste special  >  Paste Folders
     ------------------
     Open
@@ -34,7 +34,7 @@ from PySide6.QtCore import QMimeDatabase, QStandardPaths, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox
 
-from constants import GNOME_COPIED_FILES_MIME, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
+from constants import CMP_FINGERPRINT, CMP_HASH, GNOME_COPIED_FILES_MIME, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
 from panes import DirectoryPane
 
 # The roadmap asks for a confirmation before launching files. Flip to
@@ -270,6 +270,16 @@ class ContextMenuMixin:
             return act
 
         add(menu, "Copy", lambda: self.copy_to_clipboard(pane), has_sel)
+        # Copy Special: the right-clicked file's stored hash / fingerprint as
+        # text; each entry is enabled only if that digest is known.
+        clicked_path = clicked.data(0, PATH_ROLE) if clicked is not None else None
+        file_digests = {}
+        if clicked_path and not clicked.data(0, IS_DIR_ROLE):
+            file_digests = {kind: self._stored_digest(clicked_path, kind) for kind in (CMP_HASH, CMP_FINGERPRINT)}
+        copy_special = menu.addMenu("Copy Special")
+        for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
+            digest = file_digests.get(kind)
+            add(copy_special, label, lambda d=digest: QApplication.clipboard().setText(d), digest is not None)
         add(menu, "Cut", lambda: self.cut_to_clipboard(pane), has_sel)
         add(menu, "Paste", lambda: self.paste_from_clipboard(pane, targets[0]),
             can_paste and len(targets) == 1)

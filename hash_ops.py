@@ -27,7 +27,7 @@ import time
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from constants import CMP_FINGERPRINT, HASH_ALGORITHMS
+from constants import CMP_FINGERPRINT, CMP_HASH, HASH_ALGORITHMS
 from hash_cache_store import HashCacheStore
 
 _CHUNK = 1024 * 1024
@@ -249,6 +249,29 @@ class HashOpsMixin:
         if replace:
             slot.clear()
         slot[key] = digest
+
+    def _hash_key_for(self, kind):
+        """The comparison key a digest of type `kind` (CMP_HASH or
+        CMP_FINGERPRINT) gets under the algorithm / chunk sizes set now."""
+        if kind == CMP_FINGERPRINT:
+            return (CMP_FINGERPRINT, self._cmp_algorithm, self._cmp_chunk_start_kb, self._cmp_chunk_end_kb)
+        return (CMP_HASH, self._cmp_algorithm)
+
+    def _stored_digest(self, path, kind):
+        """The hex digest of type `kind` already known for the file at
+        `path` (on its snapshot node, or in the RAM hash cache while the
+        file's size and mtime still match), whatever comparison type is
+        selected now; None if there is none. Nothing is computed."""
+        node = self._snapshot_lookup(path)
+        if node is None or node["is_dir"]:
+            return None
+        stored = node.get("hash")
+        if stored and stored[0] and stored[0][0] == kind:
+            return stored[1]
+        entry = self.__dict__.get("_hash_cache", {}).get(os.path.normpath(path))
+        if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
+            return entry[2].get(self._hash_key_for(kind))
+        return None
 
     def _hash_store(self) -> HashCacheStore:
         store = self.__dict__.get("_hash_store_obj")

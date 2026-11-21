@@ -365,11 +365,13 @@ class PaneBuilderMixin:
         # comparison types -- see HashOpsMixin._hash_pane. Only enabled
         # while one of those types is selected. Sits at the outer edge of
         # the toolbar row, next to this pane's Refresh.
-        hash_button = QPushButton("Hash")
+        hash_button = QPushButton("Hash new")
         hash_button.setToolTip(
-            "Compute hashes for this pane's files (Hash value / Fingerprint comparison types). "
-            "With Recursive Folder Selections on, every file; otherwise only the visible ones. "
-            "Files already hashed are skipped."
+            "Hash only the files that are not hashed yet (new or changed ones); files "
+            "already hashed -- or found in the hash cache -- are skipped. Refresh is what "
+            "hashes everything again. Hash value / Fingerprint comparison types only. "
+            "With Recursive Folder Selections on, every file is considered; otherwise only "
+            "the visible ones."
         )
         hash_button.setFixedHeight(uniform_h)
         hash_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("hash")))

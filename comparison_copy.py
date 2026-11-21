@@ -134,16 +134,13 @@ class ComparisonCopyMixin:
         type_row.addStretch(1)
         outer.addLayout(type_row)
 
-        algorithm_row = row()
+        algorithm_row = row(8)
         algorithm_row.addWidget(self._mirror_label(self.hash_algorithm_label))
         algorithm_row.addWidget(self._mirror_combo(self.hash_algorithm_combo))
+        algorithm_row.addSpacing(10)
+        algorithm_row.addWidget(self._mirror_checkbox(self.hash_same_size_cb))
         algorithm_row.addStretch(1)
         outer.addLayout(algorithm_row)
-
-        same_size_row = row()
-        same_size_row.addWidget(self._mirror_checkbox(self.hash_same_size_cb))
-        same_size_row.addStretch(1)
-        outer.addLayout(same_size_row)
 
         labels = []
         for label_source, spin_source in ((self.fingerprint_start_label, self.fingerprint_start_spin),

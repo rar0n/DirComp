@@ -1384,12 +1384,15 @@ class ListingMixin:
         if pane is getattr(self, "right", None) and self._duplicate_mode_active():
             return
         show = bool(getattr(pane, "snapshot_has_counts", False))
-        tree.setColumnHidden(COL_COUNT, not show)
+        header = tree.header()
         if show:
-            header = tree.header()
+            tree.setColumnHidden(COL_COUNT, False)
             if header.visualIndex(COL_COUNT) != 1:
                 header.moveSection(header.visualIndex(COL_COUNT), 1)
             tree.setColumnWidth(COL_COUNT, 55)
+        elif not tree.isColumnHidden(COL_COUNT):
+            tree.setColumnHidden(COL_COUNT, True)
+        tree._fit_name_column()
 
     def _recursive_folder_contents_enabled(self) -> bool:
         cb = getattr(self, "recursive_folder_contents_cb", None)

@@ -461,11 +461,14 @@ class DuplicateFinderMixin:
             right_toolbar.addItem(QSpacerItem(0, left_toolbar.sizeHint().height(), _SP.Fixed, _SP.Fixed))
             right._dup_row_spacer = True
         # "Count" column only in the "Unique files only" list.
-        right.tree.setColumnHidden(6, not getattr(self, "_dup_unique_only", False))
         header = right.tree.header()
+        right.tree.setColumnHidden(6, False)  # Qt mis-lays-out a section moved while hidden
         if header.visualIndex(6) != 1:
             header.moveSection(header.visualIndex(6), 1)  # right after Name, so it stays in view
+        # Hide/show last: resizing a section can bring a hidden one back.
         right.tree.setColumnWidth(6, 55)
+        right.tree.setColumnHidden(6, not getattr(self, "_dup_unique_only", False))
+        right.tree._fit_name_column()  # Name takes (or gives back) the column's room
         cluster = getattr(right, "cluster_container", None)
         if cluster is not None:
             cluster.setVisible(False)

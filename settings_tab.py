@@ -1205,13 +1205,14 @@ class SettingsTabMixin:
         self.scrollbar_marker_luma_spin.setRange(0, 255)
         self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])
         self.scrollbar_marker_luma_spin.setToolTip(
-            "Keeps selection markers visible in the scrollbar. If a marker's "
-            "luminance (0 = black ... 255 = white) differs from the track's -- or, "
-            "for the markers seen on the handle, the handle's -- by less than this, "
-            "the marker's luminance is inverted (a black marker on a dark track "
-            "turns light, a white one on a light track turns dark; if inverting "
-            "does not help, e.g. a mid-gray marker, black or white is used). "
-            "0 turns it off."
+            "Keeps selection markers visible in the scrollbar. If a marker, as it is "
+            "actually seen, stands out from the track by less than this many luminance "
+            "steps (0 = black ... 255 = white), its luminance is inverted (a black marker "
+            "on a dark track turns light, a white one on a light track turns dark; if "
+            "inverting does not help, e.g. a mid-gray marker, black or white is used). "
+            "\"As seen\" counts the Scrollbar track opacity (and, for the markers under "
+            "the handle, the Scrollbar handle opacity): a marker faded to 50% differs only "
+            "half as much from the track as its own color does. 0 turns it off."
         )
         self.scrollbar_marker_luma_spin.valueChanged.connect(self._on_scrollbar_marker_luma_changed)
         marker_luma_row.addWidget(spin_slider_inline(

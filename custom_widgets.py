@@ -637,10 +637,9 @@ _SCROLLBAR_HANDLE_OPACITY = _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT / 100.0
 _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
 # Marker luminance difference threshold (Settings tab -> File List View ->
 # "Marker luminance difference threshold"; per theme, like the two
-# opacities): a selection marker whose luminance (0..255) is closer than
-# this to the luminance of what it is drawn on -- the track for the
-# ordinary markers, the handle for the ones under the handle -- gets its
-# luminance inverted (see _contrasting_marker_color), so e.g. a black row
+# opacities): a selection marker that, as it is actually seen (faded by the
+# track opacity, or by the handle's), differs in luminance (0..255) from
+# the track by less than this gets its luminance inverted (see _contrasting_marker_color), so e.g. a black row
 # on a dark track stays visible. 0 = off.
 _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD = 0
 # How the FLV scrollbar handle shows the selection markers beneath it
@@ -673,25 +672,32 @@ def _luma(color: QColor) -> float:
     return 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
 
 
-def _contrasting_marker_color(color: QColor, base: QColor) -> QColor:
-    """`color` (a selection marker) as it should be drawn on `base` (the
-    track or handle color): unchanged unless their luminances differ by
-    less than _SCROLLBAR_STYLE["marker_luma_threshold"], in which case the
-    marker's luminance is inverted (hue and saturation kept: HSL lightness
-    L -> 255 - L). A marker near mid-gray hardly changes that way, so if
-    the inverted color is still within the threshold, black or white is
-    used instead, whichever is farther from `base`."""
+def _contrasting_marker_color(color: QColor, groove: QColor, weight: float) -> QColor:
+    """`color` (a selection marker) as it should be drawn on a track whose
+    groove color is `groove`. `weight` (0..1) is how much of the marker's
+    own color reaches the screen: an ordinary track marker is drawn at
+    alpha (100 - track opacity)%, and a marker under the handle is seen
+    through the handle's fill, so (100 - handle opacity)%. Either way what
+    is seen is `weight` * marker + a part that is the same for the marker
+    and for the bare groove next to it (the groove itself, or the handle
+    color mixed in), so the marker stands out from its surroundings by
+    weight * |marker luminance - groove luminance|. If that is below
+    _SCROLLBAR_STYLE["marker_luma_threshold"] the marker's luminance is
+    inverted (hue and saturation kept: HSL lightness L -> 255 - L). A
+    marker near mid-gray hardly changes that way, so if the inverted color
+    still falls short, black or white is used instead, whichever is
+    farther from the groove."""
     threshold = _SCROLLBAR_STYLE["marker_luma_threshold"]
-    if threshold <= 0:
+    if threshold <= 0 or weight <= 0:
         return color
-    base_luma = _luma(base)
-    if abs(_luma(color) - base_luma) >= threshold:
+    groove_luma = _luma(groove)
+    if weight * abs(_luma(color) - groove_luma) >= threshold:
         return color
     hsl = color.toHsl()
     inverted = QColor.fromHsl(max(hsl.hslHue(), 0), hsl.hslSaturation(), 255 - hsl.lightness(), color.alpha())
-    if abs(_luma(inverted) - base_luma) >= threshold:
+    if weight * abs(_luma(inverted) - groove_luma) >= threshold:
         return inverted
-    extreme = QColor(0, 0, 0) if base_luma >= 128 else QColor(255, 255, 255)
+    extreme = QColor(0, 0, 0) if groove_luma >= 128 else QColor(255, 255, 255)
     extreme.setAlpha(color.alpha())
     return extreme
 
@@ -1159,7 +1165,8 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
             plain = handle_style == "plain"
             window = None if plain else self._magnifier_window(groove_rect, handle_rect)
             groove_color = QColor(_SCROLLBAR_COLORS["groove"])
-            handle_color = QColor(_SCROLLBAR_COLORS["handle"])
+            track_weight = self._track_marker_alpha()
+            handle_weight = (100 - _SCROLLBAR_STYLE["handle_opacity"]) / 100.0
             mpen = QPen()
             mpen.setWidth(2)
             x1 = groove_rect.left() + 1
@@ -1189,7 +1196,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                 painter.setClipRegion(QRegion(groove_rect).subtracted(QRegion(handle_rect)))
             for fraction, color in self._markers:
                 y = groove_top + int(fraction * groove_height)
-                mpen.setColor(_contrasting_marker_color(color, groove_color))
+                mpen.setColor(_contrasting_marker_color(color, groove_color, track_weight))
                 painter.setPen(mpen)
                 painter.drawLine(x1, y, x2, y)
             painter.restore()
@@ -1215,7 +1222,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                     # groove above).
                     for fraction, color in self._markers:
                         y = groove_top + int(fraction * groove_height)
-                        mpen.setColor(_contrasting_marker_color(color, handle_color))
+                        mpen.setColor(_contrasting_marker_color(color, groove_color, handle_weight))
                         painter.setPen(mpen)
                         painter.drawLine(x1, y, x2, y)
                 elif handle_style == "hard_cutoff":
@@ -1227,7 +1234,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                         y = self._hard_cutoff_row_to_y(row, offset, page, unit_per_row, handle_rect)
                         if y is None:
                             continue
-                        mpen.setColor(_contrasting_marker_color(color, handle_color))
+                        mpen.setColor(_contrasting_marker_color(color, groove_color, handle_weight))
                         painter.setPen(mpen)
                         painter.drawLine(x1, y, x2, y)
                 else:
@@ -1244,7 +1251,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                         if row < row_lo or row > row_hi:
                             continue
                         y = row_to_y(row, center_row, mag, row_lo, row_hi, handle_rect)
-                        mpen.setColor(_contrasting_marker_color(color, handle_color))
+                        mpen.setColor(_contrasting_marker_color(color, groove_color, handle_weight))
                         painter.setPen(mpen)
                         painter.drawLine(x1, y, x2, y)
                 painter.restore()

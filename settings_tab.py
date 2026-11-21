@@ -1887,14 +1887,14 @@ class SettingsTabMixin:
         stats_options_outer.addLayout(stats_week_row)
 
         stats_footer_row = QHBoxLayout()
-        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons and options in Symmetrical GUI")
+        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons and options in Symmetrical (ish) GUI")
         self.mirror_statistics_buttons_cb.setToolTip(
-            "Only while the main Symmetrical GUI setting is also on: mirror the right "
+            "Only while the main Symmetrical (ish) GUI setting is also on: mirror the right "
             "pane's Statistics view footer -- the buttons/options row(s) below the "
             "chart -- and its hover/selection text, horizontally -- same left/right "
-            "mirroring Symmetrical GUI already applies to the Select/Clipboard/File Op "
+            "mirroring Symmetrical (ish) GUI already applies to the Select/Clipboard/File Op "
             "groups. The Statistics view's own title line (above the chart) mirrors "
-            "whenever Symmetrical GUI is on, regardless of this setting. The axis and "
+            "whenever Symmetrical (ish) GUI is on, regardless of this setting. The axis and "
             "bins themselves are never mirrored, on either pane."
         )
         self.mirror_statistics_buttons_cb.setChecked(self._mirror_statistics_buttons)

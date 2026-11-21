@@ -1,7 +1,7 @@
 """
 ComparisonCopyMixin: a second copy of the Settings tab's "Comparison Options"
 group, shown on the Main tab in Duplicate Finder mode (below the right pane,
-where the button groups sit in Compare Folders mode) -- see
+where the button groups sit in Compare Folders mode; centered, no title) -- see
 UiBuilderMixin._build_cluster_row.
 
 The Settings tab's widgets (self.comparison_type_combo, ...) stay the real,
@@ -121,11 +121,12 @@ class ComparisonCopyMixin:
                 layout.addSpacing(indent)
             return layout
 
-        group = QGroupBox("Comparison Options")
+        # No title (saves a line of height) and centered in its cell; the
+        # mode's own layout makes it clear what it is.
+        group = QGroupBox("")
         outer = QVBoxLayout(group)
         margins = outer.contentsMargins()
         outer.setContentsMargins(_CLUSTER_GROUP_PAD, margins.top(), _CLUSTER_GROUP_PAD, margins.bottom())
-        group.setAlignment(Qt.AlignRight if self._symmetrical_buttons else Qt.AlignLeft)
 
         type_row = row(0)
         type_row.addWidget(QLabel("Comparison type:"))
@@ -189,8 +190,6 @@ class ComparisonCopyMixin:
             return
         group = self._build_comparison_options_copy()
         layout = holder.layout()
-        if self._symmetrical_buttons:
-            layout.addStretch(1)  # like the right pane's mirrored groups
+        layout.addStretch(1)
         layout.addWidget(group, 0, Qt.AlignTop)
-        if not self._symmetrical_buttons:
-            layout.addStretch(1)
+        layout.addStretch(1)

@@ -460,27 +460,34 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         main_layout.addWidget(panes_row, stretch=1)
         # Under the panes: each pane's Select/File Op/Clipboard cluster
         # either side of the central Folder Op group.
-        main_layout.addWidget(self._build_cluster_row())
-
-        # Bottom row: Global File Filter and Global Options. Dual Pane on:
-        # the two halves of the row mirror the two panes above (same
-        # equal stretch, same gap), so the filter ends exactly at the left
-        # pane's right edge and Global Options sits flush right in the
-        # right half. Dual Pane off: the filter takes the width Global
-        # Options (at its natural size, flush right) leaves over.
-        bottom_row = EqualSplitLayout(None, _PANE_GAP)
-        bottom_row.addWidget(self._build_filter_frame())
-        options_holder = QWidget()
-        holder_layout = QHBoxLayout(options_holder)
-        holder_layout.setContentsMargins(0, 0, 0, 0)
+        filter_frame = self._build_filter_frame()
         global_options = self._build_global_options_group()
-        holder_layout.addWidget(global_options)
-        if self._dual_pane_enabled:
+        if not self._dual_pane_enabled:
+            # Duplicate Finder mode: the filter goes under the left pane's
+            # button groups, and Quick Options and the Comparison Options
+            # copy share one block at the lower right, spanning this row and
+            # the one that used to be below it (see _build_cluster_row).
+            global_options.setParent(central)
+            main_layout.addWidget(self._build_cluster_row(filter_frame))
+            self._bottom_row_layout = None
+        else:
+            main_layout.addWidget(self._build_cluster_row())
+
+            # Bottom row: Global File Filter and Quick Options. The two
+            # halves of the row mirror the two panes above (same equal
+            # stretch, same gap), so the filter ends exactly at the left
+            # pane's right edge and Quick Options sits flush right in the
+            # right half.
+            bottom_row = EqualSplitLayout(None, _PANE_GAP)
+            bottom_row.addWidget(filter_frame)
+            options_holder = QWidget()
+            holder_layout = QHBoxLayout(options_holder)
+            holder_layout.setContentsMargins(0, 0, 0, 0)
+            holder_layout.addWidget(global_options)
             holder_layout.setAlignment(global_options, Qt.AlignRight)
-        # (Duplicate Finder mode: the group fills the whole right half.)
-        bottom_row.addWidget(options_holder)
-        main_layout.addLayout(bottom_row)
-        self._bottom_row_layout = bottom_row
+            bottom_row.addWidget(options_holder)
+            main_layout.addLayout(bottom_row)
+            self._bottom_row_layout = bottom_row
 
         # Bottom status line: two directional progress bars flanking a
         # shared Cancel button, with the operation label centered next
@@ -568,7 +575,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         grid.setColumnStretch(2, 1)
         return row
 
-    def _build_cluster_row(self) -> QWidget:
+    def _build_cluster_row(self, filter_frame=None) -> QWidget:
         """The row under both panes: the left pane's button cluster, the
         central "Folder Op" group (Swap; room for more folder-level
         actions later, e.g. a one-go synchronize), and the right pane's
@@ -576,20 +583,37 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         over equally (see CenterSplitLayout and
         ResponsiveLayoutMixin._cluster_available_width), so they
         re-arrange their buttons for that narrower width. Not mirrored by
-        Symmetrical GUI."""
+        Symmetrical GUI.
+
+        Duplicate Finder mode (`filter_frame` given): the left cell holds
+        the left cluster with the Global File Filter below it, and the right
+        cell is one block, as tall as both, for the Comparison Options copy
+        and Quick Options (ComparisonCopyMixin), lowered to end just above
+        the progress bar."""
         row = QWidget()
         layout = CenterSplitLayout(row, _PANE_GAP)
         layout.setContentsMargins(_PANE_SIDE_MARGIN, 0, _PANE_SIDE_MARGIN, 0)
-        layout.addWidget(self.left.cluster_container)
-        layout.addWidget(self._build_folder_op_group())
         if self._dual_pane_enabled:
+            layout.addWidget(self.left.cluster_container)
+            layout.addWidget(self._build_folder_op_group())
             layout.addWidget(self.right.cluster_container)
         else:
-            # Duplicate Finder mode: the right pane is only a list of the
-            # duplicates, so its button groups are not shown (and never get
-            # arranged -- see _update_responsive_layout). In their place: a
-            # copy of the Settings tab's Comparison Options, filled in once
-            # that tab exists (see ComparisonCopyMixin).
+            left_cell = QWidget()
+            left_cell.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            left_layout = QVBoxLayout(left_cell)
+            left_layout.setContentsMargins(0, 0, 0, 0)
+            left_layout.setSpacing(_PANE_GAP)
+            left_layout.addWidget(self.left.cluster_container)
+            left_layout.addStretch(1)
+            left_layout.addWidget(filter_frame)
+            layout.addWidget(left_cell)
+            layout.addWidget(self._build_folder_op_group())
+            # The right pane is only a list of the duplicates, so its button
+            # groups are not shown (and never get arranged -- see
+            # _update_responsive_layout). In their place: the block with a
+            # copy of the Settings tab's Comparison Options and Quick
+            # Options, filled in once that tab exists (see
+            # ComparisonCopyMixin).
             self.right.cluster_container.setParent(row)
             self.right.cluster_container.setVisible(False)
             holder = QWidget()

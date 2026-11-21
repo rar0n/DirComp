@@ -1570,8 +1570,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.main_comparison_type_combo.activated.connect(self._on_main_comparison_type_activated)
 
         # Duplicate Finder mode (Compare folders off): one line only --
-        # Recursive Folder Selections, Symmetrical GUI and Expand To
-        # Selection from the left, Refresh at the right end. Synchronize
+        # Symmetrical GUI, Recursive Folder Selections and Expand To
+        # Selection (which depends on the one before it) from the left, Refresh at the right end. Synchronize
         # Views (disabled in this mode anyway) and the comparison type
         # drop-down (the Comparison Options copy below the right pane has
         # one) stay as live widgets, just not shown.
@@ -1644,9 +1644,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.expand_matching_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         if one_line:
-            row1.addWidget(self.recursive_folder_contents_cb)
-            row1.addSpacing(20)
             row1.addWidget(self.symmetrical_buttons_cb)
+            row1.addSpacing(20)
+            row1.addWidget(self.recursive_folder_contents_cb)
             row1.addSpacing(20)
             row1.addWidget(self.expand_matching_cb)
             row1.addStretch(1)

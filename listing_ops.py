@@ -1253,6 +1253,7 @@ class ListingMixin:
 
         pane._last_listed_dir = directory
         pane._last_listed_filter_state = self._listing_filter_state()
+        self._update_count_column(pane)
         self.update_type_counts(pane)
         # _select_paths_in_tree's own update_selection_count/
         # _sync_timeline_selection calls only fire when it actually
@@ -1370,6 +1371,25 @@ class ListingMixin:
                     dup_count=child.get("dup_count"),
                 ))
         return entries
+
+    def _update_count_column(self, pane):
+        """Show the "Count" column (copies of a file, from a Duplicate
+        Finder "Unique files only" list) right after Size where the pane's
+        listing has such counts: a loaded snapshot saved from that list. The
+        Duplicate Finder's own right pane is handled by
+        DuplicateFinderMixin._dup_style_right_pane."""
+        tree = pane.tree
+        if tree is None:
+            return
+        if pane is getattr(self, "right", None) and self._duplicate_mode_active():
+            return
+        show = bool(getattr(pane, "snapshot_has_counts", False))
+        tree.setColumnHidden(COL_COUNT, not show)
+        if show:
+            header = tree.header()
+            if header.visualIndex(COL_COUNT) != 1:
+                header.moveSection(header.visualIndex(COL_COUNT), 1)
+            tree.setColumnWidth(COL_COUNT, 55)
 
     def _recursive_folder_contents_enabled(self) -> bool:
         cb = getattr(self, "recursive_folder_contents_cb", None)

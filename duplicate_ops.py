@@ -463,8 +463,8 @@ class DuplicateFinderMixin:
         # "Count" column only in the "Unique files only" list.
         right.tree.setColumnHidden(6, not getattr(self, "_dup_unique_only", False))
         header = right.tree.header()
-        if header.visualIndex(6) != 2:
-            header.moveSection(header.visualIndex(6), 2)  # right after Size, so it stays in view
+        if header.visualIndex(6) != 1:
+            header.moveSection(header.visualIndex(6), 1)  # right after Name, so it stays in view
         right.tree.setColumnWidth(6, 55)
         cluster = getattr(right, "cluster_container", None)
         if cluster is not None:

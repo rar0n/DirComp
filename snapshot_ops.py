@@ -176,6 +176,12 @@ class SnapshotOpsMixin:
         d = {"n": node["name"], "s": node["size"], "m": node["mtime"],
              "c": node["ctime"], "a": node["atime"]}
         if not node["is_dir"]:
+            if node.get("dup_count") is not None:
+                # From a Duplicate Finder "Unique files only" list: the number
+                # of copies, and the file's path under the root (the list is
+                # flat, so names can repeat).
+                d["dc"] = node["dup_count"]
+                d["p"] = os.path.relpath(node["full_path"], counts["root"])
             if node.get("nlink", 1) > 1:
                 d["l"] = node["nlink"]
             digest = self._node_hash(node)
@@ -205,7 +211,7 @@ class SnapshotOpsMixin:
         root = pane.snapshot_root
         expanded = {os.path.normpath(p) for p in self._collect_expanded_paths(pane.tree)}
         recursive = self._recursive_folder_contents_enabled()
-        counts = {"hashed": 0, "unhashed": 0, "items": 0}
+        counts = {"hashed": 0, "unhashed": 0, "items": 0, "root": root["full_path"]}
         tree = self._serialize_node(root, expanded, recursive, True, counts)
         meta = getattr(pane, "snapshot_meta", None)
         if getattr(pane, "snapshot_file", None) and meta:
@@ -281,7 +287,8 @@ class SnapshotOpsMixin:
 
     def _node_from_dict(self, d, parent_path, index, hash_key, is_root, root_path):
         name = d["n"]
-        full_path = root_path if is_root else os.path.join(parent_path, name)
+        rel = d.get("p")  # path under the root (flat "Unique files only" lists)
+        full_path = root_path if is_root else os.path.join(root_path if rel else parent_path, rel or name)
         is_dir = bool(d.get("d"))
         node = {
             "name": name, "full_path": full_path, "is_dir": is_dir,
@@ -291,6 +298,8 @@ class SnapshotOpsMixin:
         index[os.path.normpath(full_path)] = node
         if not is_dir:
             node["nlink"] = int(d.get("l", 1))
+            if "dc" in d:
+                node["dup_count"] = int(d["dc"])
             if "h" in d and hash_key:
                 node["hash"] = (hash_key, d["h"])
             return node
@@ -309,7 +318,7 @@ class SnapshotOpsMixin:
         else:
             for child in d.get("k", []):
                 c = self._node_from_dict(child, full_path, index, hash_key, False, root_path)
-                children[c["name"]] = c
+                children[child.get("p") or c["name"]] = c
         node["children"] = children
         return node
 
@@ -339,6 +348,7 @@ class SnapshotOpsMixin:
             "has_links": bool(document.get("has_links", False)),
         }
         pane.snapshot_full_root, pane.snapshot_full_index = root, index
+        pane.snapshot_has_counts = any("dup_count" in n for n in index.values())
         pane.snapshot_hash_key = hash_key
         self._update_snapshot_label(pane)
         self._update_hash_buttons_enabled()
@@ -404,6 +414,7 @@ class SnapshotOpsMixin:
         pane.snapshot_file = None
         pane.snapshot_meta = None
         pane.snapshot_full_root = pane.snapshot_full_index = None
+        pane.snapshot_has_counts = False
         pane.snapshot_hash_key = None
         self._update_snapshot_label(pane)
         if had:

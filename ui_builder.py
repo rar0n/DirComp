@@ -409,6 +409,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._fill_comparison_copy_holder()
 
         self._apply_right_pane_drops()
+        self._dup_update_expand_buttons()
 
         # Apply the right button-group arrangement and date-column
         # visibility for the window's actual current width --

@@ -275,11 +275,11 @@ class ContextMenuMixin:
         clicked_path = clicked.data(0, PATH_ROLE) if clicked is not None else None
         file_digests = {}
         if clicked_path and not clicked.data(0, IS_DIR_ROLE):
-            file_digests = {kind: self._stored_digest(clicked_path, kind) for kind in (CMP_HASH, CMP_FINGERPRINT)}
+            file_digests = {kind: self._stored_digest_info(clicked_path, kind) for kind in (CMP_HASH, CMP_FINGERPRINT)}
         copy_special = menu.addMenu("Copy Special")
         for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
-            digest = file_digests.get(kind)
-            add(copy_special, label, lambda d=digest: QApplication.clipboard().setText(d), digest is not None)
+            info = file_digests.get(kind)
+            add(copy_special, label, lambda k=kind, i=info: self._copy_digest(pane, clicked_path, k, i), info is not None)
         add(menu, "Cut", lambda: self.cut_to_clipboard(pane), has_sel)
         add(menu, "Paste", lambda: self.paste_from_clipboard(pane, targets[0]),
             can_paste and len(targets) == 1)

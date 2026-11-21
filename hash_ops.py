@@ -257,21 +257,37 @@ class HashOpsMixin:
             return (CMP_FINGERPRINT, self._cmp_algorithm, self._cmp_chunk_start_kb, self._cmp_chunk_end_kb)
         return (CMP_HASH, self._cmp_algorithm)
 
-    def _stored_digest(self, path, kind):
-        """The hex digest of type `kind` already known for the file at
-        `path` (on its snapshot node, or in the RAM hash cache while the
-        file's size and mtime still match), whatever comparison type is
+    def _stored_digest_info(self, path, kind):
+        """(comparison key, hex digest) of type `kind` already known for the
+        file at `path` (on its snapshot node, or in the RAM hash cache while
+        the file's size and mtime still match), whatever comparison type is
         selected now; None if there is none. Nothing is computed."""
         node = self._snapshot_lookup(path)
         if node is None or node["is_dir"]:
             return None
         stored = node.get("hash")
         if stored and stored[0] and stored[0][0] == kind:
-            return stored[1]
+            return stored
         entry = self.__dict__.get("_hash_cache", {}).get(os.path.normpath(path))
         if entry and entry[0] == node["size"] and entry[1] == int(node["mtime"]):
-            return entry[2].get(self._hash_key_for(kind))
+            key = self._hash_key_for(kind)
+            digest = entry[2].get(key)
+            if digest is not None:
+                return key, digest
         return None
+
+    def _copy_digest(self, pane, path, kind, info):
+        """Context menu "Copy Hash" / "Copy Fingerprint": put the digest on
+        the clipboard as text and say on the pane's upper status line which
+        one it was (algorithm, and the chunk sizes for a fingerprint)."""
+        key, digest = info
+        QApplication.clipboard().setText(digest)
+        algorithm = HASH_ALGORITHMS[key[1]]
+        if kind == CMP_FINGERPRINT:
+            what = f"{algorithm} fingerprint (size + first {key[2]} kB + last {key[3]} kB)"
+        else:
+            what = f"{algorithm} hash"
+        self._set_upper_status(pane, f"Copied {what} of {os.path.basename(path)}")
 
     def _hash_store(self) -> HashCacheStore:
         store = self.__dict__.get("_hash_store_obj")

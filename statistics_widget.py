@@ -217,6 +217,7 @@ class TimelineWidget(QWidget):
         self.setCursor(Qt.OpenHandCursor)
         self.setContextMenuPolicy(Qt.NoContextMenu)
         self.setAcceptDrops(True)
+        self._drops_enabled = True
 
         #: When True, flips the hover/selection readout text (top-left
         #: <-> top-right) horizontally -- everything else (bars, axis,
@@ -465,6 +466,17 @@ class TimelineWidget(QWidget):
         self.hover_opacity: int = HOVER_TINT_OPACITY
 
     # ------------------------------------------------------------------ data
+    def set_drops_enabled(self, enabled: bool):
+        """Accept dropped folders or not. Off (the right pane in Duplicate
+        Finder mode, where there is nothing to open there) also drops the
+        "Drag a folder ... to begin" hint from the empty state."""
+        enabled = bool(enabled)
+        if self._drops_enabled == enabled:
+            return
+        self._drops_enabled = enabled
+        self.setAcceptDrops(enabled)
+        self.update()
+
     def set_folder_open(self, is_open: bool):
         """Tell the widget whether its own pane has a folder open right
         now -- decides which empty-state message _paint shows when
@@ -1466,8 +1478,10 @@ class TimelineWidget(QWidget):
             has_folder = self._records_loaded if self._folder_open is None else self._folder_open
             if has_folder:
                 message = f"No {self._item_label}s in view"
-            else:
+            elif self._drops_enabled:
                 message = "Drag a folder into either view to begin"
+            else:
+                return  # drops are off here (Duplicate Finder right pane): no hint
             painter.drawText(self.rect(), Qt.AlignCenter, message)
             return
 

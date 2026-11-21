@@ -134,6 +134,15 @@ class ComparisonCopyMixin:
         type_row.addStretch(1)
         outer.addLayout(type_row)
 
+        # Same order as the Settings tab: the name options come right after
+        # the type.
+        name_row = row(8)
+        name_row.addWidget(self._mirror_checkbox(self.ignore_file_extensions_cb))
+        name_row.addSpacing(12)
+        name_row.addWidget(self._mirror_checkbox(self.first_name_only_cb))
+        name_row.addStretch(1)
+        outer.addLayout(name_row)
+
         algorithm_row = row(8)
         algorithm_row.addWidget(self._mirror_label(self.hash_algorithm_label))
         algorithm_row.addWidget(self._mirror_combo(self.hash_algorithm_combo))
@@ -155,13 +164,6 @@ class ComparisonCopyMixin:
         width = max(label.sizeHint().width() for label in labels)
         for label in labels:
             label.setFixedWidth(width)  # spin boxes and sliders line up
-
-        name_row = row(8)
-        name_row.addWidget(self._mirror_checkbox(self.ignore_file_extensions_cb))
-        name_row.addSpacing(12)
-        name_row.addWidget(self._mirror_checkbox(self.first_name_only_cb))
-        name_row.addStretch(1)
-        outer.addLayout(name_row)
 
         ignore_row = row()
         ignore_row.addWidget(self._mirror_checkbox(self.ignore_empty_files_cb))

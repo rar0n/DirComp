@@ -510,9 +510,11 @@ class SettingsTabMixin:
             "Name and size: same name and size; dates are not compared.\n"
             "Name: same name only; size and dates are not compared (e.g. to see "
             "which files belong together).\n"
-            "Hash value / Fingerprint: compare file contents instead. Hashing "
-            "is not available yet, so for now these two behave like "
-            "Name, size and date."
+            "Hash value: same file contents (a hash of the whole file).\n"
+            "Fingerprint: same file size plus the first and last chunk of "
+            "the contents (much faster for big files).\n"
+            "Both need the files hashed first (the Hash button); files "
+            "that are not hashed yet cannot be compared by content."
         )
         comparison_type_row.addWidget(self.comparison_type_combo)
         comparison_type_row.addStretch(1)

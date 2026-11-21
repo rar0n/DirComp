@@ -408,6 +408,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if not self._dual_pane_enabled:
             self._fill_comparison_copy_holder()
 
+        self._apply_right_pane_drops()
+
         # Apply the right button-group arrangement and date-column
         # visibility for the window's actual current width --
         # resizeEvent/showEvent keep this current from here on, but
@@ -422,6 +424,20 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._widget_defaults = self._capture_theme_widget_values()
             for color_set in self._color_sets.values():
                 color_set["widgets"] = dict(self._widget_defaults)
+
+    def _apply_right_pane_drops(self):
+        """Dropping a folder on the right pane means nothing in Duplicate
+        Finder mode (it lists the left pane's duplicates), so its entry
+        field, file list and Statistics view only accept drops in Compare
+        folders mode."""
+        enabled = self._dual_pane_enabled
+        pane = self.right
+        for widget in (getattr(pane, "entry", None), getattr(pane, "tree", None)):
+            if widget is not None:
+                widget.setAcceptDrops(enabled)
+        timeline = getattr(pane, "timeline", None)
+        if timeline is not None:
+            timeline.set_drops_enabled(enabled)
 
     def _build_main_tab(self) -> QWidget:
         """Everything that used to be the whole central widget, before

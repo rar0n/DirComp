@@ -401,10 +401,18 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
         self.setMinimumWidth(MINIMUM_WINDOW_WIDTH)
 
+        # A rebuild keeps the tab that was showing, and the new tab widget
+        # starts on it: any event pumping while the rest of the UI is built
+        # then never paints the Main tab (the flash).
+        try:
+            previous_tab = self.tabs.currentIndex()
+        except (AttributeError, RuntimeError):
+            previous_tab = 0
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
+        self.tabs.setCurrentIndex(previous_tab)
         if not self._dual_pane_enabled:
             self._fill_comparison_copy_holder()
 
@@ -915,8 +923,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         kept_selected = self._collect_selected_paths(left_tree) if left_tree is not None else set()
         current_tab = self.tabs.currentIndex() if getattr(self, "tabs", None) else 0
         self._build_ui()
-        self._restore_ui_state(state)
+        # Before _restore_ui_state, whose listing work can pump events and so
+        # paint the new tab widget's default tab (Main) -- see _rebuild_ui.
         self.tabs.setCurrentIndex(current_tab)
+        self._restore_ui_state(state)
         if kept_expanded or kept_selected:
             # Left pane only: with Synchronize Views the selection must not
             # be mirrored onto the right pane (whose own selection is gone).

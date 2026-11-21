@@ -332,18 +332,16 @@ class DuplicateFinderMixin:
             self._select_group_guard, self._bulk_select_guard = guard, bulk
 
     def _dup_buttons_state(self, pane):
-        """(duplicates enabled, extra copies enabled) for the pane's two
+        """(duplicates enabled, extra copies enabled) for the pane's
         Duplicate Finder buttons. Hash value / Fingerprint need the scanned
-        files hashed first (nothing left unhashed or changed); "Extra copies"
-        is off for the plain "Name" type, where a shared name does not
-        mean identical content."""
+        files hashed first (nothing left unhashed or changed); with every
+        other comparison type both are on."""
         info = getattr(pane, "_dup_info", None) if pane is getattr(self, "left", None) else None
         if not info:
             return False, False
         hashing = self._hash_type_selected()
         ready = not (hashing and (info["pending"] or info["changed"]))
-        name_only = (not hashing) and not self._compare_axes()[0]
-        return ready, ready and not name_only
+        return ready, ready
 
     def _dup_update_buttons(self, pane):
         """Enable/disable (and un-press, if now disabled) the two buttons."""

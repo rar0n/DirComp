@@ -474,6 +474,6 @@ Comparison types: Name and size / Name (2026-11-21)
    (DiffEngineMixin._compare_axes). Behavior change: with Name, size and date, these two
    options used to ignore size and date; they now still compare them (use "Name" for that).
  - Newer/Older are disabled when dates are not compared, Larger/Smaller when sizes are not.
- - Duplicate Finder groups by the same key; Extra copies / Sel. extras stay off for plain Name.
+ - Duplicate Finder groups by the same key; Extra copies / Sel. extras stay enabled for every name-based type.
  - Sel. dups / Sel. extras unselect selected files that have no duplicate.
 

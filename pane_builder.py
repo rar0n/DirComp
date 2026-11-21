@@ -819,8 +819,8 @@ class PaneBuilderMixin:
             ("Extra copies", "dup_extra",
              "Select all copies but one in each group of identical files -- the one "
              "left alone is set under Settings -> Options -> \"Extra copies keep\". "
-             "Not available with the plain \"Name\" comparison (a shared name does not "
-             "make files identical)."),
+             "With a name-based comparison type, \"identical\" means what that type "
+             "compares, so check the selection before deleting."),
             ("Sel. dups", "dup_sel",
              "Duplicates of selection: of the files already selected (a selected folder "
              "counts for the files in it), select every copy in their groups of identical "

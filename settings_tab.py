@@ -390,13 +390,7 @@ class SettingsTabMixin:
             "Compare folders mode always hashes every file in view."
         )
         # Shown in the Comparison Options group (it only matters for the hash
-        # types), under the hash algorithm.
-        hash_same_row = QHBoxLayout()
-        hash_same_row.setContentsMargins(0, 0, 0, 0)
-        hash_same_row.addSpacing(20)
-        hash_same_row.addWidget(self.hash_same_size_cb)
-        hash_same_row.addStretch(1)
-        comparison_grid.addLayout(hash_same_row, 15, 0, 1, 7)
+        # types), to the right of the hash algorithm.
         self.scan_expanded_cb.toggled.connect(self._on_dup_scope_option_changed)
         self.hash_same_size_cb.toggled.connect(self._on_dup_scope_option_changed)
 
@@ -533,6 +527,8 @@ class SettingsTabMixin:
         self.hash_algorithm_combo.setCurrentIndex(self._cmp_algorithm)
         self.hash_algorithm_combo.setToolTip("The hash function used by the Hash value and Fingerprint types.")
         hash_row.addWidget(self.hash_algorithm_combo)
+        hash_row.addSpacing(10)
+        hash_row.addWidget(self.hash_same_size_cb)
         hash_row.addStretch(1)
         comparison_grid.addLayout(hash_row, 14, 0, 1, 7)
 

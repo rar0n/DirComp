@@ -601,7 +601,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
     def _build_cluster_row(self, filter_frame=None) -> QWidget:
         """The row under both panes: the left pane's button cluster, the
-        central "Folder Op" group (Swap; room for more folder-level
+        central "Both Panes" group (Swap; room for more folder-level
         actions later, e.g. a one-go synchronize), and the right pane's
         cluster. The two clusters share the width the central group leaves
         over equally (see CenterSplitLayout and
@@ -651,11 +651,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         return row
 
     def _build_folder_op_group(self) -> QGroupBox:
-        """The central "Folder Op" button group -- one button column for
+        """The central "Both Panes" button group -- one button column for
         now (self._folder_op_buttons, top to bottom; append further buttons
         there)."""
         uniform_w, uniform_h = self._uniform_button_size()
-        group = QGroupBox("Folder Op")
+        group = QGroupBox("Both Panes")
         grid = QGridLayout(group)
         margins = grid.contentsMargins()
         grid.setContentsMargins(_CLUSTER_GROUP_PAD, margins.top(), _CLUSTER_GROUP_PAD, margins.bottom())
@@ -1665,7 +1665,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # feature, for after this initial sync).
         self.synchronize_views_cb.stateChanged.connect(self._on_synchronize_views_toggled_for_metric)
 
-        self.symmetrical_buttons_cb = QCheckBox("Symmetrical GUI")
+        # Duplicate Finder mode has no real right-hand button groups to mirror, so
+        # the layout is only symmetrical-ish there.
+        self.symmetrical_buttons_cb = QCheckBox(
+            "Symmetrical (ish) GUI" if not self._dual_pane_enabled else "Symmetrical GUI")
         self.symmetrical_buttons_cb.setToolTip(
             "When on, the right pane's Select/Clipboard groups and surrounding buttons "
             "mirror the left pane's around the vertical center, and the right pane's "

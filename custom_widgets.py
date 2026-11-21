@@ -2215,7 +2215,7 @@ class CenterSplitLayout(QLayout):
     (so a hidden right cluster does not make the left one grow); the center
     item is always expected to be visible. Used for the row of button groups
     below the two panes (Select/File Op/Clipboard of each pane either side
-    of the central Folder Op group), see ui_builder._build_cluster_row."""
+    of the central Both Panes group), see ui_builder._build_cluster_row."""
 
     def __init__(self, parent=None, spacing: int = 6):
         super().__init__(parent)

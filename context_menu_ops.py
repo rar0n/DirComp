@@ -289,7 +289,7 @@ class ContextMenuMixin:
         for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
             info = file_digests.get(kind)
             add(copy_metadata, label, lambda k=kind, i=info: self._copy_digest(pane, clicked_path, k, i),
-                info is not None and kind == selected_kind)
+                info is not None)
         copy_metadata.addSeparator()
         add(copy_metadata, "Copy File List View Data",
             lambda: self._copy_flv_data(pane, False), bool(selected))

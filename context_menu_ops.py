@@ -379,7 +379,14 @@ class ContextMenuMixin:
             if digest_kind is not None and path and not is_dir:
                 key = self._hash_key_for(digest_kind)
                 info = self._stored_digest_info(path, digest_kind)
-                cols.append(info[1] if info is not None and tuple(info[0]) == key else "-- not calculated --")
+                if info is not None and tuple(info[0]) == key:
+                    cols.append(info[1])
+                else:
+                    # Ignored files (Ignore empty files / hard links) are never
+                    # hashed, so say that rather than "not calculated".
+                    ignored = self._ignored_kind(self._snapshot_lookup(path, pane))
+                    cols.append({"empty": "-- ignored (empty file) --",
+                                 "hardlink": "-- ignored (hard link) --"}.get(ignored, "-- not calculated --"))
             records.append((depth, cols))
 
         # With Recursive Folder Selections on, a selected folder stands for

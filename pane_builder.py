@@ -1127,7 +1127,7 @@ class PaneBuilderMixin:
         pane._cluster_arrangement_cache = {}
         # Not added to this pane's own layout: the clusters of both panes
         # sit in a row of their own under the panes, either side of the
-        # central Folder Op group (UiBuilderMixin._build_cluster_row).
+        # central Both Panes group (UiBuilderMixin._build_cluster_row).
 
         tree.itemSelectionChanged.connect(
             lambda t=tree, p=pane: self.update_selection_count(t, p)

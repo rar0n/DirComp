@@ -497,7 +497,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self._panes_row = panes_row
         main_layout.addWidget(panes_row, stretch=1)
         # Under the panes: each pane's Select/File Op/Clipboard cluster
-        # either side of the central Folder Op group.
+        # either side of the central Both Panes group.
         filter_frame = self._build_filter_frame()
         global_options = self._build_global_options_group()
         if not self._dual_pane_enabled:
@@ -646,7 +646,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         layout.extend_right = self._dual_pane_enabled and bool(self._symmetrical_buttons)
         if self._dual_pane_enabled:
             layout.addWidget(self.left.cluster_container)
-            layout.addWidget(self._build_folder_op_group())
+            layout.addWidget(self._build_both_panes_group())
             layout.addWidget(self.right.cluster_container)
         else:
             left_cell = QWidget()
@@ -658,7 +658,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             left_layout.addStretch(1)
             left_layout.addWidget(filter_frame)
             layout.addWidget(left_cell)
-            layout.addWidget(self._build_folder_op_group())
+            layout.addWidget(self._build_both_panes_group())
             # The right pane is only a list of the duplicates, so its button
             # groups are not shown (and never get arranged -- see
             # _update_responsive_layout). In their place: the block with a
@@ -677,9 +677,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self._apply_mode_button_colors()
         return row
 
-    def _build_folder_op_group(self) -> QGroupBox:
+    def _build_both_panes_group(self) -> QGroupBox:
         """The central "Both Panes" button group -- one button column for
-        now (self._folder_op_buttons, top to bottom; append further buttons
+        now (self._both_panes_buttons, top to bottom; append further buttons
         there)."""
         uniform_w, uniform_h = self._uniform_button_size()
         group = QGroupBox("Both Panes")
@@ -696,10 +696,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.swap_pane_button.setFixedSize(uniform_w, uniform_h)
         self.swap_pane_button.clicked.connect(lambda checked=False: self._swap_panes())
-        self._folder_op_buttons = [self.swap_pane_button]
-        for row, button in enumerate(self._folder_op_buttons):
+        self._both_panes_buttons = [self.swap_pane_button]
+        for row, button in enumerate(self._both_panes_buttons):
             grid.addWidget(button, row, 0, alignment=Qt.AlignHCenter)
-        self.folder_op_group = group
+        self.both_panes_group = group
         return group
 
     def _apply_mode_button_colors(self):

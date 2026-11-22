@@ -171,12 +171,12 @@ class ResponsiveLayoutMixin:
         # Clipboard (7 buttons; None = empty cell): the order depends on how
         # many columns it wraps into (read row by row):
         #   2 columns (4 rows): Cut, Copy-->  /  Copy, Move-->  /  Copy flat, -  /  Paste, Paste Folders
-        #   4 columns (2 rows): Cut, Copy, Paste, Copy-->  /  Copy flat, Paste Folders, Move-->, -
+        #   4 columns (2 rows): Cut, Copy, Paste, Copy-->  /  -, Copy flat, Paste Folders, Move-->
         #   7 columns (1 row) and 1 column: Cut, Copy, Copy flat, Paste, Paste Folders, Move-->, Copy-->
         if cols == 2:
             return [b["cut"], across["copy"], b["copy"], across["move"], b["copy_flat"], None, b["paste"], b["paste_folders"]]
         if cols == 4:
-            return [b["cut"], b["copy"], b["paste"], across["copy"], b["copy_flat"], b["paste_folders"], across["move"], None]
+            return [b["cut"], b["copy"], b["paste"], across["copy"], None, b["copy_flat"], b["paste_folders"], across["move"]]
         return [b["cut"], b["copy"], b["copy_flat"], b["paste"], b["paste_folders"], across["move"], across["copy"]]
 
     @staticmethod

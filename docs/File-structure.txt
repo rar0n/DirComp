@@ -23,7 +23,7 @@ progress.py            -   187 - cancellable progress-bar helper
 responsive_layout.py   - 479 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
 selection_ops.py       - 2279 - Select group buttons and the recursive search behind them (SelectionMixin)
 settings_ops.py        -   662 - Save / Load Settings to the JSON settings file (SettingsMixin)
-settings_tab.py        - 2884 - Settings tab construction and helpers (SettingsTabMixin)
+settings_tab.py        - 2886 - Settings tab construction and helpers (SettingsTabMixin)
 snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   900 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
 statistics_widget.py   -  2451 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)

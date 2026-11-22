@@ -90,7 +90,7 @@ class SettingsTabMixin:
         secondary.blockSignals(False)
 
     def _settings_titled_block(
-        self, title: str, group: QWidget, pt: int, style: str, space_above: bool,
+        self, title: str, group: QWidget, pt: int, style: str, space_above: bool, bands: int = 1,
     ) -> QWidget:
         """A title label (`style`, `pt` points, bold) directly above
         `group`, with an empty band above the title exactly as tall as
@@ -98,13 +98,15 @@ class SettingsTabMixin:
         title level, so blocks start clearly apart from whatever comes
         before them (or, in a FlowLayout, from the line above when they
         wrap), in proportion to how big their own title is. Only the
-        very first title on the page (Global Settings) goes without."""
+        very first title on the page (Global Settings) goes without. `bands`:
+        how many title-heights of empty band (Level 1 uses 2: its own
+        blank line plus one more, to set the sections clearly apart)."""
         container = QWidget()
         layout = QVBoxLayout(container)
         title_font = QFont(self.font())
         title_font.setPointSize(pt)
         title_font.setBold(True)
-        layout.setContentsMargins(0, QFontMetrics(title_font).height() if space_above else 0, 0, 0)
+        layout.setContentsMargins(0, QFontMetrics(title_font).height() * bands if space_above else 0, 0, 0)
         layout.setSpacing(4)
         header = QLabel(title)
         header.setStyleSheet(style)
@@ -120,7 +122,7 @@ class SettingsTabMixin:
         is a drop-in substitute for `group` at whichever addWidget call
         adds it."""
         return self._settings_titled_block(
-            title, group, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE, space_above
+            title, group, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE, space_above, bands=2
         )
 
     def _settings_subsection(self, title: str, group: QGroupBox, space_above: bool = True) -> QWidget:

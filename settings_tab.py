@@ -885,8 +885,15 @@ class SettingsTabMixin:
         # Level 2 blocks of Global Settings: Theme, Options, Comparison Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
-        global_settings_flow.addWidget(self._settings_subsection("Context Menu", self._build_context_menu_group()))
-        global_settings_flow.addWidget(self._settings_subsection("Sync Settings", self._build_sync_settings_group()))
+        # Context Menu and Sync Settings have the same kind of rows: their
+        # labels, spin boxes and sliders, and the two groups themselves,
+        # are made equally wide below (see _align_sibling_groups) so that
+        # they line up when they sit above each other.
+        self._sibling_aligned_rows = []
+        context_menu_block = self._settings_subsection("Context Menu", self._build_context_menu_group())
+        sync_settings_block = self._settings_subsection("Sync Settings", self._build_sync_settings_group())
+        global_settings_flow.addWidget(context_menu_block)
+        global_settings_flow.addWidget(sync_settings_block)
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
@@ -2336,6 +2343,7 @@ class SettingsTabMixin:
         # after each row's own tooltip/range/connect setup above, rather
         # than threading a shared width down into every site that builds
         # one of these rows. ----
+        self._align_sibling_groups(self._sibling_aligned_rows, (context_menu_block, sync_settings_block))
         if self._aligned_option_rows:
             aligned_label_w = max(label.sizeHint().width() for label, _ in self._aligned_option_rows)
             aligned_spin_w = max(spin.sizeHint().width() for _, spin in self._aligned_option_rows)
@@ -2413,6 +2421,7 @@ class SettingsTabMixin:
         self.ctx_col_spaces_spin.setValue(self._ctx_col_spaces)
         self.ctx_col_spaces_spin.valueChanged.connect(lambda v: setattr(self, "_ctx_col_spaces", int(v)))
         col_label = QLabel("Column separation spaces:")
+        self._sibling_aligned_rows.append((col_label, self.ctx_col_spaces_spin))
         col_row = spin_slider_inline(col_label, self.ctx_col_spaces_spin,
                                      SpinSlider(self.ctx_col_spaces_spin, live=False))
         lay.addWidget(col_row, 0, Qt.AlignLeft)
@@ -2422,6 +2431,7 @@ class SettingsTabMixin:
         self.ctx_indent_spaces_spin.setValue(self._ctx_indent_spaces)
         self.ctx_indent_spaces_spin.valueChanged.connect(lambda v: setattr(self, "_ctx_indent_spaces", int(v)))
         indent_label = QLabel("Folder indentation spaces:")
+        self._sibling_aligned_rows.append((indent_label, self.ctx_indent_spaces_spin))
         indent_row = spin_slider_inline(indent_label, self.ctx_indent_spaces_spin,
                                         SpinSlider(self.ctx_indent_spaces_spin, live=False))
         lay.addWidget(indent_row, 0, Qt.AlignLeft)
@@ -2448,6 +2458,22 @@ class SettingsTabMixin:
 
         outer.addWidget(self._settings_subsubsection("Copy File List formatting", box, space_above=False))
         return group
+
+    @staticmethod
+    def _align_sibling_groups(rows, blocks):
+        """Gives the labels and spin boxes of `rows` ((label, spin) pairs of
+        sibling groups) one common width, so their sliders start at the
+        same x, and makes the `blocks` (the groups' Level 2 widgets) equally
+        wide."""
+        if rows:
+            label_w = max(label.sizeHint().width() for label, _ in rows)
+            spin_w = max(spin.sizeHint().width() for _, spin in rows)
+            for label, spin in rows:
+                label.setFixedWidth(label_w)
+                spin.setFixedWidth(spin_w)
+        widest = max(block.sizeHint().width() for block in blocks)
+        for block in blocks:
+            block.setMinimumWidth(widest)
 
     def _build_sync_settings_group(self) -> QGroupBox:
         """Global Settings -> Sync Settings: the Sync button's "folders look
@@ -2476,7 +2502,9 @@ class SettingsTabMixin:
         self.sync_warn_spin.setSuffix(" %")
         self.sync_warn_spin.setValue(self._sync_warn_percent)
         self.sync_warn_spin.valueChanged.connect(lambda v: setattr(self, "_sync_warn_percent", int(v)))
-        warn_row = spin_slider_inline(QLabel("Mismatch warning threshold:"), self.sync_warn_spin,
+        warn_label = QLabel("Mismatch warning threshold:")
+        self._sibling_aligned_rows.append((warn_label, self.sync_warn_spin))
+        warn_row = spin_slider_inline(warn_label, self.sync_warn_spin,
                                       SpinSlider(self.sync_warn_spin, live=False))
         lay.addWidget(warn_row, 0, Qt.AlignLeft)
 
@@ -2493,7 +2521,9 @@ class SettingsTabMixin:
         self.sync_min_spin.setRange(1, 1000)
         self.sync_min_spin.setValue(self._sync_min_files)
         self.sync_min_spin.valueChanged.connect(lambda v: setattr(self, "_sync_min_files", int(v)))
-        min_row = spin_slider_inline(QLabel("Fewer files than:"), self.sync_min_spin,
+        min_label = QLabel("Fewer files than:")
+        self._sibling_aligned_rows.append((min_label, self.sync_min_spin))
+        min_row = spin_slider_inline(min_label, self.sync_min_spin,
                                      SpinSlider(self.sync_min_spin, live=False))
         lay.addWidget(min_row, 0, Qt.AlignLeft)
 

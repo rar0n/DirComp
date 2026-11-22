@@ -589,6 +589,7 @@ class ListingMixin:
         return (
             self.file_filter_entry.text(),
             self.invert_filter_cb.isChecked(),
+            self._filter_ignore_case(),
             self.list_directories_cb.isChecked(),
             self.list_files_cb.isChecked(),
             self.sort_directories_first_cb.isChecked(),
@@ -606,6 +607,7 @@ class ListingMixin:
         # before either branch below, so both "directory changed" and
         # "directory cleared" leave no stale cached ranks behind.
         self._invalidate_dir_rank_cache()
+        self._name_filter_memo = None  # remembers nodes of the old snapshot
         if directory is None:
             pane.snapshot_root, pane.snapshot_index = None, {}
             self._set_upper_status(pane, "")
@@ -1077,6 +1079,10 @@ class ListingMixin:
         # response to the clear, it's an unrelated, already-pending timer
         # callback getting a chance to run during the pump.
         pane._tree_rebuild_pending = True
+        # The name filter's non-recursive scope is "expanded folders"; the
+        # tree is emptied below, so it reads this copy until the rebuild
+        # is done (cleared in the finally at the end of the rebuild).
+        pane._filter_rebuild_expanded = expanded_paths
         try:
             # Block signals for just this one call: tree.clear() can
             # synchronously emit itemSelectionChanged for whatever's
@@ -1235,6 +1241,7 @@ class ListingMixin:
                                             auto_expand=False, select_subtree=False)
         finally:
             pane._tree_rebuild_pending = False
+            pane._filter_rebuild_expanded = None
             if tree_was_visible:
                 tree.setVisible(True)
             tree.setUpdatesEnabled(True)
@@ -1318,11 +1325,7 @@ class ListingMixin:
         if node is None or node["children"] is None:
             return None
 
-        filter_extensions = [
-            ext.strip().lower()
-            for ext in self.file_filter_entry.text().split(",")
-            if ext.strip()
-        ]
+        name_filter = self._name_filter(pane)
 
         names = sorted(node["children"].keys(), key=lambda x: x.lower())
         if self.sort_directories_first_cb.isChecked():
@@ -1347,6 +1350,8 @@ class ListingMixin:
             if child["is_dir"]:
                 if not self.list_directories_cb.isChecked():
                     continue
+                if not name_filter.dir_passes(child):
+                    continue
                 item_count = len(child["children"] or {})
                 entries.append(dict(
                     name=name, full_path=full_path, is_dir=True,
@@ -1357,10 +1362,7 @@ class ListingMixin:
                 ))
             else:
                 file_ext = os.path.splitext(name)[1][1:].lower()
-                passes_filter = (not filter_extensions) or (
-                    (file_ext in filter_extensions) ^ self.invert_filter_cb.isChecked()
-                )
-                if not (self.list_files_cb.isChecked() and passes_filter):
+                if not (self.list_files_cb.isChecked() and name_filter.name_passes(name)):
                     continue
                 entries.append(dict(
                     name=name, full_path=full_path, is_dir=False,

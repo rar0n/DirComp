@@ -55,13 +55,7 @@ class DuplicateFinderMixin:
         list_files = getattr(self, "list_files_cb", None)
         if list_files is not None and not list_files.isChecked():
             return False
-        entry = getattr(self, "file_filter_entry", None)
-        extensions = [e.strip().lower() for e in entry.text().split(",") if e.strip()] if entry else []
-        if not extensions:
-            return True
-        invert = getattr(self, "invert_filter_cb", None)
-        in_filter = os.path.splitext(name)[1][1:].lower() in extensions
-        return in_filter ^ (invert.isChecked() if invert else False)
+        return self._name_filter().name_passes(name)
 
     def _dup_freeze_scope(self, pane, refresh=False):
         """The expanded folders (normalized paths) a non-recursive scan

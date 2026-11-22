@@ -34,6 +34,7 @@ from comparison_copy import ComparisonCopyMixin
 from statistics_ops import TimelineOpsMixin
 from settings_ops import SettingsMixin
 from file_filter_tab import FileFilterTabMixin
+from name_filter_ops import NameFilterMixin
 from context_menu_ops import ContextMenuMixin
 from ui_builder import UiBuilderMixin, PANE_TIMELINE_HEIGHT
 from custom_widgets import install_spinbox_wheel_guard
@@ -55,6 +56,7 @@ class DirectoryComparisonApp(
     TimelineOpsMixin,
     SettingsMixin,
     FileFilterTabMixin,
+    NameFilterMixin,
     ContextMenuMixin,
     QMainWindow,
 ):

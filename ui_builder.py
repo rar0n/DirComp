@@ -738,6 +738,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             "right_path": self.right.entry.text() if getattr(self.right, "entry", None) else "",
             "filter_text": self.file_filter_entry.text() if hasattr(self, "file_filter_entry") else "",
             "invert_filter": self.invert_filter_cb.isChecked() if hasattr(self, "invert_filter_cb") else False,
+            "ignore_case_filter": self.ignore_case_filter_cb.isChecked() if hasattr(self, "ignore_case_filter_cb") else True,
             "synchronize_views": self.synchronize_views_cb.isChecked() if hasattr(self, "synchronize_views_cb") else False,
             "recursive_folder_contents": self.recursive_folder_contents_cb.isChecked() if hasattr(self, "recursive_folder_contents_cb") else True,
             "expand_matching": self.expand_matching_cb.isChecked() if hasattr(self, "expand_matching_cb") else True,
@@ -788,6 +789,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.invert_filter_cb.blockSignals(True)
         self.invert_filter_cb.setChecked(state["invert_filter"])
         self.invert_filter_cb.blockSignals(False)
+
+        self.ignore_case_filter_cb.blockSignals(True)
+        self.ignore_case_filter_cb.setChecked(state.get("ignore_case_filter", True))
+        self.ignore_case_filter_cb.blockSignals(False)
 
         self.synchronize_views_cb.setChecked(state["synchronize_views"])
 
@@ -1467,6 +1472,15 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         invert_apply_row = QHBoxLayout()
         invert_apply_row.setContentsMargins(0, 0, 0, 0)
         invert_apply_row.addWidget(self.invert_filter_cb)
+        # On by default, and a plain per-session choice like Invert: not
+        # saved in the settings file. Not touched by Clear either.
+        self.ignore_case_filter_cb = QCheckBox("Ignore UPPER / lowercase")
+        self.ignore_case_filter_cb.setChecked(True)
+        self.ignore_case_filter_cb.setToolTip(
+            "On: 'Photo' also finds photo, PHOTO ...; off: capitalisation must match.")
+        self.ignore_case_filter_cb.stateChanged.connect(self.apply_filter)
+        invert_apply_row.addSpacing(12)
+        invert_apply_row.addWidget(self.ignore_case_filter_cb)
         invert_apply_row.addStretch(1)
         invert_apply_row.addWidget(self.apply_filter_button)
         grid.addLayout(invert_apply_row, 1, 2)
@@ -1882,6 +1896,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         selected_type = self.file_type_dropdown.currentText()
         if not selected_type:
             return
+        # The filter matches any part of a name, so a bare "txt" would
+        # also hit "context.doc"; with the dot it means the extension.
+        selected_type = "." + selected_type
         current = self.file_filter_entry.text().strip()
         if current:
             self.file_filter_entry.setText(f"{current}, {selected_type}")

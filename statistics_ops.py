@@ -97,8 +97,8 @@ class TimelineOpsMixin:
 
     def _snapshot_node_visible(self, node) -> bool:
         """Whether `node` would actually be listed in the tree at all --
-        List Files/List Directories and the extension filter (+
-        Invert), the exact same checks ListingMixin._build_entries
+        List Files/List Directories and the name filter (+
+        Invert, Ignore case), the exact same checks ListingMixin._build_entries
         applies. Used while walking the raw snapshot directly
         (_flatten_files, _pane_folder_count's recursive branch) so
         recursive-mode results match "the file list view (minus
@@ -108,19 +108,12 @@ class TimelineOpsMixin:
         Recursive Folder Selections being on meant the timeline (and
         its totals) silently ignored every one of these filters,
         showing files the file list itself was hiding."""
+        name_filter = self._name_filter()
         if node["is_dir"]:
-            return self.list_directories_cb.isChecked()
+            return self.list_directories_cb.isChecked() and name_filter.dir_passes(node)
         if not self.list_files_cb.isChecked():
             return False
-        filter_extensions = [
-            ext.strip().lower()
-            for ext in self.file_filter_entry.text().split(",")
-            if ext.strip()
-        ]
-        if not filter_extensions:
-            return True
-        file_ext = os.path.splitext(node["name"])[1][1:].lower()
-        return (file_ext in filter_extensions) ^ self.invert_filter_cb.isChecked()
+        return name_filter.name_passes(node["name"])
 
     def _flatten_files(self, node):
         """Yield every file (non-directory) node in `node`'s subtree

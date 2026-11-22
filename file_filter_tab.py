@@ -65,8 +65,9 @@ class FileFilterTabMixin:
         group_layout.addWidget(self._make_italic_note(
             "The extensions offered in the Global File Filter's drop-down on the "
             "Main tab. Double-click an entry to edit it, or use Add. Written without "
-            "a dot (txt, not .txt). The drop-down is updated by Save Settings, "
-            "Load Settings and Load Defaults, not while you edit."
+            "a dot (txt, not .txt) -- the drop-down adds the dot when you pick one. "
+            "The drop-down is updated by Save Settings, Load Settings and Load "
+            "Defaults, not while you edit."
         ))
 
         body = QHBoxLayout()

@@ -1297,6 +1297,7 @@ class PaneBuilderMixin:
         metric_combo.addItem(CHANGED_FIELD_LABEL, "changed")
         metric_combo.addItem("Accessed", "accessed")
         metric_combo.addItem("File Size", "size")
+        metric_combo.addItem("File Filter types", "file_filter")
         pane.tl_metric_combo = metric_combo
         metric_combo.currentIndexChanged.connect(
             lambda idx, p=pane: self._on_statistics_metric_changed(p, idx)

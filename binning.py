@@ -35,6 +35,20 @@ class BinAxis(ABC):
     #: SizeAxis so byte counts can't pan/zoom below 0.
     min_value: Optional[float] = None
 
+    #: True for an axis whose bins are fixed by its own nature (one per
+    #: category), so the widget always uses its step logic and never the
+    #: free "arbitrary equal-width bins" mode, whatever "Nice bins" says.
+    always_nice: bool = False
+
+    #: (start, end) the data is always shown over, or None to use the
+    #: range the records' values actually cover.
+    fixed_range: Optional[tuple] = None
+
+    def view_padding(self, span: float) -> float:
+        """Empty room added either side of the data when the view is
+        reset (reset_view)."""
+        return span * 0.03 if span > 0 else self.equal_span_pad
+
     @abstractmethod
     def choose_step(self, view_start: float, view_end: float, target_bins: int) -> Any:
         """Pick a "nice" step (opaque token) for the given visible range,
@@ -510,3 +524,50 @@ class SizeAxis(BinAxis):
         if self.log_mode:
             return 10.0 ** pos
         return pos
+
+
+# ----------------------------------------------------------------- category
+class CategoryAxis(BinAxis):
+    """One bin per named category: category i is the value range
+    [i, i + 1), and a record belongs to it by having a value in there
+    (the host uses i + 0.5). Used by the Statistics View's "File Filter
+    types" metric, where the categories are the File Filter list's entries,
+    in list order. The step is always 1 -- a bin is a whole category."""
+
+    min_span = 1.0
+    equal_span_pad = 0.5
+    min_value = 0.0
+    always_nice = True
+
+    def __init__(self, labels):
+        self.labels = [str(x) for x in labels]
+        self.fixed_range = (0.0, float(len(self.labels)))
+
+    def view_padding(self, span: float) -> float:
+        return 0.0
+
+    def choose_step(self, view_start: float, view_end: float, target_bins: int) -> Any:
+        return 1
+
+    def floor(self, value: float, step: Any) -> float:
+        return float(math.floor(value))
+
+    def next(self, boundary: float, step: Any) -> float:
+        return boundary + 1.0
+
+    def _label_at(self, value: float) -> str:
+        i = int(math.floor(value + 1e-9))
+        return self.labels[i] if 0 <= i < len(self.labels) else ""
+
+    def format_tick(self, value: float, step: Any) -> str:
+        return self._label_at(value)
+
+    def format_bin(self, start: float, end: float) -> str:
+        return self._label_at(start)
+
+    def format_step(self, step: Any) -> str:
+        return "1 entry"
+
+    def format_raw_width(self, width: float) -> str:
+        return "1 entry"
+

@@ -431,8 +431,13 @@ class SettingsTabMixin:
         # independent, and deliberately placed alongside Unnatural
         # scrolling since the two are meant to be combinable (see either
         # one's tooltip).
-        _add_synced(self.unnatural_scrolling_cb, "Unnatural scrolling", 3, 0)
-        _add_synced(self.invert_statistics_zoom_cb, "Invert scrollwheel zoom direction", 3, 2)
+        # A blank line (row 3) sets the two scroll options apart from the
+        # options above them.
+        scroll_gap = QWidget()
+        scroll_gap.setFixedHeight(QFontMetrics(self.font()).height())
+        global_grid.addWidget(scroll_gap, 3, 0, 1, 7)
+        _add_synced(self.unnatural_scrolling_cb, "Unnatural scrolling", 4, 0)
+        _add_synced(self.invert_statistics_zoom_cb, "Invert scrollwheel zoom direction", 4, 2)
 
         # Row 7: File List View folder-open history -- how many entries
         # each pane's entry combo box keeps (see panes.DirectoryPane.

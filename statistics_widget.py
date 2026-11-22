@@ -559,6 +559,10 @@ class TimelineWidget(QWidget):
         values = [self._value_of(r) for r in records]
         self.global_start = min(values)
         self.global_end = max(values)
+        if self.axis.fixed_range is not None:
+            # A categorical axis always covers all of its categories, even
+            # the ones no record falls in.
+            self.global_start, self.global_end = self.axis.fixed_range
         if self.global_end - self.global_start < self.axis.min_span:
             # All values identical, or closer together than the axis can
             # even resolve (e.g. access times a few milliseconds apart):
@@ -576,6 +580,11 @@ class TimelineWidget(QWidget):
         "arbitrary" bin behaviour: view span / bin_count."""
         self.bin_count = max(1, n)
         self._recompute_bins()
+
+    def _nice(self) -> bool:
+        """Whether bins follow the axis's step grid: the "Nice bins" setting,
+        or always for an axis whose bins are fixed by nature (categories)."""
+        return self.nice_bins or self.axis.always_nice
 
     def set_nice_bins(self, enabled: bool):
         """Toggle between "nice" calendar/magnitude-snapped bins and plain
@@ -617,7 +626,7 @@ class TimelineWidget(QWidget):
         self.update()
 
     def _strip_active(self) -> bool:
-        return self.strip_calendar_units and self.nice_bins
+        return self.strip_calendar_units and self._nice()
 
     def _format_x_tick(self, value: float, step) -> str:
         """The x-axis label text for a bin boundary -- stripped of its
@@ -814,7 +823,7 @@ class TimelineWidget(QWidget):
     def current_bin_step_label(self) -> Optional[str]:
         """Human-readable current bin width, e.g. '1 month' or '10 MB'
         (nice bins), or an approximate duration/size (arbitrary bins)."""
-        if self.nice_bins:
+        if self._nice():
             if self._current_step is None:
                 return None
             return self.axis.format_step(self._current_step)
@@ -826,7 +835,7 @@ class TimelineWidget(QWidget):
         if self.global_start is None:
             return
         span = self.global_end - self.global_start
-        pad = span * 0.03 if span > 0 else self.axis.equal_span_pad
+        pad = self.axis.view_padding(span)
         self.view_start = self.global_start - pad
         self.view_end = self.global_end + pad
         self._clamp_view_to_axis_min()
@@ -850,7 +859,7 @@ class TimelineWidget(QWidget):
         # rather than the view window (see _recompute_bins' else branch),
         # so they're never expected to tile the view edge-to-edge in the
         # first place -- nothing to snap there.
-        if self.nice_bins:
+        if self._nice():
             for edge in self.bin_edges:
                 if edge >= self.view_end:
                     self.view_end = edge
@@ -871,7 +880,7 @@ class TimelineWidget(QWidget):
     def _recompute_bins(self):
         if self.view_start is None:
             return
-        if self.nice_bins:
+        if self._nice():
             target_bins = max(1, self.bin_count)
             step = self.axis.choose_step(self.view_start, self.view_end, target_bins)
             self._current_step = step
@@ -972,7 +981,7 @@ class TimelineWidget(QWidget):
         font = QFont()
         font.setPointSize(self.label_font_pt)
         fm = QFontMetrics(font)
-        tick_step = self._current_step if self.nice_bins else self.axis.choose_step(
+        tick_step = self._current_step if self._nice() else self.axis.choose_step(
             self.bin_edges[0], self.bin_edges[1], 1
         )
         max_label_w = max(
@@ -997,7 +1006,7 @@ class TimelineWidget(QWidget):
         (same choice _recompute_bottom_margin/_draw_x_axis_labels make
         inline): the real step in nice mode, or one derived purely for
         label granularity from the actual bin width otherwise."""
-        if self.nice_bins:
+        if self._nice():
             return self._current_step
         return self.axis.choose_step(self.bin_edges[0], self.bin_edges[1], 1)
 
@@ -1615,7 +1624,7 @@ class TimelineWidget(QWidget):
             # nice-bins-or-not step lookup _recompute_bottom_margin
             # uses, so an arbitrary (non-nice) bin still gets a sensible
             # tick format instead of None.
-            step = self._current_step if self.nice_bins else self.axis.choose_step(v0, self.bin_edges[i + 1], 1)
+            step = self._current_step if self._nice() else self.axis.choose_step(v0, self.bin_edges[i + 1], 1)
             hover_segment = (
                 f"{self.axis.format_tick(v0, step)} - {self.bin_counts[i]} {self._item_label}(s)",
                 self.hover_label_color,
@@ -1755,7 +1764,7 @@ class TimelineWidget(QWidget):
                 return f"Chart: {context}"
         # Same step lookup the hover readout uses, so a non-nice (arbitrary)
         # bin width still gets a sensible tick format.
-        step = self._current_step if self.nice_bins else self.axis.choose_step(first, last, 1)
+        step = self._current_step if self._nice() else self.axis.choose_step(first, last, 1)
         first_text = self.axis.format_tick(first, step)
         last_text = self.axis.format_tick(last, step)
         return f"Chart: {first_text}" if first_text == last_text else f"Chart: {first_text} - {last_text}"

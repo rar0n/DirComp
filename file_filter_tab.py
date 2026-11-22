@@ -217,6 +217,7 @@ class FileFilterTabMixin:
         self._file_filter_working = list(self._file_filter_types)
         self._ff_fill_list(self._file_filter_working)
         self._refresh_file_type_dropdown()
+        self._refresh_filter_metric_panes()
 
     def _file_filter_set(self, types):
         """Load Settings / Load Defaults / startup: replace both copies
@@ -226,6 +227,7 @@ class FileFilterTabMixin:
         if self._file_filter_list is not None:
             self._ff_fill_list(self._file_filter_working)
         self._refresh_file_type_dropdown()
+        self._refresh_filter_metric_panes()
 
     def _reset_file_filter_defaults(self):
         """"Load Defaults" on this tab. Not saved until Save Settings."""

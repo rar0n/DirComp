@@ -43,6 +43,8 @@ import time
 from PySide6.QtWidgets import QAbstractItemView
 
 from panes import DirectoryPane
+from binning import CategoryAxis
+from name_filter_ops import _compile_term
 from constants import PATH_ROLE, IS_DIR_ROLE, TIMELINE_SCROLLBAR_RANGE, METRIC_DATE_FIELDS
 
 
@@ -56,6 +58,11 @@ def _value_of_for_metric(metric: str):
     getattr(...).timestamp() conversion is needed."""
     if metric == "size":
         return lambda r: float(r["size"] or 0)
+    if metric == "file_filter":
+        # Records are copies tagged with their File Filter entry's index
+        # (see _filter_metric_records); the value is the middle of that
+        # entry's bin on the CategoryAxis.
+        return lambda r: r["_bin"] + 0.5
     field = METRIC_DATE_FIELDS.get(metric, "mtime")
     return lambda r, f=field: r[f]
 
@@ -290,16 +297,48 @@ class TimelineOpsMixin:
             return
         metric = pane.tl_metric_combo.currentData() if pane.tl_metric_combo else "modified"
         metric = metric or "modified"
+        records = self._pane_timeline_records(pane)
+        axis = None
+        if metric == "file_filter":
+            records, axis = self._filter_metric_records(records)
         timeline.set_records(
-            self._pane_timeline_records(pane),
+            records,
             metric=metric,
             value_of=_value_of_for_metric(metric),
             path_of=_path_of,
             size_of=_size_of,
+            axis=axis,
             item_label="folder" if pane.tl_folder_mode else "file",
         )
         self._update_statistics_bin_size_label(pane)
         self._update_timeline_totals_label(pane)
+
+    def _filter_metric_records(self, nodes: list):
+        """The "File Filter types" metric: one bin per entry of the File
+        Filter list, in list order (the entries the Main tab's drop-down
+        shows). Returns (records, CategoryAxis). Each record is a copy of
+        a visible node tagged with the index of an entry its name matches
+        (same matching as the filter: wildcards, "Ignore UPPER / lowercase"),
+        so a name matching several entries is counted in each of their
+        bins; a name matching none is not plotted."""
+        terms = list(getattr(self, "_file_filter_types", []))
+        ignore_case = self._filter_ignore_case()
+        matchers = [_compile_term(t, ignore_case) for t in terms]
+        records = []
+        for node in nodes:
+            name = node["name"]
+            for i, match in enumerate(matchers):
+                if match(name):
+                    records.append({**node, "_bin": i})
+        return records, CategoryAxis(terms)
+
+    def _refresh_filter_metric_panes(self):
+        """The File Filter list (or what its terms match) changed: redo the
+        chart of every pane that is plotting the File Filter types metric."""
+        for pane in (self.left, self.right):
+            combo = getattr(pane, "tl_metric_combo", None)
+            if combo is not None and combo.currentData() == "file_filter":
+                self._refresh_pane_timeline(pane)
 
     def _on_timeline_mode_changed(self, pane: DirectoryPane, folder_mode: bool):
         """Files/Folders toggle next to the Statistics view title (see
@@ -466,10 +505,15 @@ class TimelineOpsMixin:
         pane, which is exactly what re-buckets/retags it too."""
         timeline = pane.timeline
         metric = pane.tl_metric_combo.currentData()
-        timeline.set_records(
-            timeline.records, metric=metric,
-            value_of=_value_of_for_metric(metric), path_of=_path_of, size_of=_size_of,
-        )
+        if metric == "file_filter" or timeline.metric_name == "file_filter":
+            # This metric plots its own tagged copies of the records (see
+            # _filter_metric_records), so going to or from it reloads them.
+            self._refresh_pane_timeline(pane)
+        else:
+            timeline.set_records(
+                timeline.records, metric=metric,
+                value_of=_value_of_for_metric(metric), path_of=_path_of, size_of=_size_of,
+            )
         self._update_statistics_bin_size_label(pane)
         self.update_listings()
         self._propagate_metric_to_other_pane(pane)

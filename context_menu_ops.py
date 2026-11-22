@@ -357,23 +357,24 @@ class ContextMenuMixin:
         if not rows:
             return
         base = min(d for d, _ in rows)
-        lines = []
+        info_line = None
+        records = []  # (depth, [columns]) -- laid out at the end, per Settings
         digest_kind = getattr(self, "_cmp_type", None) if with_digests else None
         if digest_kind not in (CMP_HASH, CMP_FINGERPRINT):
             digest_kind = None
         if digest_kind == CMP_FINGERPRINT:
             key = self._hash_key_for(CMP_FINGERPRINT)
-            lines.append(f"Fingerprint: {HASH_ALGORITHMS[key[1]]}, file size + first {key[2]} kB + last {key[3]} kB")
+            info_line = (f"Fingerprint: {HASH_ALGORITHMS[key[1]]}, file size + first {key[2]} kB + last {key[3]} kB")
 
         def add_line(depth, name, size, type_, date, path, is_dir):
-            cols = [("  " * depth) + name, size, type_, date]
+            cols = [name, size, type_, date]
             if digest_kind is not None and path and not is_dir:
                 key = self._hash_key_for(digest_kind)
                 word = "fingerprint" if digest_kind == CMP_FINGERPRINT else "hash"
                 info = self._stored_digest_info(path, digest_kind)
                 value = info[1] if info is not None and tuple(info[0]) == key else "-- not calculated --"
                 cols += [f"{HASH_ALGORITHMS[key[1]]} {word}", value]
-            lines.append("\t".join(cols))
+            records.append((depth, cols))
 
         # With Recursive Folder Selections on, a selected folder stands for
         # everything inside it (as for Copy and the Select group), so its
@@ -401,9 +402,36 @@ class ContextMenuMixin:
                          e["full_path"], e["is_dir"])
                 if e["is_dir"]:
                     stack.extend((d + 1, c) for c in reversed(self._build_entries(e["full_path"], pane=pane) or []))
+        lines = self._format_flv_records(records)
+        if info_line:
+            lines.insert(0, info_line)
         QApplication.clipboard().setText("\n".join(lines))
-        n = len(lines)
+        n = len(records)
         self._set_upper_status(pane, f"Copied list data of {n} item{'s' if n != 1 else ''}")
+
+    def _format_flv_records(self, records) -> list:
+        """Lay out (depth, columns) records as text lines per Settings ->
+        Context Menu -> Copy File List formatting: tab-separated with no
+        indentation, or spaces (folder indentation per depth, column
+        separation spaces, optionally padded so the columns line up)."""
+        if not getattr(self, "_ctx_sep_spaces", False):
+            return ["\t".join(cols) for _, cols in records]
+        gap = " " * max(1, int(getattr(self, "_ctx_col_spaces", 2)))
+        indent = max(0, int(getattr(self, "_ctx_indent_spaces", 2)))
+        rows = [[" " * (indent * depth) + cols[0], *cols[1:]] for depth, cols in records]
+        if not getattr(self, "_ctx_nice_format", False):
+            return [gap.join(r) for r in rows]
+        widths = []
+        for r in rows:
+            for i, cell in enumerate(r):
+                if i == len(widths):
+                    widths.append(0)
+                widths[i] = max(widths[i], len(cell))
+        return [
+            (gap.join(cell.ljust(widths[i]) for i, cell in enumerate(r[:-1])) + gap + r[-1]
+             if len(r) > 1 else r[0])
+            for r in rows
+        ]
 
     # ------------------------------------------------------------------
     # Open / Open with

@@ -58,6 +58,8 @@ _SHARED_WIDGET_KEYS = frozenset({
     "ignore_file_extensions", "first_name_only",
     "cache_hashed_folders",
     "folder_counts_include_subfolders",
+    "context_menu_separator", "context_menu_column_spaces", "context_menu_indent_spaces",
+    "context_menu_nice_format",
     "ignore_empty_files", "ignore_hard_links", "scan_expanded_folders", "hash_same_size_files", "extra_copies_keep",
 })
 
@@ -122,6 +124,10 @@ class SettingsMixin:
             "hash_same_size_files": getattr(self, "hash_same_size_cb", None),
             "ignore_hard_links": getattr(self, "ignore_hard_links_cb", None),
             "folder_counts_include_subfolders": getattr(self, "folder_counts_include_subfolders_cb", None),
+            "context_menu_separator": getattr(self, "ctx_separator_group", None),
+            "context_menu_column_spaces": getattr(self, "ctx_col_spaces_spin", None),
+            "context_menu_indent_spaces": getattr(self, "ctx_indent_spaces_spin", None),
+            "context_menu_nice_format": getattr(self, "ctx_nice_format_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)

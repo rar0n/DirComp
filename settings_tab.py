@@ -874,6 +874,7 @@ class SettingsTabMixin:
         # Level 2 blocks of Global Settings: Theme, Options, Comparison Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
+        global_settings_flow.addWidget(self._settings_subsection("Context Menu", self._build_context_menu_group()))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
@@ -2366,6 +2367,73 @@ class SettingsTabMixin:
         tab_layout.addLayout(save_load_row)
         tab_layout.addWidget(self.settings_status_label)
         return tab_container
+
+    def _build_context_menu_group(self) -> QGroupBox:
+        """Global Settings -> Context Menu: "Copy File List formatting",
+        how the File List View's "Copy File List View Data" entries lay
+        out their text -- tab-separated (for spreadsheets), or padded with
+        spaces (and optionally lined up in columns)."""
+        group = QGroupBox("")
+        outer = QVBoxLayout(group)
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+
+        self.ctx_separator_group = QButtonGroup(group)
+        sep_row = QHBoxLayout()
+        sep_row.addWidget(QLabel("Column separation:"))
+        for rid, text, tip in (
+            (0, "Tab", "Columns are separated by a single tab and nothing is indented -- pastes straight into a spreadsheet."),
+            (1, "Spaces", "Columns are separated by spaces; folder contents are indented."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.ctx_separator_group.addButton(radio, rid)
+            sep_row.addWidget(radio)
+            radio.setChecked(rid == (1 if self._ctx_sep_spaces else 0))
+        sep_row.addStretch(1)
+        lay.addLayout(sep_row)
+
+        self.ctx_col_spaces_spin = SliderSpinBox()
+        self.ctx_col_spaces_spin.setRange(1, 20)
+        self.ctx_col_spaces_spin.setValue(self._ctx_col_spaces)
+        self.ctx_col_spaces_spin.valueChanged.connect(lambda v: setattr(self, "_ctx_col_spaces", int(v)))
+        col_label = QLabel("Column separation spaces:")
+        col_row = spin_slider_inline(col_label, self.ctx_col_spaces_spin,
+                                     SpinSlider(self.ctx_col_spaces_spin, live=False))
+        lay.addWidget(col_row, 0, Qt.AlignLeft)
+
+        self.ctx_indent_spaces_spin = SliderSpinBox()
+        self.ctx_indent_spaces_spin.setRange(0, 20)
+        self.ctx_indent_spaces_spin.setValue(self._ctx_indent_spaces)
+        self.ctx_indent_spaces_spin.valueChanged.connect(lambda v: setattr(self, "_ctx_indent_spaces", int(v)))
+        indent_label = QLabel("Folder indentation spaces:")
+        indent_row = spin_slider_inline(indent_label, self.ctx_indent_spaces_spin,
+                                        SpinSlider(self.ctx_indent_spaces_spin, live=False))
+        lay.addWidget(indent_row, 0, Qt.AlignLeft)
+
+        self.ctx_nice_format_cb = QCheckBox("Nice plain-text formatting")
+        self.ctx_nice_format_cb.setToolTip(
+            "Lines the columns up under each other (for a constant-width font), padding "
+            "shorter entries with spaces up to the widest one plus the column separation.")
+        self.ctx_nice_format_cb.setChecked(self._ctx_nice_format)
+        self.ctx_nice_format_cb.toggled.connect(lambda c: setattr(self, "_ctx_nice_format", bool(c)))
+        lay.addWidget(self.ctx_nice_format_cb)
+
+        space_widgets = (col_row, indent_row, self.ctx_nice_format_cb)
+
+        def on_sep(rid, checked):
+            if not checked:
+                return
+            self._ctx_sep_spaces = rid == 1
+            for w in space_widgets:
+                w.setEnabled(self._ctx_sep_spaces)
+        self.ctx_separator_group.idToggled.connect(on_sep)
+        for w in space_widgets:
+            w.setEnabled(self._ctx_sep_spaces)
+
+        outer.addWidget(self._settings_subsubsection("Copy File List formatting", box, space_above=False))
+        return group
 
     def _on_folder_counts_subfolders_toggled(self, checked):
         self._folder_counts_include_subfolders = bool(checked)

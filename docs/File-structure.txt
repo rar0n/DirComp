@@ -5,7 +5,7 @@ File                   - Lines - Comment
 binning.py             -   573 - Pluggable "nice" binning strategies (time, size, file filter categories) for the Statistics View
 comparison_copy.py     -   234 - Main-tab copy of the Comparison Options group for Duplicate Finder mode (ComparisonCopyMixin)
 constants.py           -   285 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
-context_menu_ops.py    -   564 - File List View right-click menu (ContextMenuMixin)
+context_menu_ops.py    -   592 - File List View right-click menu (ContextMenuMixin)
 custom_widgets.py      - 2,337 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
 diff_engine.py         -  1028 - comparison types, hash pairing, diff tags (DiffEngineMixin)
 dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)
@@ -23,7 +23,7 @@ progress.py            -   187 - cancellable progress-bar helper
 responsive_layout.py   -   448 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
 selection_ops.py       - 2,231 - Select group buttons and the recursive search behind them (SelectionMixin)
 settings_ops.py        -   650 - Save / Load Settings to the JSON settings file (SettingsMixin)
-settings_tab.py        -  2696 - Settings tab construction and helpers (SettingsTabMixin)
+settings_tab.py        -  2764 - Settings tab construction and helpers (SettingsTabMixin)
 snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   900 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
 statistics_widget.py   -  2435 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)

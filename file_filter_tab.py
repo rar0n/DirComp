@@ -75,7 +75,6 @@ class FileFilterTabMixin:
             "Double-click an entry to edit it, or use Add. The drop-down is updated "
             "by Save Settings, Load Settings and Load Defaults, not while you edit."
         )
-        group.setToolTip(tip)
 
         body = QHBoxLayout()
         self._file_filter_list = QListWidget()
@@ -111,7 +110,11 @@ class FileFilterTabMixin:
         group_layout.addLayout(body)
 
         block = self._settings_section("File type list", group, space_above=False)
-        block.setToolTip(tip)
+        # The tooltip belongs to the title and the list box themselves (not to
+        # the whole block, whose empty areas and buttons would show it too).
+        for label in block.findChildren(QLabel):
+            label.setToolTip(tip)
+        self._file_filter_list.setToolTip(tip)
         outer.addWidget(block, 0, Qt.AlignLeft | Qt.AlignTop)
         outer.addStretch(1)
 

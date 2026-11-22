@@ -1704,8 +1704,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
         # Duplicate Finder mode has no real right-hand button groups to mirror, so
         # the layout is only symmetrical-ish there.
-        self.symmetrical_buttons_cb = QCheckBox(
-            "Symmetrical (ish) GUI" if not self._dual_pane_enabled else "Symmetrical-ish GUI")
+        self.symmetrical_buttons_cb = QCheckBox("Symmetrical (ish) GUI")
         self.symmetrical_buttons_cb.setToolTip(
             "When on, the right pane's Select/Clipboard groups and surrounding buttons "
             "mirror the left pane's around the vertical center, and the right pane's "

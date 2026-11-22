@@ -277,9 +277,10 @@ class ContextMenuMixin:
             file_digests = {kind: self._stored_digest_info(clicked_path, kind) for kind in (CMP_HASH, CMP_FINGERPRINT)}
 
         copy_metadata = menu.addMenu("Copy Metadata")
+        # All selected rows' names, one per line -- the same rows (Recursive
+        # Folder Selections, File Filter) as the list-data entries below.
         add(copy_metadata, "Copy File Name",
-            lambda t=(node["name"] if node else None): self._copy_text(pane, clicked_path, t, "file name"),
-            node is not None)
+            lambda: self._copy_flv_data(pane, False, names_only=True), bool(selected))
         selected_kind = getattr(self, "_cmp_type", None)
         for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
             info = file_digests.get(kind)
@@ -318,8 +319,9 @@ class ContextMenuMixin:
     # ------------------------------------------------------------------
     # Copy File List View Data
     # ------------------------------------------------------------------
-    def _copy_flv_data(self, pane, with_digests: bool):
-        """The selected rows as plain text, one per line, in list order:
+    def _copy_flv_data(self, pane, with_digests: bool, names_only: bool = False):
+        """(names_only: just the names, one per line, no indentation.)
+        The selected rows as plain text, one per line, in list order:
         Name, Size, Type and the date column the pane's Statistics-view
         Metric picks (tab separated). Each level of nesting below the
         shallowest selected row indents the name by 2 spaces. With
@@ -365,7 +367,12 @@ class ContextMenuMixin:
             key = self._hash_key_for(CMP_FINGERPRINT)
             info_line = (f"Fingerprint: {HASH_ALGORITHMS[key[1]]}, file size + first {key[2]} kB + last {key[3]} kB")
 
+        names = []
+
         def add_line(depth, name, size, type_, date, path, is_dir, count=""):
+            if names_only:
+                names.append(name)
+                return
             cols = [name, size, count, type_, date] if show_count else [name, size, type_, date]
             if digest_kind is not None and path and not is_dir:
                 key = self._hash_key_for(digest_kind)
@@ -402,6 +409,11 @@ class ContextMenuMixin:
                          e["full_path"], e["is_dir"], "" if count is None else str(count))
                 if e["is_dir"]:
                     stack.extend((d + 1, c) for c in reversed(self._build_entries(e["full_path"], pane=pane) or []))
+        if names_only:
+            QApplication.clipboard().setText("\n".join(names))
+            n = len(names)
+            self._set_upper_status(pane, f"Copied {n} file name{'s' if n != 1 else ''}")
+            return
         nice = bool(getattr(self, "_ctx_sep_spaces", False) and getattr(self, "_ctx_nice_format", False))
         header = None
         if nice:

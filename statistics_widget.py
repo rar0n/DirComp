@@ -286,6 +286,7 @@ class TimelineWidget(QWidget):
         #: internal calculation" -- the default, for a host that never
         #: calls either setter.
         self._selected_size_override: Optional[float] = None
+        self._any_selected: bool = False
         self._total_size_override: Optional[float] = None
         #: percent bin_color -> selection_color for partially selected bins
         self.partial_lerp: int = 50
@@ -1243,7 +1244,7 @@ class TimelineWidget(QWidget):
             self.selectionChanged.emit(set(self.selected_paths))
         self.update()
 
-    def set_selected_total_size(self, value: Optional[float]):
+    def set_selected_total_size(self, value: Optional[float], any_selected: bool = False):
         """Override for the readout's selected-size figure (see
         paintEvent) -- lets a host with a more complete notion of
         "selected size" than this widget can derive on its own take
@@ -1254,9 +1255,12 @@ class TimelineWidget(QWidget):
         a real selection spanning both files and folders at once would
         silently show only one type's share. Pass None to fall back to
         that internal, narrower calculation again."""
-        if value == self._selected_size_override:
+        if value == self._selected_size_override and any_selected == self._any_selected:
             return
         self._selected_size_override = value
+        #: host says something is selected in the pane (any type), so the
+        #: readout still shows e.g. "0 files, X total" for a folder-only selection
+        self._any_selected = bool(any_selected)
         self.update()
 
     def set_total_size_override(self, value: Optional[float]):
@@ -1715,7 +1719,7 @@ class TimelineWidget(QWidget):
         cover whichever single record type is currently loaded into
         self.records. Its own method so _paint can measure it before
         deciding where the hover text goes."""
-        if not self.selected_paths:
+        if not self.selected_paths and not self._any_selected:
             return None
         n = len(self.selected_paths)
         selected_size = self._selected_size_override if self._selected_size_override is not None else self._selected_size

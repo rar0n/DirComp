@@ -421,7 +421,7 @@ class SelectionMixin:
         # figure pushed in from here instead.
         timeline = getattr(pane, "timeline", None)
         if timeline is not None:
-            timeline.set_selected_total_size(total_size)
+            timeline.set_selected_total_size(total_size, any_selected=bool(selected_items))
         # Moved from the Select group's own title (setTitle/setStyleSheet
         # there) to the status line's left/right selection labels -- see
         # ui_builder._build_status_line -- so the Select group's title

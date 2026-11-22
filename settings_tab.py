@@ -2080,7 +2080,7 @@ class SettingsTabMixin:
         # below (Ranged Opacity: File/Folder, Hover Opacity: File/
         # Folder): the widest "<title>: File:" label, so all four spin
         # boxes and sliders start at the same x.
-        _OPACITY_TITLES = ("Ranged Opacity", "Hover Opacity")
+        _OPACITY_TITLES = ("Ranged Opacity", "Hover Opacity", "Partial Bin Lerp")
         opacity_label_w = max(QLabel(f"{t}: File:").sizeHint().width() for t in _OPACITY_TITLES)
 
         def _opacity_file_folder_rows(
@@ -2166,12 +2166,31 @@ class SettingsTabMixin:
             self.stats_file_hover_opacity_spin, self.stats_folder_hover_opacity_spin,
         )
 
+        # Lerp selected partial bin color: how far a partially selected
+        # bin's bar moves from the Bins color toward the Selection color.
+        self.stats_file_partial_lerp_spin = _narrow_opacity_spin(
+            self._stats_colors["file"]["partial_lerp"], 10,
+            lambda v: self._on_stats_opacity_changed("file", v, "partial_lerp"),
+        )
+        self.stats_folder_partial_lerp_spin = _narrow_opacity_spin(
+            self._stats_colors["folder"]["partial_lerp"], 10,
+            lambda v: self._on_stats_opacity_changed("folder", v, "partial_lerp"),
+        )
+        for _sp in (self.stats_file_partial_lerp_spin, self.stats_folder_partial_lerp_spin):
+            _sp.setRange(10, 90)
+            _sp.setToolTip("Lerp selected partial bin color: how far a partially selected bin moves from the Bins color toward the Selection color.")
+        partial_lerp_rows = _opacity_file_folder_rows(
+            "Partial Bin Lerp",
+            self.stats_file_partial_lerp_spin, self.stats_folder_partial_lerp_spin,
+        )
+
         graph_colors_container = QWidget()
         graph_colors_layout = QVBoxLayout(graph_colors_container)
         graph_colors_layout.setContentsMargins(0, 0, 0, 0)
         graph_colors_layout.addWidget(graph_colors_table)
         graph_colors_layout.addLayout(ranged_opacity_rows)
         graph_colors_layout.addLayout(hover_opacity_rows)
+        graph_colors_layout.addLayout(partial_lerp_rows)
         graph_colors_block = self._settings_subsubsection("Graph colors", graph_colors_container)
 
         # The upper-left readout's text, split by which of its segments

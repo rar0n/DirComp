@@ -327,6 +327,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 "stripped_info_color": "#00ff7f",
                 "hover_color": "#D2D2D2",
                 "hover_opacity": 35,
+                "partial_lerp": 50,
                 "bin_color": "#4682DC",
                 "grid_color": "#3C3C3C",
                 "axis_label_color": "#D2D2D2",

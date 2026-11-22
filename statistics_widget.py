@@ -287,6 +287,8 @@ class TimelineWidget(QWidget):
         #: calls either setter.
         self._selected_size_override: Optional[float] = None
         self._total_size_override: Optional[float] = None
+        #: percent bin_color -> selection_color for partially selected bins
+        self.partial_lerp: int = 50
         #: Singular noun for whatever a record actually represents, used in
         #: the hover/selection readouts below ("12 file(s)", "3 files
         #: selected") -- plural is just this + "s" (English-regular for
@@ -729,7 +731,7 @@ class TimelineWidget(QWidget):
         grid_color=None, axis_label_color=None, hover_label_color=None,
         selection_info_color=None, background_color=None,
         hover_color=None, hover_opacity=None,
-        bin_info_color=None, stripped_info_color=None,
+        bin_info_color=None, stripped_info_color=None, partial_lerp=None,
     ):
         """Override any subset of this widget's paint colors -- each
         *_color argument accepts anything QColor(...) does (a "#RRGGBB"
@@ -763,6 +765,8 @@ class TimelineWidget(QWidget):
             self.bin_info_color = QColor(bin_info_color)
         if stripped_info_color is not None:
             self.stripped_info_color = QColor(stripped_info_color)
+        if partial_lerp is not None:
+            self.partial_lerp = max(0, min(100, int(partial_lerp)))
         self.update()
 
     @staticmethod
@@ -793,11 +797,7 @@ class TimelineWidget(QWidget):
         """A bin where only *some* of its files are selected - a blend
         of bin_color and selection_color, so it reads as "partway
         there" without being confused with either (see _paint)."""
-        return QColor(
-            (self.bin_color.red() + self.selection_color.red()) // 2,
-            (self.bin_color.green() + self.selection_color.green()) // 2,
-            (self.bin_color.blue() + self.selection_color.blue()) // 2,
-        )
+        return self._mix(self.bin_color, self.selection_color, self.partial_lerp / 100)
 
     def _axis_highlight_color(self) -> QColor:
         """grid_color (an axis line's own normal color) blended toward
@@ -1719,10 +1719,9 @@ class TimelineWidget(QWidget):
             return None
         n = len(self.selected_paths)
         selected_size = self._selected_size_override if self._selected_size_override is not None else self._selected_size
-        total_size = self._total_size_override if self._total_size_override is not None else self._total_size
         return (
             f"{n} {self._item_label}{'s' if n != 1 else ''}, "
-            f"{_format_bytes(selected_size)} / {_format_bytes(total_size)} total"
+            f"{_format_bytes(selected_size)} total"
         )
 
     def _visible_tick_indices(self) -> set:

@@ -21,15 +21,15 @@ name_filter_ops.py     -   190 - Global File Filter matching: terms with * / ? w
 panes.py               -   169 - a plain state holder for DirectoryPane
 progress.py            -   187 - cancellable progress-bar helper
 responsive_layout.py   -   448 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
-selection_ops.py       - 2,242 - Select group buttons and the recursive search behind them (SelectionMixin)
+selection_ops.py       - 2,231 - Select group buttons and the recursive search behind them (SelectionMixin)
 settings_ops.py        -   650 - Save / Load Settings to the JSON settings file (SettingsMixin)
-settings_tab.py        -  2677 - Settings tab construction and helpers (SettingsTabMixin)
+settings_tab.py        -  2696 - Settings tab construction and helpers (SettingsTabMixin)
 snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   900 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
-statistics_widget.py   -  2436 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
+statistics_widget.py   -  2435 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
 swap_ops.py            -   105 - Main-tab Swap button: swaps root folders + histories (SwapOpsMixin)
 sync_views.py          -   693 - Synchronize Views: mirrors navigation, selection, expand and scroll (SyncMixin)
-theme_ops.py           - 1,386 - color/theme handlers, palette, color sets (ThemeOpsMixin)
+theme_ops.py           - 1,390 - color/theme handlers, palette, color sets (ThemeOpsMixin)
 transfer_ops.py        - 1,256 - Clipboard group, Move/Copy, New Folder, transfers and the central progress bar (TransferMixin)
 trash_compat.py        -    15 - optional send2trash shim for Delete
 ui_builder.py          -  1961 - window skeleton, status line, filter and global options (UiBuilderMixin)

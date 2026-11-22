@@ -647,17 +647,6 @@ class SelectionMixin:
             counts, total_count, total_size = self._count_recursive_types(pane)
         else:
             counts, total_count, total_size = self._count_visible_types(pane)
-        # Also feeds the Statistics view's own upper-corner readout's
-        # "total" figure (see TimelineWidget.set_total_size_override) --
-        # this total_size already covers everything in the pane's own
-        # listing (files and folders together, per whichever of
-        # _count_recursive_types/_count_visible_types ran above), unlike
-        # that widget's own internal self._total_size, which is only
-        # ever whichever single type (files, or folders) the Files/
-        # Folders toggle currently has loaded.
-        timeline = getattr(pane, "timeline", None)
-        if timeline is not None:
-            timeline.set_total_size_override(total_size)
         if total_items_label:
             # "Total: X items (Y size)" -- only the two figures (the count,
             # and the size with its unit) get the Settings tab's "Title

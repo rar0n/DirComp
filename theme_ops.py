@@ -315,6 +315,8 @@ class ThemeOpsMixin:
             ("folder", "stats_folder_selection_opacity_spin", "selection_opacity"),
             ("file", "stats_file_hover_opacity_spin", "hover_opacity"),
             ("folder", "stats_folder_hover_opacity_spin", "hover_opacity"),
+            ("file", "stats_file_partial_lerp_spin", "partial_lerp"),
+            ("folder", "stats_folder_partial_lerp_spin", "partial_lerp"),
         ):
             spin = getattr(self, spin_attr, None)
             if spin is not None:
@@ -755,7 +757,8 @@ class ThemeOpsMixin:
 
     def _on_stats_opacity_changed(self, mode: str, value, key: str = "selection_opacity"):
         """`key` is which opacity: "selection_opacity" (Ranged Opacity,
-        the drag-range fill) or "hover_opacity" (Hover Opacity)."""
+        the drag-range fill) "hover_opacity" (Hover Opacity) or "partial_lerp"
+        (Lerp selected partial bin color)."""
         self._stats_colors[mode][key] = int(value)
         want_folder = mode == "folder"
         for pane in (self.left, self.right):
@@ -1030,6 +1033,7 @@ class ThemeOpsMixin:
             # split selection_opacity out of it.
             "hover_color": defaults["stats_hover"],
             "hover_opacity": 35,
+            "partial_lerp": 50,
             # Upper-left readout, split into its three segments -- see
             # TimelineWidget._draw_readout_segments -- each with its own
             # color; the same text tone every plain axis/readout label

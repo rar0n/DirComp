@@ -370,6 +370,9 @@ class ContextMenuMixin:
             info_line = f"Hash: {HASH_ALGORITHMS[self._hash_key_for(CMP_HASH)[1]]}"
 
         names = []
+        dup_hashable = None
+        if digest_kind is not None and pane is self.left and self._duplicate_mode_active():
+            dup_hashable = {n["full_path"] for n in self._dup_hash_nodes(pane)}
 
         def add_line(depth, name, size, type_, date, path, is_dir, count=""):
             if names_only:
@@ -385,8 +388,13 @@ class ContextMenuMixin:
                     # Ignored files (Ignore empty files / hard links) are never
                     # hashed, so say that rather than "not calculated".
                     ignored = self._ignored_kind(self._snapshot_lookup(path, pane))
-                    cols.append({"empty": "-- ignored (empty file) --",
-                                 "hardlink": "-- ignored (hard link) --"}.get(ignored, "-- not calculated --"))
+                    text = {"empty": "-- ignored (empty file) --",
+                            "hardlink": "-- ignored (hard link) --"}.get(ignored, "-- not calculated --")
+                    # Duplicate Finder mode only hashes files whose size another
+                    # file in scope shares (Hash only same-size files).
+                    if text == "-- not calculated --" and dup_hashable is not None and path not in dup_hashable:
+                        text = "-- not hashed (unique size) --"
+                    cols.append(text)
             records.append((depth, cols))
 
         # With Recursive Folder Selections on, a selected folder stands for

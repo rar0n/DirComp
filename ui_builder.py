@@ -1750,7 +1750,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             row2.addWidget(self.refresh_button)
 
             row1.addWidget(self.recursive_folder_contents_cb)
-            row1.addSpacing(20)
             row1.addWidget(self.expand_matching_cb)
             row1.addStretch(1)
             row1.addWidget(self.main_comparison_type_combo)

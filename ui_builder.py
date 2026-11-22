@@ -265,6 +265,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # Settings tab -> Options -> "Use Binary sizes" (see
             # constants.format_bytes): off = decimal kB/MB, on = KiB/MiB.
             self._binary_sizes = False
+            # Settings tab -> Sync Settings (see FolderSyncMixin._sync_mismatch).
+            self._sync_warn_enabled = True
+            self._sync_warn_percent = 50
+            self._sync_min_enabled = True
+            self._sync_min_files = 10
         if not hasattr(self, "_cmp_type"):
             # Settings tab -> Global Options -> comparison type controls.
             # Plain attributes (not read back from the widgets) so they

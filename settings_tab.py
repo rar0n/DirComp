@@ -886,6 +886,7 @@ class SettingsTabMixin:
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
         global_settings_flow.addWidget(self._settings_subsection("Context Menu", self._build_context_menu_group()))
+        global_settings_flow.addWidget(self._settings_subsection("Sync Settings", self._build_sync_settings_group()))
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
@@ -2446,6 +2447,66 @@ class SettingsTabMixin:
             w.setEnabled(self._ctx_sep_spaces)
 
         outer.addWidget(self._settings_subsubsection("Copy File List formatting", box, space_above=False))
+        return group
+
+    def _build_sync_settings_group(self) -> QGroupBox:
+        """Global Settings -> Sync Settings: the Sync button's "folders look
+        unrelated" warning (see FolderSyncMixin._sync_mismatch) -- shown in
+        the overview when both folders have more than this share of files
+        without a counterpart -- and the small-folder limit under which it
+        is not shown, since a percentage of a handful of files means little."""
+        group = QGroupBox("")
+        outer = QVBoxLayout(group)
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+
+        self.sync_warn_cb = QCheckBox("Warn when the folders look unrelated")
+        self.sync_warn_cb.setToolTip(
+            "Sync's overview gets an extra prominent warning when more than the threshold below "
+            "of the files in BOTH folders have no counterpart at the same path -- a sign that the "
+            "two folders are not meant to be copies of each other. (An empty or much smaller "
+            "folder, as in a first sync, does not trigger it.)")
+        self.sync_warn_cb.setChecked(self._sync_warn_enabled)
+        self.sync_warn_cb.toggled.connect(lambda c: setattr(self, "_sync_warn_enabled", bool(c)))
+        lay.addWidget(self.sync_warn_cb)
+
+        self.sync_warn_spin = SliderSpinBox()
+        self.sync_warn_spin.setRange(0, 100)
+        self.sync_warn_spin.setSuffix(" %")
+        self.sync_warn_spin.setValue(self._sync_warn_percent)
+        self.sync_warn_spin.valueChanged.connect(lambda v: setattr(self, "_sync_warn_percent", int(v)))
+        warn_row = spin_slider_inline(QLabel("Mismatch warning threshold:"), self.sync_warn_spin,
+                                      SpinSlider(self.sync_warn_spin, live=False))
+        lay.addWidget(warn_row, 0, Qt.AlignLeft)
+
+        self.sync_min_cb = QCheckBox("Skip the warning for small folders")
+        self.sync_min_cb.setToolTip(
+            "No unrelated-folders warning when either folder has fewer files than the limit below "
+            "(counting only the files the File Filter lets through): a percentage of a handful of "
+            "files says little.")
+        self.sync_min_cb.setChecked(self._sync_min_enabled)
+        self.sync_min_cb.toggled.connect(lambda c: setattr(self, "_sync_min_enabled", bool(c)))
+        lay.addWidget(self.sync_min_cb)
+
+        self.sync_min_spin = SliderSpinBox()
+        self.sync_min_spin.setRange(1, 1000)
+        self.sync_min_spin.setValue(self._sync_min_files)
+        self.sync_min_spin.valueChanged.connect(lambda v: setattr(self, "_sync_min_files", int(v)))
+        min_row = spin_slider_inline(QLabel("Fewer files than:"), self.sync_min_spin,
+                                     SpinSlider(self.sync_min_spin, live=False))
+        lay.addWidget(min_row, 0, Qt.AlignLeft)
+
+        def update_enabled():
+            warn = self.sync_warn_cb.isChecked()
+            warn_row.setEnabled(warn)
+            self.sync_min_cb.setEnabled(warn)
+            min_row.setEnabled(warn and self.sync_min_cb.isChecked())
+        self.sync_warn_cb.toggled.connect(lambda _c: update_enabled())
+        self.sync_min_cb.toggled.connect(lambda _c: update_enabled())
+        update_enabled()
+
+        outer.addWidget(box)
         return group
 
     @staticmethod

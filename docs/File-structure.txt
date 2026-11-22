@@ -22,18 +22,18 @@ panes.py               -   169 - a plain state holder for DirectoryPane
 progress.py            -   187 - cancellable progress-bar helper
 responsive_layout.py   - 479 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
 selection_ops.py       - 2279 - Select group buttons and the recursive search behind them (SelectionMixin)
-settings_ops.py        -   657 - Save / Load Settings to the JSON settings file (SettingsMixin)
-settings_tab.py        - 2793 - Settings tab construction and helpers (SettingsTabMixin)
+settings_ops.py        -   662 - Save / Load Settings to the JSON settings file (SettingsMixin)
+settings_tab.py        - 2,854 - Settings tab construction and helpers (SettingsTabMixin)
 snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   900 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
 statistics_widget.py   -  2451 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
 swap_ops.py            -   105 - Main-tab Swap button: swaps root folders + histories (SwapOpsMixin)
-sync_ops.py            -   368 - Main-tab Sync button: make both folders equal, newest Modified wins, trash on overwrite (FolderSyncMixin)
+sync_ops.py            -   411 - Main-tab Sync button: make both folders equal, newest Modified wins, trash on overwrite (FolderSyncMixin)
 sync_views.py          -   693 - Synchronize Views: mirrors navigation, selection, expand and scroll (SyncMixin)
 theme_ops.py           - 1,390 - color/theme handlers, palette, color sets (ThemeOpsMixin)
 transfer_ops.py        - 1,368 - Clipboard group, Move/Copy, New Folder, transfers and the central progress bar (TransferMixin)
 trash_compat.py        -    15 - optional send2trash shim for Delete
-ui_builder.py          - 1985 - window skeleton, status line, filter and global options (UiBuilderMixin)
+ui_builder.py          - 1,990 - window skeleton, status line, filter and global options (UiBuilderMixin)
 
 
 
@@ -516,7 +516,9 @@ of (newest Modified date wins). Nothing is deleted; an overwritten file is
 first sent to the trash. Both folders are scanned afresh, build_sync_plan (a
 plain function on two snapshot trees) makes the plan, and an overview with a
 warning (counts and sizes per direction, files going to the trash, skipped
-conflicts, an active File Filter) must be confirmed before anything is copied.
+conflicts, an active File Filter, and a "folders look unrelated" warning when
+both sides have too large a share of files without a counterpart -- Settings >
+Sync Settings) must be confirmed before anything is copied.
 Not available in Duplicate Finder mode, on a loaded snapshot, or without
 send2trash.
 

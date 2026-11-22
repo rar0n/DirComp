@@ -48,8 +48,12 @@ def build_sync_plan(left_root, right_root, name_passes=None):
       ops       {"src", "dest", "size", "kind": "new"|"update", "dir": "lr"|"rl"}
       mkdirs    (path, dir) -- empty folders to create (no filter only)
       conflicts (display path, reason)
-      filtered  files that would have been copied but fail the File Filter"""
-    plan = {"ops": [], "mkdirs": [], "conflicts": [], "filtered": 0}
+      filtered  files that would have been copied but fail the File Filter
+      left_total/right_total  files in each folder within the File Filter's
+                scope; left_only/right_only: those without a counterpart at
+                the same relative path (see _sync_mismatch)"""
+    plan = {"ops": [], "mkdirs": [], "conflicts": [], "filtered": 0,
+            "left_total": 0, "right_total": 0, "left_only": 0, "right_only": 0}
     ops, conflicts = plan["ops"], plan["conflicts"]
     filter_active = name_passes is not None
 
@@ -69,6 +73,10 @@ def build_sync_plan(left_root, right_root, name_passes=None):
         while stack:
             current, dest = stack.pop()
             if not current["is_dir"]:
+                if passes(current["name"]):
+                    side = "left" if direction == _LR else "right"
+                    plan[side + "_total"] += 1
+                    plan[side + "_only"] += 1
                 add_op(current, dest, "new", direction)
                 continue
             if current.get("scan_failed"):
@@ -99,6 +107,9 @@ def build_sync_plan(left_root, right_root, name_passes=None):
             elif l_node["is_dir"] != r_node["is_dir"]:
                 conflicts.append((l_node["full_path"], "A file on one side, a folder on the other"))
             else:
+                if passes(name):
+                    plan["left_total"] += 1
+                    plan["right_total"] += 1
                 l_time, r_time = int(l_node["mtime"]), int(r_node["mtime"])
                 if l_time > r_time:
                     add_op(l_node, r_node["full_path"], "update", _LR)
@@ -195,6 +206,26 @@ class FolderSyncMixin:
             return
         self._sync_execute(plan)
 
+    def _sync_mismatch(self, plan):
+        """(left share, right share, warn) -- the share of each folder's
+        files (within the File Filter's scope) that have no counterpart at
+        the same path, and whether the "folders look unrelated" warning
+        applies: both shares above the threshold setting, unless a side has
+        fewer files than the small-folder limit. See the Settings tab's
+        Sync Settings."""
+        def share(only, total):
+            return only / total if total else 0.0
+        left = share(plan["left_only"], plan["left_total"])
+        right = share(plan["right_only"], plan["right_total"])
+        if not getattr(self, "_sync_warn_enabled", True):
+            return left, right, False
+        if getattr(self, "_sync_min_enabled", True):
+            limit = getattr(self, "_sync_min_files", 10)
+            if plan["left_total"] < limit or plan["right_total"] < limit:
+                return left, right, False
+        threshold = getattr(self, "_sync_warn_percent", 50) / 100.0
+        return left, right, min(left, right) > threshold
+
     def _sync_totals(self, plan, direction):
         new = [op for op in plan["ops"] if op["dir"] == direction and op["kind"] == "new"]
         upd = [op for op in plan["ops"] if op["dir"] == direction and op["kind"] == "update"]
@@ -229,7 +260,19 @@ class FolderSyncMixin:
         html = [self._sync_banner("WARNING: this changes files in BOTH folders.<br>"
                                   "Check that these are the right two folders:"),
                 f"<p><b>Left:</b> {esc(left_dir)}<br><b>Right:</b> {esc(right_dir)}</p>"]
+        left_share, right_share, mismatch = self._sync_mismatch(plan)
+        if mismatch:
+            html.append(self._sync_banner(
+                f"These folders look unrelated: {left_share:.0%} of the files in the left folder and "
+                f"{right_share:.0%} in the right have no counterpart at the same path "
+                f"(warning threshold {getattr(self, '_sync_warn_percent', 50)}%).<br>"
+                "Make sure these are the folders you mean to merge -- this is expected only "
+                "for a first sync."))
         html.append("<p>" + "<br>".join(lines) + "</p>")
+        if plan["left_total"] or plan["right_total"]:
+            html.append(f"<p>Files without a counterpart: left {left_share:.0%} "
+                        f"({plan['left_only']} of {plan['left_total']}), right {right_share:.0%} "
+                        f"({plan['right_only']} of {plan['right_total']}).</p>")
         if trashed:
             html.append(f"<p>{trashed} older file{'' if trashed == 1 else 's'} will be moved to the trash "
                         "before being replaced. Nothing is deleted otherwise.</p>")

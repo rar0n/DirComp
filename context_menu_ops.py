@@ -413,7 +413,7 @@ class ContextMenuMixin:
         """Lay out (depth, columns) records as text lines per Settings ->
         Context Menu -> Copy File List formatting: tab-separated with no
         indentation, or spaces (folder indentation per depth, column
-        separation spaces, optionally padded so the columns line up)."""
+        separation spaces, optionally padded so the columns line up, the Size column right-aligned)."""
         if not getattr(self, "_ctx_sep_spaces", False):
             return ["\t".join(cols) for _, cols in records]
         gap = " " * max(1, int(getattr(self, "_ctx_col_spaces", 2)))
@@ -428,7 +428,7 @@ class ContextMenuMixin:
                     widths.append(0)
                 widths[i] = max(widths[i], len(cell))
         return [
-            (gap.join(cell.ljust(widths[i]) for i, cell in enumerate(r[:-1])) + gap + r[-1]
+            (gap.join((cell.rjust if i == 1 else cell.ljust)(widths[i]) for i, cell in enumerate(r[:-1])) + gap + r[-1]
              if len(r) > 1 else r[0])
             for r in rows
         ]

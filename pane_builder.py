@@ -759,7 +759,8 @@ class PaneBuilderMixin:
         # Laid out left-to-right, top-to-bottom as (for the left pane):
         #   Row 1: Select All, Missing, Smaller, Newer
         #   Row 2: Invert, Matching, Larger, Older
-        #   Row 3: Clear, Diff Folders, All Parents, File Parent
+        #   Row 3: Clear, Diff Folders, All Parents, Item Parent
+        #   Row 4: (empty), (empty), All Childs, Item Childs
         # The right pane mirrors this column-for-column (and swaps the
         # Cancel/Diff Folders side) so it reads as a left-right reflection
         # of the left pane's group -- unless Symmetrical Buttons is off,
@@ -923,6 +924,36 @@ class PaneBuilderMixin:
         fg, bg = self._select_colors["all_parents"]
         folder_parents_button.setStyleSheet(_bevel_button_stylesheet(bg, fg))
         pane.select_plain_buttons["all_parents"] = folder_parents_button
+
+        # The counterparts of the two parent buttons, going down instead of
+        # up: Item Childs = one level (the folders' own entries), All Childs
+        # = every level. Both follow the List Directories/Files settings and
+        # the File Filter, like the file list itself.
+        item_childs_button = QPushButton("Item Childs")
+        item_childs_button.setToolTip(
+            "Add the items one level down from every currently selected folder "
+            "(its own files and folders, as listed -- List Directories/Files and "
+            "the File Filter apply). The current selection stays; press again to "
+            "go another level down. Works regardless of the Recursive Folder "
+            "Selections setting."
+        )
+        item_childs_button.clicked.connect(lambda checked=False, p=pane: self.select_item_childs(p))
+        item_childs_button.setFixedSize(_select_button_width, _select_button_height)
+        fg, bg = self._select_colors["item_childs"]
+        item_childs_button.setStyleSheet(_bevel_button_stylesheet(bg, fg))
+        pane.select_plain_buttons["item_childs"] = item_childs_button
+
+        all_childs_button = QPushButton("All Childs")
+        all_childs_button.setToolTip(
+            "Select everything inside every currently selected folder, at all "
+            "levels down (List Directories/Files and the File Filter apply) -- "
+            "regardless of the \"Recursive Folder Selections\" setting."
+        )
+        all_childs_button.clicked.connect(lambda checked=False, p=pane: self.select_all_childs(p))
+        all_childs_button.setFixedSize(_select_button_width, _select_button_height)
+        fg, bg = self._select_colors["all_childs"]
+        all_childs_button.setStyleSheet(_bevel_button_stylesheet(bg, fg))
+        pane.select_plain_buttons["all_childs"] = all_childs_button
 
         pane.select_group = select_group
         # Places every button above into select_layout for the current

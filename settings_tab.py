@@ -2271,6 +2271,7 @@ class SettingsTabMixin:
             "dup_all": "Duplicates", "dup_extra": "Extra copies",
             "dup_sel": "Duplicates of selection", "dup_sel_extra": "Extra copies of selection",
             "file_parent": "Item Parent", "all_parents": "All Parents",
+            "item_childs": "Item Childs", "all_childs": "All Childs",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)
         self._style_table_widget(select_colors_table, ["Button", "Fg", "Bg"])

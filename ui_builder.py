@@ -1159,7 +1159,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if not hasattr(self, "_uniform_button_dims"):
             fm = QFontMetrics(self.font())
             longest = max(
-                fm.horizontalAdvance(s) for s in ("Diff Folders", "Select All", "Item Parent", "All Parents")
+                fm.horizontalAdvance(s) for s in ("Diff Folders", "Select All", "Item Parent", "All Parents", "Item Childs", "All Childs")
             )
             width = longest + 14 + fm.averageCharWidth()
             height = fm.height() + 10

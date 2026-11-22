@@ -119,7 +119,7 @@ def _indent_wheel_color(color1_hex: str, color2_hex: str, steps: int, depth_inde
 # each entry editing its own TAG_COLORS entry independently -- and it's
 # also what "Reload Defaults" seeds those entries from, using the
 # matching button's default in _DEFAULT_SELECT_COLORS below. Select
-# All/Clear/File Parent/All Parents aren't here -- they don't
+# All/Clear/Item Parent/All Parents/Item Childs/All Childs aren't here -- they don't
 # correspond to any file-list row coloring.
 _SELECT_KEY_TO_TAG_COLOR_KEYS = {
     "missing": ("missing_file", "missing_dir"),
@@ -152,6 +152,9 @@ _DEFAULT_SELECT_COLORS = {
     "dup_sel_extra": ("black", "#D97C7C"),
     "file_parent": ("white", "#3355DD"),
     "all_parents": ("white", "#1A237E"),
+    # Counterparts of the two parent buttons, one level down / all levels down.
+    "item_childs": ("white", "#2E8B57"),
+    "all_childs": ("white", "#145A32"),
 }
 
 # Clipboard/File Op buttons' original hardcoded (bg, fg) colors -- fixed

@@ -63,7 +63,7 @@ _DATE_COLUMNS = (COL_MODIFIED, COL_CHANGED, COL_ACCESSED)
 # The three groups, in the order their sizes are measured.
 _GROUP_KEYS = ("select", "file_op", "clipboard")
 # Columns each group has when there is room for everything (Select: 4
-# semantic columns of 3 buttons; File Op: one vertical stack; Clipboard: 2
+# semantic columns of 4 cells; File Op: one vertical stack; Clipboard: 2
 # columns of 3 rows).
 _NATURAL_COLS = {"select": 4, "file_op": 1, "clipboard": 2}
 # The column counts a group may use, so no row is left ragged (File Op: 3
@@ -71,8 +71,8 @@ _NATURAL_COLS = {"select": 4, "file_op": 1, "clipboard": 2}
 # Select wraps whole semantic columns, so any count up to 4 works).
 _VALID_COLS = {"select": (1, 2, 3, 4), "file_op": (1, 3), "clipboard": (1, 2, 3, 6)}
 _MAX_COLS = {key: max(cols) for key, cols in _VALID_COLS.items()}
-# Buttons per semantic Select column.
-_SELECT_COLUMN_HEIGHT = 3
+# Cells per semantic Select column (the last one is empty in the first column).
+_SELECT_COLUMN_HEIGHT = 4
 
 # Candidate arrangements, in order of preference (used to break ties
 # between arrangements of about the same height).
@@ -138,7 +138,7 @@ class ResponsiveLayoutMixin:
         """The group's buttons in the order they wrap in. Select's list is
         its 3 x 4 grid read row by row (so with 4 columns it reads
         Select All/Missing/Newer/Smaller, Invert/Matching/Older/Larger,
-        Clear/Diff Items/All Parents/Item Parent -- see
+        Clear/Diff Items/All Parents/Item Parent, -/-/All Childs/Item Childs -- see
         _cell_positions for how fewer columns wrap)."""
         if key == "select":
             sp = pane.select_plain_buttons
@@ -149,12 +149,14 @@ class ResponsiveLayoutMixin:
                 return [
                     sp["select_all"], st["dup_all"], st["dup_sel"], sp["all_parents"],
                     pane.invert_button, st["dup_extra"], st["dup_sel_extra"], sp["file_parent"],
-                    sp["clear"], None, None, None,
+                    sp["clear"], None, None, sp["all_childs"],
+                    None, None, None, sp["item_childs"],
                 ]
             return [
                 sp["select_all"], st["missing"], st["newer"], st["smaller"],
                 pane.invert_button, st["matching"], st["older"], st["larger"],
                 sp["clear"], st["diff_folders"], sp["all_parents"], sp["file_parent"],
+                None, None, sp["all_childs"], sp["item_childs"],
             ]
         if key == "file_op":
             return [pane.rename_button, pane.new_folder_button, pane.delete_button]
@@ -178,9 +180,10 @@ class ResponsiveLayoutMixin:
             for i in range(count):
                 unit, level = i % units, i // units
                 if cols == 3:
-                    # 3 columns x 4 rows, compact: the first semantic
-                    # column (Select All/Invert/Clear) lies down as the
-                    # top row and the other three keep their rows below it.
+                    # 3 columns x 5 rows, compact: the first semantic
+                    # column (Select All/Invert/Clear + an empty cell) lies
+                    # down as the top row and the other three keep their
+                    # rows below it.
                     cells.append((i, 0, level) if unit == 0 else (i, 1 + level, unit - 1))
                 else:
                     block, col = divmod(unit, cols)

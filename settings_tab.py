@@ -898,6 +898,7 @@ class SettingsTabMixin:
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
             ("swap_pane", "Swap"),
+            ("sync", "Sync"),
         ])
         global_settings_flow.addWidget(self._settings_subsection("Misc Buttons", misc_buttons_group))
 

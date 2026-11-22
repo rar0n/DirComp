@@ -199,7 +199,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "copy_flat": "copy", "p
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
     "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "pane_refresh", "save_snapshot",
-    "mode_unpressed", "swap_pane", "dup_list_unpressed",
+    "mode_unpressed", "swap_pane", "sync", "dup_list_unpressed",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->

@@ -675,6 +675,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self._cluster_row = row
         self._cluster_row_layout = layout
         self._apply_mode_button_colors()
+        self._update_sync_button_enabled()
         return row
 
     def _build_both_panes_group(self) -> QGroupBox:
@@ -696,7 +697,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.swap_pane_button.setFixedSize(uniform_w, uniform_h)
         self.swap_pane_button.clicked.connect(lambda checked=False: self._swap_panes())
-        self._both_panes_buttons = [self.swap_pane_button]
+        self.sync_button = QPushButton("Sync")
+        self.sync_button.setToolTip(self._SYNC_TOOLTIP)
+        self.sync_button.setFixedSize(uniform_w, uniform_h)
+        self.sync_button.clicked.connect(lambda checked=False: self._sync_panes())
+        self._both_panes_buttons = [self.sync_button, self.swap_pane_button]
         for row, button in enumerate(self._both_panes_buttons):
             grid.addWidget(button, row, 0, alignment=Qt.AlignHCenter)
         self.both_panes_group = group
@@ -713,6 +718,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         swap = getattr(self, "swap_pane_button", None)
         if swap is not None:
             swap.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("swap_pane")))
+        sync = getattr(self, "sync_button", None)
+        if sync is not None:
+            sync.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("sync")))
         for button in getattr(getattr(self, "right", None), "dup_list_buttons", None) or []:
             try:
                 button.setStyleSheet(self._dup_list_button_sheet())

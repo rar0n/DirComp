@@ -30,6 +30,7 @@ from selection_ops import SelectionMixin
 from transfer_ops import TransferMixin
 from sync_views import SyncMixin
 from swap_ops import SwapOpsMixin
+from sync_ops import FolderSyncMixin
 from comparison_copy import ComparisonCopyMixin
 from statistics_ops import TimelineOpsMixin
 from settings_ops import SettingsMixin
@@ -48,6 +49,7 @@ class DirectoryComparisonApp(
     TransferMixin,
     SyncMixin,
     SwapOpsMixin,
+    FolderSyncMixin,
     ComparisonCopyMixin,
     DiffEngineMixin,
     HashOpsMixin,

@@ -327,7 +327,7 @@ class ContextMenuMixin:
         shallowest selected row indents the name by 2 spaces. With
         `with_digests`, a file's already-known hash / fingerprint is
         appended as a last column -- only the
-        type selected as the comparison type, "-- not calculated --" where
+        type selected as the comparison type, "-- Not calculated --" where
         the file has no value yet (nothing is computed here). For a
         fingerprint, an info line at the top gives algorithm (and chunk
         sizes). Follows Recursive Folder Selections (on: a selected
@@ -388,12 +388,12 @@ class ContextMenuMixin:
                     # Ignored files (Ignore empty files / hard links) are never
                     # hashed, so say that rather than "not calculated".
                     ignored = self._ignored_kind(self._snapshot_lookup(path, pane))
-                    text = {"empty": "-- ignored (empty file) --",
-                            "hardlink": "-- ignored (hard link) --"}.get(ignored, "-- not calculated --")
+                    text = {"empty": "-- Ignored (empty file) --",
+                            "hardlink": "-- Ignored (hard link) --"}.get(ignored, "-- Not calculated --")
                     # Duplicate Finder mode only hashes files whose size another
                     # file in scope shares (Hash only same-size files).
-                    if text == "-- not calculated --" and dup_hashable is not None and path not in dup_hashable:
-                        text = "-- not hashed (unique size) --"
+                    if text == "-- Not calculated --" and dup_hashable is not None and path not in dup_hashable:
+                        text = "-- Not hashed (unique size) --"
                     cols.append(text)
             records.append((depth, cols))
 

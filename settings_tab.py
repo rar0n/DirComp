@@ -354,7 +354,7 @@ class SettingsTabMixin:
         # their Main-tab primaries where they have one, just applied to
         # these secondary copies too (_link_checkboxes only mirrors
         # checked state, not enabled state).
-        symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical (ish) GUI", 1, 0, indent=20)
+        symmetrical_secondary = _add_synced(self.symmetrical_buttons_cb, "Symmetrical (ish) GUI", 2, 0)
         symmetrical_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         expand_secondary = _add_synced(self.expand_matching_cb, "Expand To Selection", 1, 2, indent=20)
@@ -428,9 +428,9 @@ class SettingsTabMixin:
         self.scan_expanded_cb.toggled.connect(self._on_dup_scope_option_changed)
         self.hash_same_size_cb.toggled.connect(self._on_dup_scope_option_changed)
 
-        # Row 3: Synchronize Views, aligned below Symmetrical GUI (same
-        # indent, same column).
-        sync_secondary = _add_synced(self.synchronize_views_cb, "Synchronize Views", 2, 0, indent=20)
+        # Row 2, column 0: Synchronize Views (indented under Compare
+        # folders); Symmetrical (ish) GUI sits below it, not indented.
+        sync_secondary = _add_synced(self.synchronize_views_cb, "Synchronize Views", 1, 0, indent=20)
         sync_secondary.setEnabled(self.dual_pane_cb.isChecked())
         self.dual_pane_cb.toggled.connect(sync_secondary.setEnabled)
         sync_secondary.setStyleSheet(_DISABLED_CHECKBOX_STYLE)

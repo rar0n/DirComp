@@ -66,15 +66,16 @@ class FileFilterTabMixin:
 
         group = QGroupBox("")
         group_layout = QVBoxLayout(group)
-        group_layout.addWidget(self._make_italic_note(
+        tip = (
             "The entries of the Global File Filter's drop-down on the Main tab. Each "
             "entry is one complete search term, used exactly as written: *.txt is "
             "every name ending in .txt, while a plain term like report matches "
             "anywhere in a name (* = any characters, ? = one character; with one of "
-            "them the term must match the whole name). Double-click an entry to edit "
-            "it, or use Add. The drop-down is updated by Save Settings, Load Settings "
-            "and Load Defaults, not while you edit."
-        ))
+            "them the term must match the whole name).\n"
+            "Double-click an entry to edit it, or use Add. The drop-down is updated "
+            "by Save Settings, Load Settings and Load Defaults, not while you edit."
+        )
+        group.setToolTip(tip)
 
         body = QHBoxLayout()
         self._file_filter_list = QListWidget()
@@ -107,10 +108,11 @@ class FileFilterTabMixin:
             buttons.addWidget(button)
         buttons.addStretch(1)
         body.addLayout(buttons)
-        body.addStretch(1)
         group_layout.addLayout(body)
 
-        outer.addWidget(self._settings_section("File type list", group, space_above=False))
+        block = self._settings_section("File type list", group, space_above=False)
+        block.setToolTip(tip)
+        outer.addWidget(block, 0, Qt.AlignLeft | Qt.AlignTop)
         outer.addStretch(1)
 
         scroll = QScrollArea()

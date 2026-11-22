@@ -5,7 +5,7 @@ File                   - Lines - Comment
 binning.py             -   573 - Pluggable "nice" binning strategies (time, size, file filter categories) for the Statistics View
 comparison_copy.py     -   234 - Main-tab copy of the Comparison Options group for Duplicate Finder mode (ComparisonCopyMixin)
 constants.py           -   285 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
-context_menu_ops.py    -   482 - File List View right-click menu (ContextMenuMixin)
+context_menu_ops.py    -   520 - File List View right-click menu (ContextMenuMixin)
 custom_widgets.py      - 2,337 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
 diff_engine.py         -  1028 - comparison types, hash pairing, diff tags (DiffEngineMixin)
 dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)

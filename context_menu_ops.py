@@ -1,7 +1,7 @@
 """
 ContextMenuMixin: the File List View's right-click menu.
 
-    Copy / Copy Metadata  >  name, size, dates, hash, fingerprint / Cut / Paste
+    Copy / Copy Metadata  >  name, hash, fingerprint, list data (+ hash) / Cut / Paste
     Paste special  >  Paste Folders
     ------------------
     Open
@@ -34,7 +34,7 @@ from PySide6.QtCore import QMimeDatabase, QStandardPaths, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox
 
-from constants import CHANGED_FIELD_LABEL, CMP_FINGERPRINT, CMP_HASH, GNOME_COPIED_FILES_MIME, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
+from constants import CMP_FINGERPRINT, CMP_HASH, GNOME_COPIED_FILES_MIME, HASH_ALGORITHMS, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
 from panes import DirectoryPane
 
 # The roadmap asks for a confirmation before launching files. Flip to
@@ -281,24 +281,19 @@ class ContextMenuMixin:
         if is_file:
             file_digests = {kind: self._stored_digest_info(clicked_path, kind) for kind in (CMP_HASH, CMP_FINGERPRINT)}
 
-        def stamp(ts):
-            return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
-
         copy_metadata = menu.addMenu("Copy Metadata")
-        text_entries = [("Copy File Name", "file name", node["name"] if node else None)]
-        text_entries.append(("Copy File Size", "file size", str(node["size"]) if is_file else None))
-        for label, what, field in (("Copy Modified Date", "modified date", "mtime"),
-                                   (f"Copy {CHANGED_FIELD_LABEL}", "changed date", "ctime"),
-                                   ("Copy Accessed Date", "accessed date", "atime")):
-            text_entries.append((label, what, stamp(node[field]) if node else None))
-        for label, what, text in text_entries:
-            add(copy_metadata, label, lambda t=text, w=what: self._copy_text(pane, clicked_path, t, w),
-                text is not None)
-        copy_metadata.addSeparator()
+        add(copy_metadata, "Copy File Name",
+            lambda t=(node["name"] if node else None): self._copy_text(pane, clicked_path, t, "file name"),
+            node is not None)
         for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
             info = file_digests.get(kind)
             add(copy_metadata, label, lambda k=kind, i=info: self._copy_digest(pane, clicked_path, k, i),
                 info is not None)
+        copy_metadata.addSeparator()
+        add(copy_metadata, "Copy File List View Data",
+            lambda: self._copy_flv_data(pane, False), bool(selected))
+        add(copy_metadata, "Copy File List View Data + Hash / Fingerprint",
+            lambda: self._copy_flv_data(pane, True), bool(selected))
         add(menu, "Cut", lambda: self.cut_to_clipboard(pane), has_sel)
         add(menu, "Paste", lambda: self.paste_from_clipboard(pane, targets[0]),
             can_paste and len(targets) == 1)
@@ -322,6 +317,49 @@ class ContextMenuMixin:
         handler = handlers.get(chosen)
         if handler is not None:
             handler()
+
+    # ------------------------------------------------------------------
+    # Copy File List View Data
+    # ------------------------------------------------------------------
+    def _copy_flv_data(self, pane, with_digests: bool):
+        """The selected rows as plain text, one per line, in list order:
+        Name, Size, Type and the date column the pane's Statistics-view
+        Metric picks (tab separated). Each level of nesting below the
+        shallowest selected row indents the name by 2 spaces. With
+        `with_digests`, a file's already-known hash / fingerprint is
+        appended as "<algorithm> hash|fingerprint<TAB><value>" (nothing is
+        computed)."""
+        from PySide6.QtWidgets import QTreeWidgetItemIterator
+        from listing_ops import COL_NAME, COL_SIZE, COL_TYPE, _DATE_FIELD_TO_COLUMN
+        tree = pane.tree
+        date_col = _DATE_FIELD_TO_COLUMN.get(self._pane_diff_date_field(pane), 3)
+        rows = []  # (depth, item) in visual (tree) order
+        it = QTreeWidgetItemIterator(tree, QTreeWidgetItemIterator.Selected)
+        while it.value():
+            item = it.value()
+            depth, parent = 0, item.parent()
+            while parent is not None:
+                depth += 1
+                parent = parent.parent()
+            rows.append((depth, item))
+            it += 1
+        if not rows:
+            return
+        base = min(d for d, _ in rows)
+        lines = []
+        for depth, item in rows:
+            cols = [("  " * (depth - base)) + item.text(COL_NAME), item.text(COL_SIZE),
+                    item.text(COL_TYPE), item.text(date_col)]
+            path = item.data(0, PATH_ROLE)
+            if with_digests and path and not item.data(0, IS_DIR_ROLE):
+                for kind, word in ((CMP_HASH, "hash"), (CMP_FINGERPRINT, "fingerprint")):
+                    info = self._stored_digest_info(path, kind)
+                    if info is not None:
+                        cols += [f"{HASH_ALGORITHMS[info[0][1]]} {word}", info[1]]
+            lines.append("\t".join(cols))
+        QApplication.clipboard().setText("\n".join(lines))
+        n = len(lines)
+        self._set_upper_status(pane, f"Copied list data of {n} item{'s' if n != 1 else ''}")
 
     # ------------------------------------------------------------------
     # Open / Open with

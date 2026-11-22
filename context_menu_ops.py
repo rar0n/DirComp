@@ -402,14 +402,25 @@ class ContextMenuMixin:
                          e["full_path"], e["is_dir"], "" if count is None else str(count))
                 if e["is_dir"]:
                     stack.extend((d + 1, c) for c in reversed(self._build_entries(e["full_path"], pane=pane) or []))
-        lines = self._format_flv_records(records, right_cols)
+        nice = bool(getattr(self, "_ctx_sep_spaces", False) and getattr(self, "_ctx_nice_format", False))
+        header = None
+        if nice:
+            head = tree.headerItem()
+            header = [head.text(COL_NAME), head.text(COL_SIZE)]
+            if show_count:
+                header.append("Count")
+            header += [head.text(COL_TYPE), head.text(date_col)]
+            if digest_kind is not None:
+                word = "Fingerprint" if digest_kind == CMP_FINGERPRINT else "Hash"
+                header += [f"{word} Type", word]
+        lines = self._format_flv_records(records, right_cols, header)
         if info_line:
-            lines.insert(0, info_line)
+            lines[0:0] = [info_line, ""] if nice else [info_line]
         QApplication.clipboard().setText("\n".join(lines))
         n = len(records)
         self._set_upper_status(pane, f"Copied list data of {n} item{'s' if n != 1 else ''}")
 
-    def _format_flv_records(self, records, right_cols=frozenset({1})) -> list:
+    def _format_flv_records(self, records, right_cols=frozenset({1}), header=None) -> list:
         """Lay out (depth, columns) records as text lines per Settings ->
         Context Menu -> Copy File List formatting: tab-separated with no
         indentation, or spaces (folder indentation per depth, column
@@ -421,17 +432,26 @@ class ContextMenuMixin:
         rows = [[" " * (indent * depth) + cols[0], *cols[1:]] for depth, cols in records]
         if not getattr(self, "_ctx_nice_format", False):
             return [gap.join(r) for r in rows]
+        if header is not None and 2 in right_cols:
+            # no room for "Count" over narrow numbers: shorten it
+            if max((len(r[2]) for r in rows if len(r) > 2), default=0) < len("Count"):
+                header[2] = "Cnt"
+        if header is not None:
+            rows.insert(0, list(header))
         widths = []
         for r in rows:
             for i, cell in enumerate(r):
                 if i == len(widths):
                     widths.append(0)
                 widths[i] = max(widths[i], len(cell))
-        return [
+        lines = [
             (gap.join((cell.rjust if i in right_cols else cell.ljust)(widths[i]) for i, cell in enumerate(r[:-1])) + gap + r[-1]
              if len(r) > 1 else r[0])
             for r in rows
         ]
+        if header is not None:
+            lines.insert(1, "-" * max(len(x) for x in lines))
+        return lines
 
     # ------------------------------------------------------------------
     # Open / Open with

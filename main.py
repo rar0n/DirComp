@@ -30,6 +30,7 @@ from selection_ops import SelectionMixin
 from transfer_ops import TransferMixin
 from sync_views import SyncMixin
 from swap_ops import SwapOpsMixin
+from sync_ops import FolderSyncMixin
 from comparison_copy import ComparisonCopyMixin
 from statistics_ops import TimelineOpsMixin
 from settings_ops import SettingsMixin
@@ -48,6 +49,7 @@ class DirectoryComparisonApp(
     TransferMixin,
     SyncMixin,
     SwapOpsMixin,
+    FolderSyncMixin,
     ComparisonCopyMixin,
     DiffEngineMixin,
     HashOpsMixin,
@@ -78,6 +80,7 @@ class DirectoryComparisonApp(
         # Base directory the current clipboard contents were copied/cut
         # from, used to preserve relative subfolder structure on paste.
         self._clipboard_source_base_dir = None
+        self._flat_stage_dir = None  # temp folder of Copy flat (see copy_flat_to_clipboard)
         # (removed) The "Recursive Folder Contents" checkbox now lives once
         # in the shared File Filter frame -- see _build_filter_frame.
         # "Expand Folders Matching Selection" lives there too now, right of

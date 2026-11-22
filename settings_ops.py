@@ -60,6 +60,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "folder_counts_include_subfolders",
     "binary_sizes", "context_menu_separator", "context_menu_column_spaces", "context_menu_indent_spaces",
     "context_menu_nice_format",
+    "sync_warn_enabled", "sync_warn_percent", "sync_min_enabled", "sync_min_files",
     "ignore_empty_files", "ignore_hard_links", "scan_expanded_folders", "hash_same_size_files", "extra_copies_keep",
 })
 
@@ -129,6 +130,10 @@ class SettingsMixin:
             "context_menu_column_spaces": getattr(self, "ctx_col_spaces_spin", None),
             "context_menu_indent_spaces": getattr(self, "ctx_indent_spaces_spin", None),
             "context_menu_nice_format": getattr(self, "ctx_nice_format_cb", None),
+            "sync_warn_enabled": getattr(self, "sync_warn_cb", None),
+            "sync_warn_percent": getattr(self, "sync_warn_spin", None),
+            "sync_min_enabled": getattr(self, "sync_min_cb", None),
+            "sync_min_files": getattr(self, "sync_min_spin", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)

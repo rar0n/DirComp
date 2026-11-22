@@ -25,7 +25,7 @@ TIMELINE_SCROLLBAR_RANGE = 100_000
 
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
 # counting the versions made on the same day (1, 2, ...). Bump on every batch.
-APP_VERSION = "2026.11.22.34"
+APP_VERSION = "2026.11.22.49"
 
 # st_ctime means different things on different platforms (same split as
 # Timeline Explorer's file_scanner.py, which this mirrors so the two
@@ -214,7 +214,7 @@ _TABLE_HEADER_STYLE = "font-size: 11pt; font-weight: bold;"
 # sidesteps that platform quirk entirely -- a plain QLabel reliably
 # honors font-size via QSS the way the small table headers above
 # already do.
-_SECTION_HEADER_PT = 14
+_SECTION_HEADER_PT = 18
 _SECTION_HEADER_STYLE = f"font-size: {_SECTION_HEADER_PT}pt; font-weight: bold;"
 # Settings tab's smaller sub-headers -- above an individual table within
 # a larger section (e.g. "Select Colors" under the "Button Colors"

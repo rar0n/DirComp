@@ -119,7 +119,7 @@ def _indent_wheel_color(color1_hex: str, color2_hex: str, steps: int, depth_inde
 # each entry editing its own TAG_COLORS entry independently -- and it's
 # also what "Reload Defaults" seeds those entries from, using the
 # matching button's default in _DEFAULT_SELECT_COLORS below. Select
-# All/Clear/File Parent/All Parents aren't here -- they don't
+# All/Clear/Item Parent/All Parents/Item Childs/All Childs aren't here -- they don't
 # correspond to any file-list row coloring.
 _SELECT_KEY_TO_TAG_COLOR_KEYS = {
     "missing": ("missing_file", "missing_dir"),
@@ -152,6 +152,9 @@ _DEFAULT_SELECT_COLORS = {
     "dup_sel_extra": ("black", "#D97C7C"),
     "file_parent": ("white", "#3355DD"),
     "all_parents": ("white", "#1A237E"),
+    # Counterparts of the two parent buttons, one level down / all levels down.
+    "item_childs": ("white", "#2E8B57"),
+    "all_childs": ("white", "#145A32"),
 }
 
 # Clipboard/File Op buttons' original hardcoded (bg, fg) colors -- fixed
@@ -167,6 +170,8 @@ _DEFAULT_SELECT_COLORS = {
 # Buttons tables.
 _DEFAULT_MAIN_BUTTON_COLORS = {
     "copy": ["#D0D0D0", "black"],
+    # Copy flat: Copy's light grey nudged toward blue-grey -- a sibling of Copy.
+    "copy_flat": ["#B5C7D3", "black"],
     "cut": ["#FFA0A0", "black"],
     "paste": ["#A9784B", "#F5F5F5"],
     "paste_folders": ["#6E6694", "#F5F5F5"],
@@ -182,7 +187,7 @@ _DEFAULT_MAIN_BUTTON_COLORS = {
 # kind passed to _make_icon for whichever of the above (or "rename",
 # which has none) also draws an icon -- so a color change updates the
 # icon's fg right along with the button's own.
-_MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "paste_folders": "paste", "delete": "delete"}
+_MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "copy_flat": "copy", "paste": "paste", "paste_folders": "paste", "delete": "delete"}
 
 # Main-tab buttons whose color is customizable (self._main_button_colors)
 # but that have no fixed design color of their own -- each starts as None,
@@ -194,7 +199,7 @@ _MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "past
 _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
     "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "pane_refresh", "save_snapshot",
-    "mode_unpressed", "swap_pane", "dup_list_unpressed",
+    "mode_unpressed", "swap_pane", "sync", "dup_list_unpressed",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->
@@ -2272,6 +2277,11 @@ class CenterSplitLayout(QLayout):
         # own geometry is -- so whoever is notified by a cell's resize reads
         # a width that already agrees with it (see side_width).
         self.total_width = 0
+        # Whether each side cell may reach into the free space under the
+        # center item (see extra_width): the left one always, the right one
+        # only where its content is anchored to its right edge.
+        self.extend_left = True
+        self.extend_right = True
         self.setContentsMargins(0, 0, 0, 0)
 
     def addItem(self, item):
@@ -2298,6 +2308,20 @@ class CenterSplitLayout(QLayout):
         if len(self._items) < 3:
             return 0
         return self._items[1].sizeHint().width()
+
+    def center_height(self) -> int:
+        """Height of the center item (top-aligned): below it the middle is free."""
+        if len(self._items) < 3:
+            return 0
+        return self._items[1].sizeHint().height()
+
+    def extra_width(self) -> int:
+        """How far a side cell's lower rows may reach toward the middle,
+        below the center item: half of the center item plus the gap, so the
+        two sides stay a gap apart there."""
+        if len(self._items) < 3:
+            return 0
+        return (self.center_width() + self._gap) // 2
 
     def side_width(self, total_width: int) -> int:
         """Width each side cell gets when the whole row is `total_width`
@@ -2331,7 +2355,18 @@ class CenterSplitLayout(QLayout):
         center_w = self.center_width()
         # Odd leftover pixels go into the gap before the right cell.
         leftover = max(0, area.width() - 2 * side - center_w - 2 * self._gap)
-        left.setGeometry(QRect(area.x(), area.y(), side, area.height()))
+        # The side cells are widened toward the middle (extra_width): their
+        # rows above the center item's bottom never use that part (the
+        # arrangement is chosen for `side`), the lower ones may.
+        extra = self.extra_width()
+        extra_l = extra if self.extend_left else 0
+        extra_r = extra if self.extend_right else 0
+        left.setGeometry(QRect(area.x(), area.y(), side + extra_l, area.height()))
         center_x = area.x() + side + self._gap
         center.setGeometry(QRect(center_x, area.y(), center_w, min(area.height(), center.sizeHint().height())))
-        right.setGeometry(QRect(center_x + center_w + self._gap + leftover, area.y(), side, area.height()))
+        right_x = center_x + center_w + self._gap + leftover
+        right.setGeometry(QRect(right_x - extra_r, area.y(), side + extra_r, area.height()))
+        # The widened cells overlap the center one: keep it on top so its
+        # buttons stay clickable.
+        if center.widget() is not None:
+            center.widget().raise_()

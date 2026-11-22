@@ -8,12 +8,14 @@ group's recursive searches -- see _start_transfer_progress -- since only
 one such operation can ever be in flight at once.
 """
 
+import atexit
 import os
 import shutil
 import sys
+import tempfile
 import time
 
-from PySide6.QtCore import QUrl, QMimeData
+from PySide6.QtCore import Qt, QUrl, QMimeData
 from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
 
 from constants import PATH_ROLE, GNOME_COPIED_FILES_MIME
@@ -439,9 +441,106 @@ class TransferMixin:
     def cut_to_clipboard(self, pane: DirectoryPane):
         self._do_copy_or_cut(pane, cut=True)
 
+    def copy_flat_to_clipboard(self, pane: DirectoryPane):
+        """Copy without the folder structure: every selected item ends up
+        directly in whatever folder it is pasted into, here or in another
+        file explorer. A selected folder still brings its own contents
+        (and an item selected inside a selected folder is just part of
+        that folder's copy -- see _dedupe_nested_paths). Items that share
+        a name get " (1)", " (2)", ... on all but the first (before the
+        extension for files). Only when some name actually had to change
+        are the items staged under their new names in a temporary folder
+        (hard links where the file system allows, copies otherwise) so
+        that other programs see a conflict-free set; otherwise the plain
+        paths go on the clipboard, with no source base folder so that
+        Paste drops each one directly into the target."""
+        if self._snapshot_blocks(pane, what="Copy flat"):
+            return
+        selected_items = pane.tree.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Selection Error", "No items selected.")
+            return
+        paths = self._dedupe_nested_paths([item.data(0, PATH_ROLE) for item in selected_items])
+        names = self._unique_flat_names(paths)
+        self._cleanup_flat_stage()
+        staged_dir = None
+        if any(names[i] != os.path.basename(p) for i, p in enumerate(paths)):
+            staged_dir = tempfile.mkdtemp(prefix="dircomp_flat_")
+            self._flat_stage_dir = staged_dir
+            atexit.register(shutil.rmtree, staged_dir, True)
+            error = None
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            try:
+                paths = [self._stage_flat_item(p, os.path.join(staged_dir, names[i])) for i, p in enumerate(paths)]
+            except OSError as e:
+                error = e
+            finally:
+                QApplication.restoreOverrideCursor()
+            if error is not None:
+                self._cleanup_flat_stage()
+                QMessageBox.warning(self, "Copy flat", f"Could not prepare the items: {error}")
+                return
+        self._set_clipboard_paths(paths, cut=False, base_dir=staged_dir)
+        self._clear_cut_marks()
+
+    @staticmethod
+    def _unique_flat_names(paths) -> list:
+        """One name per path, same order: the basename, with " (n)" added
+        (before the extension, for files) to later ones sharing it."""
+        used = {}
+        result = []
+        for p in paths:
+            name = os.path.basename(os.path.normpath(p))
+            candidate = name
+            if candidate.lower() in used:
+                stem, ext = (name, "") if os.path.isdir(p) else os.path.splitext(name)
+                n = used[name.lower()]
+                while True:
+                    n += 1
+                    candidate = f"{stem} ({n}){ext}"
+                    if candidate.lower() not in used:
+                        break
+                used[name.lower()] = n
+            used.setdefault(candidate.lower(), 0)
+            result.append(candidate)
+        return result
+
+    @staticmethod
+    def _stage_flat_item(src, dest):
+        """Hard-link (or copy) `src` to `dest`; folders are rebuilt the
+        same way. Returns dest."""
+        def link_or_copy(s, d, **_kw):
+            try:
+                os.link(s, d)
+            except OSError:
+                shutil.copy2(s, d)
+            return d
+        if os.path.isdir(src):
+            shutil.copytree(src, dest, copy_function=link_or_copy, symlinks=True)
+        else:
+            link_or_copy(src, dest)
+        return dest
+
+    def _cleanup_flat_stage(self):
+        stage = getattr(self, "_flat_stage_dir", None)
+        if stage:
+            shutil.rmtree(stage, ignore_errors=True)
+            self._flat_stage_dir = None
+
+    def _set_clipboard_paths(self, paths, cut: bool, base_dir):
+        self._clipboard_source_base_dir = base_dir
+        urls = [QUrl.fromLocalFile(p) for p in paths]
+        mime = QMimeData()
+        mime.setUrls(urls)
+        op = b"cut" if cut else b"copy"
+        uri_lines = "\n".join(u.toString() for u in urls)
+        mime.setData(GNOME_COPIED_FILES_MIME, op + b"\n" + uri_lines.encode("utf-8"))
+        QApplication.clipboard().setMimeData(mime)
+
     def _do_copy_or_cut(self, pane: DirectoryPane, cut: bool):
         if self._snapshot_blocks(pane, what="Cut/Copy"):
             return
+        self._cleanup_flat_stage()
         selected_items = pane.tree.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "Selection Error", "No items selected.")
@@ -712,8 +811,21 @@ class TransferMixin:
             progress.start_phase(len(dirs) + len(files))
             self._set_transfer_label("Moving..." if move else "Copying...")
 
+        tops = [os.path.normpath(os.path.abspath(p)) for p in paths]
+
         def dest_for(src):
-            rel = os.path.relpath(src, rel_root) if rel_root else os.path.basename(src)
+            if rel_root:
+                rel = os.path.relpath(src, rel_root)
+            else:
+                # No common root: each top-level item lands directly in
+                # dest_dir under its own name, carrying whatever it holds
+                # (a folder's contents keep their structure inside it).
+                asrc = os.path.normpath(os.path.abspath(src))
+                rel = os.path.basename(asrc)
+                for top in tops:
+                    if asrc == top or asrc.startswith(top + os.sep):
+                        rel = os.path.join(os.path.basename(top), os.path.relpath(asrc, top)) if asrc != top else os.path.basename(top)
+                        break
             return os.path.join(dest_dir, rel)
 
         errors = []

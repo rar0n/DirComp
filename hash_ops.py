@@ -690,3 +690,4 @@ class HashOpsMixin:
             if snap:
                 for b in (getattr(pane, "_across_buttons", None) or {}).values():
                     b.setEnabled(False)
+        self._update_sync_button_enabled(operation_enabled)

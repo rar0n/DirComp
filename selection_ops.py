@@ -1654,6 +1654,54 @@ class SelectionMixin:
         up to the pane's root, regardless of that checkbox's state."""
         self._select_ancestor_folders(pane, full_walk=True)
 
+    def select_item_childs(self, pane: DirectoryPane):
+        """Item Childs, the counterpart of Item Parent: adds the items one
+        level down from every selected folder, additively (the selection
+        stays), regardless of Recursive Folder Selections. Each press goes
+        one more level down, since the folders just added are selected too."""
+        self._select_descendants(pane, full_walk=False)
+
+    def select_all_childs(self, pane: DirectoryPane):
+        """All Childs, the counterpart of All Parents: adds everything at
+        every level below every selected folder, regardless of Recursive
+        Folder Selections."""
+        self._select_descendants(pane, full_walk=True)
+
+    def _select_descendants(self, pane: DirectoryPane, full_walk: bool):
+        """Shared engine behind Item Childs and All Childs. Reads each
+        selected folder's entries through _build_entries -- the same rows
+        the file list would show (List Directories/Files, File Filter,
+        Invert, Ignore case) -- so a filtered-out item is never selected.
+        A selected file has no children and contributes nothing. The
+        folders themselves needn't be expanded: _select_paths_in_tree
+        populates whatever it needs to reach the targets (and expands them
+        when Expand To Selection is on). Each target is selected on its
+        own (select_subtree off): with full_walk off only that one level is
+        wanted, and with it on every level is already in the list."""
+        self._begin_timed_operation(pane)
+        folders = [item.data(0, PATH_ROLE) for item in pane.tree.selectedItems()
+                   if item.data(0, IS_DIR_ROLE) and item.data(0, PATH_ROLE)]
+        child_paths = set()
+        stack = list(folders)
+        seen = set()
+        while stack:  # explicit stack: very deep trees
+            folder = stack.pop()
+            if folder in seen:
+                continue
+            seen.add(folder)
+            for e in self._build_entries(folder, pane=pane) or []:
+                child_paths.add(e["full_path"])
+                if full_walk and e["is_dir"]:
+                    stack.append(e["full_path"])
+        if child_paths and self._select_paths_in_tree(
+                pane.tree, child_paths, additive=True, select_subtree=False,
+                auto_expand=self._expand_folders_matching_selection_enabled()):
+            self._reset_mirrored_pane_toggle_buttons(pane)
+            self._scroll_tree_to_first_selected(pane.tree)
+            self._append_operation_duration()
+        else:
+            self._show_result_count(0)
+
     # -------------------------------------------------- Filesystem search
 
     def _collect_common_paths(self, directory, other_dir, progress=None, date_field="mtime"):

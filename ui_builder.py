@@ -265,6 +265,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # Settings tab -> Options -> "Use Binary sizes" (see
             # constants.format_bytes): off = decimal kB/MB, on = KiB/MiB.
             self._binary_sizes = False
+            # Settings tab -> Sync Settings (see FolderSyncMixin._sync_mismatch).
+            self._sync_warn_enabled = True
+            self._sync_warn_percent = 50
+            self._sync_min_enabled = True
+            self._sync_min_files = 10
         if not hasattr(self, "_cmp_type"):
             # Settings tab -> Global Options -> comparison type controls.
             # Plain attributes (not read back from the widgets) so they
@@ -497,7 +502,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self._panes_row = panes_row
         main_layout.addWidget(panes_row, stretch=1)
         # Under the panes: each pane's Select/File Op/Clipboard cluster
-        # either side of the central Folder Op group.
+        # either side of the central Both Panes group.
         filter_frame = self._build_filter_frame()
         global_options = self._build_global_options_group()
         if not self._dual_pane_enabled:
@@ -639,9 +644,14 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row = QWidget()
         layout = CenterSplitLayout(row, _PANE_GAP)
         layout.setContentsMargins(_PANE_SIDE_MARGIN, 0, _PANE_SIDE_MARGIN, 0)
+        # Lower button rows may reach into the free middle under the Both Panes
+        # group -- with two panes only when the right one is mirrored (its
+        # buttons are anchored to the right edge); with one pane (Duplicate
+        # Finder) the left cluster may always.
+        layout.extend_right = self._dual_pane_enabled and bool(self._symmetrical_buttons)
         if self._dual_pane_enabled:
             layout.addWidget(self.left.cluster_container)
-            layout.addWidget(self._build_folder_op_group())
+            layout.addWidget(self._build_both_panes_group())
             layout.addWidget(self.right.cluster_container)
         else:
             left_cell = QWidget()
@@ -653,7 +663,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             left_layout.addStretch(1)
             left_layout.addWidget(filter_frame)
             layout.addWidget(left_cell)
-            layout.addWidget(self._build_folder_op_group())
+            layout.addWidget(self._build_both_panes_group())
             # The right pane is only a list of the duplicates, so its button
             # groups are not shown (and never get arranged -- see
             # _update_responsive_layout). In their place: the block with a
@@ -670,11 +680,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self._cluster_row = row
         self._cluster_row_layout = layout
         self._apply_mode_button_colors()
+        self._update_sync_button_enabled()
         return row
 
-    def _build_folder_op_group(self) -> QGroupBox:
+    def _build_both_panes_group(self) -> QGroupBox:
         """The central "Both Panes" button group -- one button column for
-        now (self._folder_op_buttons, top to bottom; append further buttons
+        now (self._both_panes_buttons, top to bottom; append further buttons
         there)."""
         uniform_w, uniform_h = self._uniform_button_size()
         group = QGroupBox("Both Panes")
@@ -691,10 +702,14 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.swap_pane_button.setFixedSize(uniform_w, uniform_h)
         self.swap_pane_button.clicked.connect(lambda checked=False: self._swap_panes())
-        self._folder_op_buttons = [self.swap_pane_button]
-        for row, button in enumerate(self._folder_op_buttons):
+        self.sync_button = QPushButton("Sync")
+        self.sync_button.setToolTip(self._SYNC_TOOLTIP)
+        self.sync_button.setFixedSize(uniform_w, uniform_h)
+        self.sync_button.clicked.connect(lambda checked=False: self._sync_panes())
+        self._both_panes_buttons = [self.sync_button, self.swap_pane_button]
+        for row, button in enumerate(self._both_panes_buttons):
             grid.addWidget(button, row, 0, alignment=Qt.AlignHCenter)
-        self.folder_op_group = group
+        self.both_panes_group = group
         return group
 
     def _apply_mode_button_colors(self):
@@ -708,6 +723,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         swap = getattr(self, "swap_pane_button", None)
         if swap is not None:
             swap.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("swap_pane")))
+        sync = getattr(self, "sync_button", None)
+        if sync is not None:
+            sync.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("sync")))
         for button in getattr(getattr(self, "right", None), "dup_list_buttons", None) or []:
             try:
                 button.setStyleSheet(self._dup_list_button_sheet())
@@ -1159,7 +1177,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if not hasattr(self, "_uniform_button_dims"):
             fm = QFontMetrics(self.font())
             longest = max(
-                fm.horizontalAdvance(s) for s in ("Diff Folders", "Select All", "Item Parent", "All Parents")
+                fm.horizontalAdvance(s) for s in ("Diff Folders", "Select All", "Item Parent", "All Parents", "Item Childs", "All Childs")
             )
             width = longest + 14 + fm.averageCharWidth()
             height = fm.height() + 10

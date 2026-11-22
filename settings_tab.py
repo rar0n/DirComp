@@ -90,7 +90,7 @@ class SettingsTabMixin:
         secondary.blockSignals(False)
 
     def _settings_titled_block(
-        self, title: str, group: QWidget, pt: int, style: str, space_above: bool,
+        self, title: str, group: QWidget, pt: int, style: str, space_above: bool, bands: int = 1,
     ) -> QWidget:
         """A title label (`style`, `pt` points, bold) directly above
         `group`, with an empty band above the title exactly as tall as
@@ -98,13 +98,15 @@ class SettingsTabMixin:
         title level, so blocks start clearly apart from whatever comes
         before them (or, in a FlowLayout, from the line above when they
         wrap), in proportion to how big their own title is. Only the
-        very first title on the page (Global Settings) goes without."""
+        very first title on the page (Global Settings) goes without. `bands`:
+        how many title-heights of empty band (Level 1 uses 2: its own
+        blank line plus one more, to set the sections clearly apart)."""
         container = QWidget()
         layout = QVBoxLayout(container)
         title_font = QFont(self.font())
-        title_font.setPointSize(pt)
+        title_font.setPointSizeF(float(pt))
         title_font.setBold(True)
-        layout.setContentsMargins(0, QFontMetrics(title_font).height() if space_above else 0, 0, 0)
+        layout.setContentsMargins(0, QFontMetrics(title_font).height() * bands if space_above else 0, 0, 0)
         layout.setSpacing(4)
         header = QLabel(title)
         header.setStyleSheet(style)
@@ -120,7 +122,7 @@ class SettingsTabMixin:
         is a drop-in substitute for `group` at whichever addWidget call
         adds it."""
         return self._settings_titled_block(
-            title, group, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE, space_above
+            title, group, _SECTION_HEADER_PT, _SECTION_HEADER_STYLE, space_above, bands=2
         )
 
     def _settings_subsection(self, title: str, group: QGroupBox, space_above: bool = True) -> QWidget:
@@ -885,7 +887,15 @@ class SettingsTabMixin:
         # Level 2 blocks of Global Settings: Theme, Options, Comparison Options, Misc Colors.
         global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
         global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
-        global_settings_flow.addWidget(self._settings_subsection("Context Menu", self._build_context_menu_group()))
+        # Context Menu and Sync Settings have the same kind of rows: their
+        # labels, spin boxes and sliders, and the two groups themselves,
+        # are made equally wide below (see _align_sibling_groups) so that
+        # they line up when they sit above each other.
+        self._sibling_aligned_rows = []
+        context_menu_block = self._settings_subsection("Context Menu", self._build_context_menu_group())
+        sync_settings_block = self._settings_subsection("Sync Settings", self._build_sync_settings_group())
+        global_settings_flow.addWidget(context_menu_block)
+        global_settings_flow.addWidget(sync_settings_block)
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
@@ -898,6 +908,7 @@ class SettingsTabMixin:
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
             ("swap_pane", "Swap"),
+            ("sync", "Sync"),
         ])
         global_settings_flow.addWidget(self._settings_subsection("Misc Buttons", misc_buttons_group))
 
@@ -2271,6 +2282,7 @@ class SettingsTabMixin:
             "dup_all": "Duplicates", "dup_extra": "Extra copies",
             "dup_sel": "Duplicates of selection", "dup_sel_extra": "Extra copies of selection",
             "file_parent": "Item Parent", "all_parents": "All Parents",
+            "item_childs": "Item Childs", "all_childs": "All Childs",
         }
         select_colors_table = QTableWidget(len(_DEFAULT_SELECT_COLORS) + 1, 3)
         self._style_table_widget(select_colors_table, ["Button", "Fg", "Bg"])
@@ -2304,7 +2316,7 @@ class SettingsTabMixin:
         # button colors rather than a fixed design color of their own
         # (see _main_button_color_for) until customized here. ----
         clipboard_colors_group = self._main_button_color_table([
-            ("copy", "Copy"), ("cut", "Cut"), ("paste", "Paste"), ("paste_folders", "Paste Folders"),
+            ("copy", "Copy"), ("copy_flat", "Copy flat"), ("cut", "Cut"), ("paste", "Paste"), ("paste_folders", "Paste Folders"),
             ("copy_across", "Copy -->"), ("move_across", "Move -->"),
         ])
         file_op_colors_group = self._main_button_color_table(
@@ -2333,6 +2345,7 @@ class SettingsTabMixin:
         # after each row's own tooltip/range/connect setup above, rather
         # than threading a shared width down into every site that builds
         # one of these rows. ----
+        self._align_sibling_groups(self._sibling_aligned_rows, (context_menu_block, sync_settings_block))
         if self._aligned_option_rows:
             aligned_label_w = max(label.sizeHint().width() for label, _ in self._aligned_option_rows)
             aligned_spin_w = max(spin.sizeHint().width() for _, spin in self._aligned_option_rows)
@@ -2410,6 +2423,7 @@ class SettingsTabMixin:
         self.ctx_col_spaces_spin.setValue(self._ctx_col_spaces)
         self.ctx_col_spaces_spin.valueChanged.connect(lambda v: setattr(self, "_ctx_col_spaces", int(v)))
         col_label = QLabel("Column separation spaces:")
+        self._sibling_aligned_rows.append((col_label, self.ctx_col_spaces_spin))
         col_row = spin_slider_inline(col_label, self.ctx_col_spaces_spin,
                                      SpinSlider(self.ctx_col_spaces_spin, live=False))
         lay.addWidget(col_row, 0, Qt.AlignLeft)
@@ -2419,6 +2433,7 @@ class SettingsTabMixin:
         self.ctx_indent_spaces_spin.setValue(self._ctx_indent_spaces)
         self.ctx_indent_spaces_spin.valueChanged.connect(lambda v: setattr(self, "_ctx_indent_spaces", int(v)))
         indent_label = QLabel("Folder indentation spaces:")
+        self._sibling_aligned_rows.append((indent_label, self.ctx_indent_spaces_spin))
         indent_row = spin_slider_inline(indent_label, self.ctx_indent_spaces_spin,
                                         SpinSlider(self.ctx_indent_spaces_spin, live=False))
         lay.addWidget(indent_row, 0, Qt.AlignLeft)
@@ -2444,6 +2459,86 @@ class SettingsTabMixin:
             w.setEnabled(self._ctx_sep_spaces)
 
         outer.addWidget(self._settings_subsubsection("Copy File List formatting", box, space_above=False))
+        return group
+
+    @staticmethod
+    def _align_sibling_groups(rows, blocks):
+        """Gives the labels and spin boxes of `rows` ((label, spin) pairs of
+        sibling groups) one common width, so their sliders start at the
+        same x, and makes the `blocks` (the groups' Level 2 widgets) equally
+        wide."""
+        if rows:
+            label_w = max(label.sizeHint().width() for label, _ in rows)
+            spin_w = max(spin.sizeHint().width() for _, spin in rows)
+            for label, spin in rows:
+                label.setFixedWidth(label_w)
+                spin.setFixedWidth(spin_w)
+        widest = max(block.sizeHint().width() for block in blocks)
+        for block in blocks:
+            block.setMinimumWidth(widest)
+
+    def _build_sync_settings_group(self) -> QGroupBox:
+        """Global Settings -> Sync Settings: the Sync button's "folders look
+        unrelated" warning (see FolderSyncMixin._sync_mismatch) -- shown in
+        the overview when both folders have more than this share of files
+        without a counterpart -- and the small-folder limit under which it
+        is not shown, since a percentage of a handful of files means little."""
+        group = QGroupBox("")
+        outer = QVBoxLayout(group)
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+
+        self.sync_warn_cb = QCheckBox("Warn when the folders look unrelated")
+        self.sync_warn_cb.setToolTip(
+            "Sync's overview gets an extra prominent warning when more than the threshold below "
+            "of the files in BOTH folders have no counterpart at the same path -- a sign that the "
+            "two folders are not meant to be copies of each other. (An empty or much smaller "
+            "folder, as in a first sync, does not trigger it.)")
+        self.sync_warn_cb.setChecked(self._sync_warn_enabled)
+        self.sync_warn_cb.toggled.connect(lambda c: setattr(self, "_sync_warn_enabled", bool(c)))
+        lay.addWidget(self.sync_warn_cb)
+
+        self.sync_warn_spin = SliderSpinBox()
+        self.sync_warn_spin.setRange(0, 100)
+        self.sync_warn_spin.setSuffix(" %")
+        self.sync_warn_spin.setValue(self._sync_warn_percent)
+        self.sync_warn_spin.valueChanged.connect(lambda v: setattr(self, "_sync_warn_percent", int(v)))
+        warn_label = QLabel("Mismatch warning threshold:")
+        self._sibling_aligned_rows.append((warn_label, self.sync_warn_spin))
+        warn_row = spin_slider_inline(warn_label, self.sync_warn_spin,
+                                      SpinSlider(self.sync_warn_spin, live=False))
+        lay.addWidget(warn_row, 0, Qt.AlignLeft)
+
+        self.sync_min_cb = QCheckBox("Skip the warning for small folders")
+        self.sync_min_cb.setToolTip(
+            "No unrelated-folders warning when either folder has fewer files than the limit below "
+            "(counting only the files the File Filter lets through): a percentage of a handful of "
+            "files says little.")
+        self.sync_min_cb.setChecked(self._sync_min_enabled)
+        self.sync_min_cb.toggled.connect(lambda c: setattr(self, "_sync_min_enabled", bool(c)))
+        lay.addWidget(self.sync_min_cb)
+
+        self.sync_min_spin = SliderSpinBox()
+        self.sync_min_spin.setRange(1, 1000)
+        self.sync_min_spin.setValue(self._sync_min_files)
+        self.sync_min_spin.valueChanged.connect(lambda v: setattr(self, "_sync_min_files", int(v)))
+        min_label = QLabel("Fewer files than:")
+        self._sibling_aligned_rows.append((min_label, self.sync_min_spin))
+        min_row = spin_slider_inline(min_label, self.sync_min_spin,
+                                     SpinSlider(self.sync_min_spin, live=False))
+        lay.addWidget(min_row, 0, Qt.AlignLeft)
+
+        def update_enabled():
+            warn = self.sync_warn_cb.isChecked()
+            warn_row.setEnabled(warn)
+            self.sync_min_cb.setEnabled(warn)
+            min_row.setEnabled(warn and self.sync_min_cb.isChecked())
+        self.sync_warn_cb.toggled.connect(lambda _c: update_enabled())
+        self.sync_min_cb.toggled.connect(lambda _c: update_enabled())
+        update_enabled()
+
+        outer.addWidget(box)
         return group
 
     @staticmethod

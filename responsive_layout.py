@@ -34,6 +34,12 @@ next one (Select instead wraps whole semantic columns). The mirrored right
 pane (Symmetrical GUI on) is the exact mirror image: groups right-aligned,
 rows starting at the right edge.
 
+Free middle: the central Both Panes group is short, so below it the space
+between the two clusters is free. A row that starts under that group (a
+group alone on its own row in a "B" topology) may borrow half of that space
+for each pane (CenterSplitLayout.extra_width) -- only with Symmetrical GUI
+on (the right pane's rows are anchored to its right edge) or with one pane.
+
 Adding a button later only means appending it to its group's list in
 _group_buttons -- the wrapping takes care of the rest.
 """
@@ -63,16 +69,16 @@ _DATE_COLUMNS = (COL_MODIFIED, COL_CHANGED, COL_ACCESSED)
 # The three groups, in the order their sizes are measured.
 _GROUP_KEYS = ("select", "file_op", "clipboard")
 # Columns each group has when there is room for everything (Select: 4
-# semantic columns of 3 buttons; File Op: one vertical stack; Clipboard: 2
-# columns of 3 rows).
+# semantic columns of 4 cells; File Op: one vertical stack; Clipboard: 2
+# columns of 4 rows).
 _NATURAL_COLS = {"select": 4, "file_op": 1, "clipboard": 2}
 # The column counts a group may use, so no row is left ragged (File Op: 3
-# buttons -> 1 or 3 columns; Clipboard: 6 buttons -> 1, 2, 3 or 6 columns;
+# buttons -> 1 or 3 columns; Clipboard: 7 buttons -> 1, 2, 4 or 7 columns, empty cells allowed;
 # Select wraps whole semantic columns, so any count up to 4 works).
-_VALID_COLS = {"select": (1, 2, 3, 4), "file_op": (1, 3), "clipboard": (1, 2, 3, 6)}
+_VALID_COLS = {"select": (1, 2, 3, 4), "file_op": (1, 3), "clipboard": (1, 2, 4, 7)}
 _MAX_COLS = {key: max(cols) for key, cols in _VALID_COLS.items()}
-# Buttons per semantic Select column.
-_SELECT_COLUMN_HEIGHT = 3
+# Cells per semantic Select column (the last one is empty in the first column).
+_SELECT_COLUMN_HEIGHT = 4
 
 # Candidate arrangements, in order of preference (used to break ties
 # between arrangements of about the same height).
@@ -134,11 +140,11 @@ class ResponsiveLayoutMixin:
         }[key]
 
     @staticmethod
-    def _group_buttons(pane: DirectoryPane, key: str) -> list:
+    def _group_buttons(pane: DirectoryPane, key: str, cols: int = 2) -> list:
         """The group's buttons in the order they wrap in. Select's list is
         its 3 x 4 grid read row by row (so with 4 columns it reads
         Select All/Missing/Newer/Smaller, Invert/Matching/Older/Larger,
-        Clear/Diff Items/All Parents/Item Parent -- see
+        Clear/Diff Items/All Parents/Item Parent, -/-/All Childs/Item Childs -- see
         _cell_positions for how fewer columns wrap)."""
         if key == "select":
             sp = pane.select_plain_buttons
@@ -149,18 +155,29 @@ class ResponsiveLayoutMixin:
                 return [
                     sp["select_all"], st["dup_all"], st["dup_sel"], sp["all_parents"],
                     pane.invert_button, st["dup_extra"], st["dup_sel_extra"], sp["file_parent"],
-                    sp["clear"], None, None, None,
+                    sp["clear"], None, None, sp["all_childs"],
+                    None, None, None, sp["item_childs"],
                 ]
             return [
                 sp["select_all"], st["missing"], st["newer"], st["smaller"],
                 pane.invert_button, st["matching"], st["older"], st["larger"],
                 sp["clear"], st["diff_folders"], sp["all_parents"], sp["file_parent"],
+                None, None, sp["all_childs"], sp["item_childs"],
             ]
         if key == "file_op":
             return [pane.rename_button, pane.new_folder_button, pane.delete_button]
         b = pane._clipboard_buttons
         across = pane._across_buttons
-        return [across["move"], across["copy"], b["copy"], b["cut"], b["paste"], b["paste_folders"]]
+        # Clipboard (7 buttons; None = empty cell): the order depends on how
+        # many columns it wraps into (read row by row):
+        #   2 columns (4 rows): Cut, Copy-->  /  Copy, Move-->  /  Copy flat, -  /  Paste, Paste Folders
+        #   4 columns (2 rows): Cut, Copy, Paste, Copy-->  /  -, Copy flat, Paste Folders, Move-->
+        #   7 columns (1 row) and 1 column: Cut, Copy, Copy flat, Paste, Paste Folders, Move-->, Copy-->
+        if cols == 2:
+            return [b["cut"], across["copy"], b["copy"], across["move"], b["copy_flat"], None, b["paste"], b["paste_folders"]]
+        if cols == 4:
+            return [b["cut"], b["copy"], b["paste"], across["copy"], None, b["copy_flat"], b["paste_folders"], across["move"]]
+        return [b["cut"], b["copy"], b["copy_flat"], b["paste"], b["paste_folders"], across["move"], across["copy"]]
 
     @staticmethod
     def _cell_positions(key: str, count: int, cols: int, mirrored: bool) -> list:
@@ -178,9 +195,10 @@ class ResponsiveLayoutMixin:
             for i in range(count):
                 unit, level = i % units, i // units
                 if cols == 3:
-                    # 3 columns x 4 rows, compact: the first semantic
-                    # column (Select All/Invert/Clear) lies down as the
-                    # top row and the other three keep their rows below it.
+                    # 3 columns x 5 rows, compact: the first semantic
+                    # column (Select All/Invert/Clear + an empty cell) lies
+                    # down as the top row and the other three keep their
+                    # rows below it.
                     cells.append((i, 0, level) if unit == 0 else (i, 1 + level, unit - 1))
                 else:
                     block, col = divmod(unit, cols)
@@ -203,7 +221,7 @@ class ResponsiveLayoutMixin:
         # when mirrored, the left one otherwise (matters where a column
         # holds a wider button, e.g. Paste Folders).
         align = Qt.AlignRight if mirrored else Qt.AlignLeft
-        buttons = self._group_buttons(pane, key)
+        buttons = self._group_buttons(pane, key, cols)
         for i, row, col in self._cell_positions(key, len(buttons), cols, mirrored):
             if buttons[i] is not None:
                 grid.addWidget(buttons[i], row, col, alignment=align)
@@ -245,6 +263,14 @@ class ResponsiveLayoutMixin:
                     return cols
             return 1
 
+        # Below the central group the middle is free: rows that start under
+        # it may be `ext` px wider than the side (see CenterSplitLayout).
+        row_layout = getattr(self, "_cluster_row_layout", None)
+        ext = 0
+        if row_layout is not None and (not self._dual_pane_enabled or row_layout.extend_right):
+            ext = row_layout.extra_width()
+        center_bottom = row_layout.center_height() + vgap if row_layout is not None else 0
+
         def evaluate(index, select_cols):
             kind, structure = _TOPOLOGIES[index]
             cols = {}
@@ -263,14 +289,27 @@ class ResponsiveLayoutMixin:
                     widths.append(max(sizes[(k, cols[k])][0] for k in stack))
                     heights.append(sum(sizes[(k, cols[k])][1] for k in stack) + vgap * (len(stack) - 1))
                 return sum(widths) + gap * (len(widths) - 1), max(heights), cols
+            top = 0
             for row in structure:
+                row_ext = ext if top >= center_bottom else 0
                 if len(row) == 1 and row[0] != "select":
-                    cols[row[0]] = widest_fit(row[0], avail)
+                    cols[row[0]] = widest_fit(row[0], avail + row_ext)
                 else:
                     for key in row:
                         cols[key] = natural(key)
-                widths.append(sum(sizes[(k, cols[k])][0] for k in row) + gap * (len(row) - 1))
+                    if "clipboard" in row:
+                        # Clipboard shares the row (with File Op): it takes
+                        # the most columns -- i.e. the fewest rows -- that
+                        # fit in what the others leave, not just its
+                        # natural 2 columns.
+                        others = sum(sizes[(k, cols[k])][0] for k in row if k != "clipboard")
+                        left = avail + row_ext - others - gap * (len(row) - 1)
+                        cols["clipboard"] = widest_fit("clipboard", left)
+                # width less what this row may borrow from the middle, so
+                # the caller's `<= avail` test holds per row
+                widths.append(sum(sizes[(k, cols[k])][0] for k in row) + gap * (len(row) - 1) - row_ext)
                 heights.append(max(sizes[(k, cols[k])][1] for k in row))
+                top += heights[-1] + vgap
             return max(widths), sum(heights) + vgap * (len(heights) - 1), cols
 
         for select_cols in reversed(_VALID_COLS["select"]):

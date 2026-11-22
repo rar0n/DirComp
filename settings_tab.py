@@ -380,6 +380,23 @@ class SettingsTabMixin:
         scan_wrapper.addWidget(self.scan_expanded_cb)
         global_grid.addLayout(scan_wrapper, 2, 2)
 
+        # Row 3, under Sort Directories First (same column, same indent): the
+        # folder-count option. Only exists on this tab (no Main-tab primary).
+        self.folder_counts_include_subfolders_cb = QCheckBox("Folder counts include subfolders")
+        self.folder_counts_include_subfolders_cb.setChecked(self._folder_counts_include_subfolders)
+        self.folder_counts_include_subfolders_cb.setToolTip(
+            "The \"N items\" shown for a folder in the File List View. Off: only the "
+            "folder's own entries. On: everything in it at any depth, files and "
+            "folders alike. Either way only what the File Filter and List "
+            "Directories / List Files let through is counted."
+        )
+        self.folder_counts_include_subfolders_cb.toggled.connect(self._on_folder_counts_subfolders_toggled)
+        folder_counts_wrapper = QHBoxLayout()
+        folder_counts_wrapper.setContentsMargins(0, 0, 0, 0)
+        folder_counts_wrapper.addSpacing(20)
+        folder_counts_wrapper.addWidget(self.folder_counts_include_subfolders_cb)
+        global_grid.addLayout(folder_counts_wrapper, 2, 3)
+
         self.hash_same_size_cb = QCheckBox("Hash only same-size files")
         self.hash_same_size_cb.setChecked(self._hash_same_size)
         self.hash_same_size_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
@@ -446,17 +463,6 @@ class SettingsTabMixin:
         clear_history_button.setToolTip("Removes every entry from both panes' folder-history drop-downs.")
         clear_history_button.clicked.connect(self._on_clear_folder_history)
         history_row.addWidget(clear_history_button)
-        history_row.addSpacing(30)
-        self.folder_counts_include_subfolders_cb = QCheckBox("Folder counts include subfolders")
-        self.folder_counts_include_subfolders_cb.setChecked(self._folder_counts_include_subfolders)
-        self.folder_counts_include_subfolders_cb.setToolTip(
-            "The \"N items\" shown for a folder in the File List View. Off: only the "
-            "folder's own entries. On: everything in it at any depth, files and "
-            "folders alike. Either way only what the File Filter and List "
-            "Directories / List Files let through is counted."
-        )
-        self.folder_counts_include_subfolders_cb.toggled.connect(self._on_folder_counts_subfolders_toggled)
-        history_row.addWidget(self.folder_counts_include_subfolders_cb)
         history_row.addStretch(1)
         self._aligned_option_rows.append((history_label, self.file_list_history_limit_spin))
         global_grid.addLayout(history_row, 8, 0, 1, 7)

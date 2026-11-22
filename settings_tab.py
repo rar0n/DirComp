@@ -396,6 +396,11 @@ class SettingsTabMixin:
         folder_counts_wrapper.addSpacing(20)
         folder_counts_wrapper.addWidget(self.folder_counts_include_subfolders_cb)
         global_grid.addLayout(folder_counts_wrapper, 2, 3)
+        # Folder rows only exist while List Directories is on -- same
+        # enable-wiring and dim-when-disabled style as Sort Directories First.
+        self.folder_counts_include_subfolders_cb.setEnabled(self.list_directories_cb.isChecked())
+        self.list_directories_cb.toggled.connect(self.folder_counts_include_subfolders_cb.setEnabled)
+        self.folder_counts_include_subfolders_cb.setStyleSheet(_DISABLED_CHECKBOX_STYLE)
 
         self.hash_same_size_cb = QCheckBox("Hash only same-size files")
         self.hash_same_size_cb.setChecked(self._hash_same_size)

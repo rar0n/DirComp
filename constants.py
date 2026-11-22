@@ -25,7 +25,7 @@ TIMELINE_SCROLLBAR_RANGE = 100_000
 
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
 # counting the versions made on the same day (1, 2, ...). Bump on every batch.
-APP_VERSION = "2026.11.22.20"
+APP_VERSION = "2026.11.22.21"
 
 # st_ctime means different things on different platforms (same split as
 # Timeline Explorer's file_scanner.py, which this mirrors so the two
@@ -283,3 +283,31 @@ DEFAULT_FILE_FILTER_TYPES = ["*." + ext for ext in sorted([
     "xls", "xlsx", "jpg", "jpeg", "png", "gif", "mp3", "mp4", "zip",
     "html", "css", "js", "py", "java", "cpp", "h",
 ])]
+
+
+# Settings tab -> Options -> "Use Binary sizes". One shared switch so every
+# size text (File List View, status lines, dialogs) follows it.
+SIZE_STYLE = {"binary": False}
+
+
+def format_bytes(size) -> str:
+    """Human-readable byte size: decimal (1000, kB/MB/GB/TB) or, with
+    SIZE_STYLE["binary"], binary (1024, KiB/MiB/GiB/TiB). Two decimals;
+    the unit is padded (" B" / "  B") so values line up in a column."""
+    binary = SIZE_STYLE["binary"]
+    step = 1024.0 if binary else 1000.0
+    units = ("  B", "KiB", "MiB", "GiB", "TiB") if binary else (" B", "kB", "MB", "GB", "TB")
+    size = float(size)
+    for unit in units[:-1]:
+        if size < step:
+            return f"{size:.2f} {unit}"
+        size /= step
+    return f"{size:.2f} {units[-1]}"
+
+
+def parse_size_text(text: str) -> float:
+    """Bytes for a text produced by format_bytes (either style)."""
+    value, unit = text.split()
+    factors = {"B": 1, "kB": 1000, "MB": 1000 ** 2, "GB": 1000 ** 3, "TB": 1000 ** 4,
+               "KiB": 1024, "MiB": 1024 ** 2, "GiB": 1024 ** 3, "TiB": 1024 ** 4}
+    return float(value) * factors[unit]

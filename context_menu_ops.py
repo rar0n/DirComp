@@ -34,7 +34,7 @@ from PySide6.QtCore import QMimeDatabase, QStandardPaths, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox
 
-from constants import CMP_FINGERPRINT, CMP_HASH, GNOME_COPIED_FILES_MIME, HASH_ALGORITHMS, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
+from constants import SIZE_STYLE, format_bytes, CMP_FINGERPRINT, CMP_HASH, GNOME_COPIED_FILES_MIME, HASH_ALGORITHMS, IS_DIR_ROLE, IS_WINDOWS, PATH_ROLE
 from panes import DirectoryPane
 
 # The roadmap asks for a confirmation before launching files. Flip to
@@ -43,12 +43,7 @@ CONFIRM_BEFORE_OPEN = True
 
 
 def _human_size(n: int) -> str:
-    size = float(n)
-    for unit in ("B", "kB", "MB", "GB", "TB"):
-        if size < 1000 or unit == "TB":
-            return f"{int(size)} B" if unit == "B" else f"{size:.1f} {unit}"
-        size /= 1000
-    return f"{n} B"
+    return f"{n} B" if n < (1024 if SIZE_STYLE["binary"] else 1000) else format_bytes(n)
 
 
 # ------------------------------------------------------------------

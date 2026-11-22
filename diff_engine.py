@@ -22,7 +22,7 @@ A future change to how dates are compared/typed, or to what counts as
 import os
 import datetime
 
-from constants import CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT, CMP_NAME_SIZE, CMP_NAME, CMP_NAME_SIZE, CMP_NAME
+from constants import format_bytes, parse_size_text, CMP_NAME_SIZE_DATE, CMP_HASH, CMP_FINGERPRINT, CMP_NAME_SIZE, CMP_NAME, CMP_NAME_SIZE, CMP_NAME
 
 # Sentinel results of DiffEngineMixin._diff_axes for a file the Smaller/
 # Larger/Newer/Older axes can't describe: hash comparison with no hash
@@ -1013,16 +1013,9 @@ class DiffEngineMixin:
         def parse_size(size):
             if size.endswith("items"):
                 return int(size.split()[0])
-            value, unit = size.split()
-            value = float(value)
-            units = {"B": 1, "KB": 1024, "MB": 1024 ** 2, "GB": 1024 ** 3, "TB": 1024 ** 4}
-            return value * units[unit]
+            return parse_size_text(size)
 
         return parse_size(size1) - parse_size(size2)
 
     def format_size(self, size):
-        for unit in [" B", "KB", "MB", "GB", "TB"]:
-            if size < 1024.0:
-                return f"{size:.2f} {unit}"
-            size /= 1024.0
-        return f"{size:.2f} TB"
+        return format_bytes(size)

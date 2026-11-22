@@ -179,11 +179,23 @@ def _format_bytes(num: float) -> str:
     this widget stays a standalone, dependency-free component any host
     can drop in without needing that host's own formatting helper."""
     num = float(num)
-    for unit in ("B", "KB", "MB", "GB"):
-        if num < 1024.0:
+    step = 1024.0 if BINARY_SIZES else 1000.0
+    units = ("B", "KiB", "MiB", "GiB") if BINARY_SIZES else ("B", "kB", "MB", "GB")
+    for unit in units:
+        if num < step:
             return f"{num:.2f} {unit}" if unit != "B" else f"{int(num)} {unit}"
-        num /= 1024.0
-    return f"{num:.2f} TB"
+        num /= step
+    return f"{num:.2f} {'TiB' if BINARY_SIZES else 'TB'}"
+
+
+#: decimal (kB/MB, 1000) by default; the host flips this with set_binary_sizes
+BINARY_SIZES = False
+
+
+def set_binary_sizes(enabled: bool):
+    """Binary (KiB/MiB, 1024) instead of decimal sizes in this module's text."""
+    global BINARY_SIZES
+    BINARY_SIZES = bool(enabled)
 
 # Built-in time-based metrics (datetime attributes on FileRecord). "size" is
 # handled separately (byte count -> SizeAxis).

@@ -335,6 +335,17 @@ class SettingsTabMixin:
         _add_synced(self.list_directories_cb, "List Directories", 0, 3)
         _add_synced(self.list_files_cb, "List Files", 0, 4)
 
+        # Row 1, column 4 (under List Files, not indented): "Use Binary
+        # sizes". Only exists on this tab (no Main-tab primary).
+        self.use_binary_sizes_cb = QCheckBox("Use Binary sizes")
+        self.use_binary_sizes_cb.setChecked(self._binary_sizes)
+        self.use_binary_sizes_cb.setToolTip(
+            "On: sizes are shown in binary units (1024 bytes = 1 KiB, MiB, GiB, TiB).\n"
+            "Off: decimal units (1000 bytes = 1 kB, MB, GB, TB).")
+        self.use_binary_sizes_cb.toggled.connect(self._on_binary_sizes_toggled)
+        global_grid.addWidget(self.use_binary_sizes_cb, 1, 4)
+        self._apply_binary_sizes(self._binary_sizes)
+
         # Row 2: dependents, each indented below its decider.
         # Symmetrical GUI/Synchronize Views depend on Dual Pane; Expand
         # To Selection depends on Recursive Folder Selections; Sort
@@ -2434,6 +2445,22 @@ class SettingsTabMixin:
 
         outer.addWidget(self._settings_subsubsection("Copy File List formatting", box, space_above=False))
         return group
+
+    @staticmethod
+    def _apply_binary_sizes(enabled: bool):
+        import statistics_widget
+        from constants import SIZE_STYLE
+        SIZE_STYLE["binary"] = bool(enabled)
+        statistics_widget.set_binary_sizes(enabled)
+
+    def _on_binary_sizes_toggled(self, checked):
+        self._binary_sizes = bool(checked)
+        self._apply_binary_sizes(checked)
+        for pane in (self.left, self.right):
+            timeline = getattr(pane, "timeline", None)
+            if timeline is not None:
+                timeline.update()
+        self.apply_filter()  # relists (deferred) so every size text is rebuilt
 
     def _on_folder_counts_subfolders_toggled(self, checked):
         self._folder_counts_include_subfolders = bool(checked)

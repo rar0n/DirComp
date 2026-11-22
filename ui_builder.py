@@ -258,10 +258,13 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # Settings tab -> Context Menu -> "Copy File List formatting"
             # (see ContextMenuMixin._copy_flv_data). Plain attributes so
             # they survive a UI rebuild.
-            self._ctx_sep_spaces = False   # False: tab-separated; True: spaces
+            self._ctx_sep_spaces = True    # False: tab-separated; True: spaces
             self._ctx_col_spaces = 2
             self._ctx_indent_spaces = 2
-            self._ctx_nice_format = False
+            self._ctx_nice_format = True
+            # Settings tab -> Options -> "Use Binary sizes" (see
+            # constants.format_bytes): off = decimal kB/MB, on = KiB/MiB.
+            self._binary_sizes = False
         if not hasattr(self, "_cmp_type"):
             # Settings tab -> Global Options -> comparison type controls.
             # Plain attributes (not read back from the widgets) so they

@@ -591,6 +591,7 @@ class ListingMixin:
             self.invert_filter_cb.isChecked(),
             self._filter_ignore_case(),
             getattr(self, "_folder_counts_include_subfolders", False),
+            getattr(self, "_binary_sizes", False),
             self.list_directories_cb.isChecked(),
             self.list_files_cb.isChecked(),
             self.sort_directories_first_cb.isChecked(),

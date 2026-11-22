@@ -326,11 +326,11 @@ class ContextMenuMixin:
         Metric picks (tab separated). Each level of nesting below the
         shallowest selected row indents the name by 2 spaces. With
         `with_digests`, a file's already-known hash / fingerprint is
-        appended as "<algorithm> hash|fingerprint<TAB><value>" -- only the
+        appended as a last column -- only the
         type selected as the comparison type, "-- not calculated --" where
         the file has no value yet (nothing is computed here). For a
-        fingerprint, an info line at the top gives algorithm and chunk
-        sizes. Follows Recursive Folder Selections (on: a selected
+        fingerprint, an info line at the top gives algorithm (and chunk
+        sizes). Follows Recursive Folder Selections (on: a selected
         folder brings its whole contents, de-duplicated against other
         selected rows; off: only the selected rows) and the File Filter /
         List Files / List Directories settings."""
@@ -366,6 +366,8 @@ class ContextMenuMixin:
         if digest_kind == CMP_FINGERPRINT:
             key = self._hash_key_for(CMP_FINGERPRINT)
             info_line = (f"Fingerprint: {HASH_ALGORITHMS[key[1]]}, file size + first {key[2]} kB + last {key[3]} kB")
+        elif digest_kind == CMP_HASH:
+            info_line = f"Hash: {HASH_ALGORITHMS[self._hash_key_for(CMP_HASH)[1]]}"
 
         names = []
 
@@ -376,10 +378,8 @@ class ContextMenuMixin:
             cols = [name, size, count, type_, date] if show_count else [name, size, type_, date]
             if digest_kind is not None and path and not is_dir:
                 key = self._hash_key_for(digest_kind)
-                word = "fingerprint" if digest_kind == CMP_FINGERPRINT else "hash"
                 info = self._stored_digest_info(path, digest_kind)
-                value = info[1] if info is not None and tuple(info[0]) == key else "-- not calculated --"
-                cols += [f"{HASH_ALGORITHMS[key[1]]} {word}", value]
+                cols.append(info[1] if info is not None and tuple(info[0]) == key else "-- not calculated --")
             records.append((depth, cols))
 
         # With Recursive Folder Selections on, a selected folder stands for
@@ -424,7 +424,7 @@ class ContextMenuMixin:
             header += [head.text(COL_TYPE), head.text(date_col)]
             if digest_kind is not None:
                 word = "Fingerprint" if digest_kind == CMP_FINGERPRINT else "Hash"
-                header += [f"{word} Type", word]
+                header.append(word)
         lines = self._format_flv_records(records, right_cols, header)
         if info_line:
             lines[0:0] = [info_line, ""] if nice else [info_line]

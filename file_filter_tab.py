@@ -113,10 +113,7 @@ class FileFilterTabMixin:
         group_layout.addLayout(body)
 
         block = self._settings_section("File type list", group, space_above=False)
-        # The tooltip belongs to the title and the list box themselves (not to
-        # the whole block, whose empty areas and buttons would show it too).
-        for label in block.findChildren(QLabel):
-            label.setToolTip(list_tip)
+        # The tooltip belongs to the list box only.
         self._file_filter_list.setToolTip(list_tip)
         outer.addWidget(block, 0, Qt.AlignLeft | Qt.AlignTop)
         outer.addStretch(1)

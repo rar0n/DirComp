@@ -61,12 +61,15 @@ class FileFilterTabMixin:
         scroll area, the same Save Settings / Load Settings / Load
         Defaults row and status line as the Settings tab."""
         page = QWidget()
-        page.setStyleSheet("QGroupBox::title { font-size: 14pt; font-weight: bold; }")
+        page.setStyleSheet(
+            "QGroupBox::title { font-size: 14pt; font-weight: bold; } "
+            f"QToolTip {{ font-size: {self.font().pointSize()}pt; font-weight: normal; }}"
+        )
         outer = QVBoxLayout(page)
 
         group = QGroupBox("")
         group_layout = QVBoxLayout(group)
-        tip = (
+        list_tip = (
             "The entries of the Global File Filter's drop-down on the Main tab. Each "
             "entry is one complete search term, used exactly as written: *.txt is "
             "every name ending in .txt, while a plain term like report matches "
@@ -113,8 +116,8 @@ class FileFilterTabMixin:
         # The tooltip belongs to the title and the list box themselves (not to
         # the whole block, whose empty areas and buttons would show it too).
         for label in block.findChildren(QLabel):
-            label.setToolTip(tip)
-        self._file_filter_list.setToolTip(tip)
+            label.setToolTip(list_tip)
+        self._file_filter_list.setToolTip(list_tip)
         outer.addWidget(block, 0, Qt.AlignLeft | Qt.AlignTop)
         outer.addStretch(1)
 

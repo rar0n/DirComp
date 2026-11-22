@@ -20,7 +20,7 @@ pane_builder.py        - 1483 - one pane's widgets, Statistics panel, splitter (
 name_filter_ops.py     -   190 - Global File Filter matching: terms with * / ? wildcards, any part of a file/folder name, Invert, ignore case, filtered folder counts (NameFilterMixin)
 panes.py               -   169 - a plain state holder for DirectoryPane
 progress.py            -   187 - cancellable progress-bar helper
-responsive_layout.py   - 464 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
+responsive_layout.py   - 479 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
 selection_ops.py       - 2279 - Select group buttons and the recursive search behind them (SelectionMixin)
 settings_ops.py        -   657 - Save / Load Settings to the JSON settings file (SettingsMixin)
 settings_tab.py        - 2792 - Settings tab construction and helpers (SettingsTabMixin)

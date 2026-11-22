@@ -140,7 +140,7 @@ class ResponsiveLayoutMixin:
         }[key]
 
     @staticmethod
-    def _group_buttons(pane: DirectoryPane, key: str) -> list:
+    def _group_buttons(pane: DirectoryPane, key: str, cols: int = 2) -> list:
         """The group's buttons in the order they wrap in. Select's list is
         its 3 x 4 grid read row by row (so with 4 columns it reads
         Select All/Missing/Newer/Smaller, Invert/Matching/Older/Larger,
@@ -168,7 +168,16 @@ class ResponsiveLayoutMixin:
             return [pane.rename_button, pane.new_folder_button, pane.delete_button]
         b = pane._clipboard_buttons
         across = pane._across_buttons
-        return [across["move"], across["copy"], b["copy"], b["cut"], b["paste"], b["paste_folders"]]
+        # Clipboard: the order depends on how many columns it wraps into
+        # (read row by row):
+        #   2 columns (3 rows): Cut, Copy-->  /  Copy, Move-->  /  Paste, Paste Folders
+        #   3 columns (2 rows): Cut, Copy, Copy-->  /  Paste, Paste Folders, Move-->
+        #   6 columns (1 row) and 1 column: Cut, Copy, Paste, Paste Folders, Move-->, Copy-->
+        if cols == 2:
+            return [b["cut"], across["copy"], b["copy"], across["move"], b["paste"], b["paste_folders"]]
+        if cols == 3:
+            return [b["cut"], b["copy"], across["copy"], b["paste"], b["paste_folders"], across["move"]]
+        return [b["cut"], b["copy"], b["paste"], b["paste_folders"], across["move"], across["copy"]]
 
     @staticmethod
     def _cell_positions(key: str, count: int, cols: int, mirrored: bool) -> list:
@@ -212,7 +221,7 @@ class ResponsiveLayoutMixin:
         # when mirrored, the left one otherwise (matters where a column
         # holds a wider button, e.g. Paste Folders).
         align = Qt.AlignRight if mirrored else Qt.AlignLeft
-        buttons = self._group_buttons(pane, key)
+        buttons = self._group_buttons(pane, key, cols)
         for i, row, col in self._cell_positions(key, len(buttons), cols, mirrored):
             if buttons[i] is not None:
                 grid.addWidget(buttons[i], row, col, alignment=align)

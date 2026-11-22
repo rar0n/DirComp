@@ -25,7 +25,7 @@ TIMELINE_SCROLLBAR_RANGE = 100_000
 
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
 # counting the versions made on the same day (1, 2, ...). Bump on every batch.
-APP_VERSION = "2026.11.22.4"
+APP_VERSION = "2026.11.22.5"
 
 # st_ctime means different things on different platforms (same split as
 # Timeline Explorer's file_scanner.py, which this mirrors so the two
@@ -267,3 +267,11 @@ DEFAULT_HASH_ALGORITHM = 2
 # Fingerprint = file size + this many kB from the start + this many from the end.
 DEFAULT_FINGERPRINT_CHUNK_KB = 64
 MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB = 1, 1024
+
+# The File Type dropdown's built-in list (Main tab, Global File Filter) --
+# also what the File Filter tab's "Load Defaults" puts back. Sorted.
+DEFAULT_FILE_FILTER_TYPES = sorted([
+    "txt", "safetensors", "ckpt", "pt", "pdf", "json", "doc", "docx",
+    "xls", "xlsx", "jpg", "jpeg", "png", "gif", "mp3", "mp4", "zip",
+    "html", "css", "js", "py", "java", "cpp", "h",
+])

@@ -2300,49 +2300,14 @@ class SettingsTabMixin:
         # reset confirmation message -- stay visible regardless of
         # scroll position, instead of requiring a scroll to the very
         # bottom to reach the buttons or notice a message.
-        status_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("M")
-
-        save_load_row = QHBoxLayout()
-        save_load_row.addStretch(1)
-
-        # Fixed (bg, fg) copies of the Select group's current Matching/
-        # Missing/File Parent colors at the moment this tab is built
-        # (Save Settings gets Missing's, Load Settings Matching's) --
-        # a literal snapshot, not a live reference: these three buttons
-        # keep this look even if Matching/Missing/File Parent get
-        # recolored afterward in Panel Button Colors above.
-        matching_fg, matching_bg = self._select_colors["matching"]
-        missing_fg, missing_bg = self._select_colors["missing"]
-        file_parent_fg, file_parent_bg = self._select_colors["file_parent"]
-
-        self.save_settings_button = QPushButton("Save Settings")
-        self.save_settings_button.setFixedSize(status_btn_w, uniform_h)
-        self.save_settings_button.setStyleSheet(_bevel_button_stylesheet(missing_bg, missing_fg))
-        self.save_settings_button.setToolTip("Save every option and spinbox on this GUI to disk.")
-        self.save_settings_button.clicked.connect(self.save_settings)
-        save_load_row.addWidget(self.save_settings_button)
-
-        self.load_settings_button = QPushButton("Load Settings")
-        self.load_settings_button.setFixedSize(status_btn_w, uniform_h)
-        self.load_settings_button.setStyleSheet(_bevel_button_stylesheet(matching_bg, matching_fg))
-        self.load_settings_button.setToolTip("Reload every option and spinbox on this GUI from disk.")
-        self.load_settings_button.clicked.connect(lambda checked=False: self.load_settings())
-        save_load_row.addWidget(self.load_settings_button)
-
-        self.reset_settings_button = QPushButton("Reload Defaults")
-        reset_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("Reload Defaults") // 2
-        self.reset_settings_button.setFixedSize(reset_btn_w, uniform_h)
-        self.reset_settings_button.setStyleSheet(_bevel_button_stylesheet(file_parent_bg, file_parent_fg))
-        self.reset_settings_button.setToolTip(
+        save_load_row, (self.save_settings_button, self.load_settings_button,
+                        self.reset_settings_button) = self._build_save_load_row(
+            "Reload Defaults", self._reset_to_defaults,
             "Reset the current theme's colors (and the color-related options) back "
             "to the program's own built-in defaults -- the other theme's colors are "
             "left alone, and the saved settings file isn't touched; Save Settings "
-            "afterward if you want the reset to stick."
+            "afterward if you want the reset to stick.",
         )
-        self.reset_settings_button.clicked.connect(self._reset_to_defaults)
-        save_load_row.addWidget(self.reset_settings_button)
-
-        save_load_row.addStretch(1)
 
         self.settings_status_label = QLabel("")
         self.settings_status_label.setAlignment(Qt.AlignCenter)
@@ -2355,6 +2320,54 @@ class SettingsTabMixin:
         tab_layout.addLayout(save_load_row)
         tab_layout.addWidget(self.settings_status_label)
         return tab_container
+
+    def _build_save_load_row(self, reset_text: str, reset_handler, reset_tooltip: str):
+        """The Save Settings / Load Settings / <reset> button row shared by
+        the Settings tab and the File Filter tab (same look, same spot:
+        centered under the tab's scroll area). Save and Load always act on
+        the one settings file for the whole program; only the reset button
+        is tab-specific (`reset_text`/`reset_handler`/`reset_tooltip`).
+        Returns (the row layout, (save, load, reset buttons))."""
+        uniform_w, uniform_h = self._uniform_button_size()
+        status_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("M")
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+
+        # Fixed (bg, fg) copies of the Select group's current Matching/
+        # Missing/File Parent colors at the moment the tab is built
+        # (Save Settings gets Missing's, Load Settings Matching's) --
+        # a literal snapshot, not a live reference: these buttons keep
+        # this look even if Matching/Missing/File Parent get recolored
+        # afterward in Panel Button Colors.
+        matching_fg, matching_bg = self._select_colors["matching"]
+        missing_fg, missing_bg = self._select_colors["missing"]
+        file_parent_fg, file_parent_bg = self._select_colors["file_parent"]
+
+        save_button = QPushButton("Save Settings")
+        save_button.setFixedSize(status_btn_w, uniform_h)
+        save_button.setStyleSheet(_bevel_button_stylesheet(missing_bg, missing_fg))
+        save_button.setToolTip("Save every option and spinbox on this GUI to disk.")
+        save_button.clicked.connect(self.save_settings)
+        row.addWidget(save_button)
+
+        load_button = QPushButton("Load Settings")
+        load_button.setFixedSize(status_btn_w, uniform_h)
+        load_button.setStyleSheet(_bevel_button_stylesheet(matching_bg, matching_fg))
+        load_button.setToolTip("Reload every option and spinbox on this GUI from disk.")
+        load_button.clicked.connect(lambda checked=False: self.load_settings())
+        row.addWidget(load_button)
+
+        reset_button = QPushButton(reset_text)
+        reset_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("Reload Defaults") // 2
+        reset_button.setFixedSize(reset_btn_w, uniform_h)
+        reset_button.setStyleSheet(_bevel_button_stylesheet(file_parent_bg, file_parent_fg))
+        reset_button.setToolTip(reset_tooltip)
+        reset_button.clicked.connect(lambda checked=False: reset_handler())
+        row.addWidget(reset_button)
+
+        row.addStretch(1)
+        return row, (save_button, load_button, reset_button)
 
     def _on_common_font_size_changed(self, value):
         for pane in (self.left, self.right):

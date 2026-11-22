@@ -412,6 +412,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
+        self.tabs.addTab(self._build_file_filter_tab(), "File Filter")
         self.tabs.setCurrentIndex(previous_tab)
         if not self._dual_pane_enabled:
             self._fill_comparison_copy_holder()
@@ -1440,14 +1441,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.clear_filter_button.clicked.connect(self.clear_filter)
         grid.addWidget(self.clear_filter_button, 0, 0)
 
-        self.common_types = sorted([
-            "txt", "safetensors", "ckpt", "pt", "pdf", "json", "doc", "docx",
-            "xls", "xlsx", "jpg", "jpeg", "png", "gif", "mp3", "mp4", "zip",
-            "html", "css", "js", "py", "java", "cpp", "h",
-        ])
         self.file_type_dropdown = QComboBox()
-        self.file_type_dropdown.addItem("")
-        self.file_type_dropdown.addItems(self.common_types)
+        self._refresh_file_type_dropdown()
         self.file_type_dropdown.currentIndexChanged.connect(self.add_file_type)
         grid.addWidget(self.file_type_dropdown, 0, 1)
 

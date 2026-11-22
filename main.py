@@ -33,6 +33,7 @@ from swap_ops import SwapOpsMixin
 from comparison_copy import ComparisonCopyMixin
 from statistics_ops import TimelineOpsMixin
 from settings_ops import SettingsMixin
+from file_filter_tab import FileFilterTabMixin
 from context_menu_ops import ContextMenuMixin
 from ui_builder import UiBuilderMixin, PANE_TIMELINE_HEIGHT
 from custom_widgets import install_spinbox_wheel_guard
@@ -53,6 +54,7 @@ class DirectoryComparisonApp(
     SnapshotOpsMixin,
     TimelineOpsMixin,
     SettingsMixin,
+    FileFilterTabMixin,
     ContextMenuMixin,
     QMainWindow,
 ):
@@ -111,6 +113,7 @@ class DirectoryComparisonApp(
         # color from the right palette, so nothing downstream needs to
         # correct itself later.
         self._theme = "dark"
+        self._init_file_filter_state()
         self._apply_theme_palette(self._theme)
 
         self._build_ui()

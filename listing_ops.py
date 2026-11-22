@@ -1550,6 +1550,7 @@ class ListingMixin:
                 e["changed_str"], e["accessed_str"],
             ])
             item.setData(COL_SIZE, Qt.UserRole, e["size_raw"])
+            item.setTextAlignment(COL_SIZE, Qt.AlignRight | Qt.AlignVCenter)
             item.setData(COL_MODIFIED, Qt.UserRole, e["date_raw"])
             item.setData(COL_CHANGED, Qt.UserRole, e["changed_raw"])
             item.setData(COL_ACCESSED, Qt.UserRole, e["accessed_raw"])
@@ -1794,6 +1795,7 @@ class ListingMixin:
                         parent_item=None, changed="", accessed="", changed_raw=0, accessed_raw=0):
         item = QTreeWidgetItem([name, size, file_type, date, changed, accessed])
         item.setData(COL_SIZE, Qt.UserRole, size_raw)
+        item.setTextAlignment(COL_SIZE, Qt.AlignRight | Qt.AlignVCenter)
         item.setData(COL_MODIFIED, Qt.UserRole, date_raw)
         item.setData(COL_CHANGED, Qt.UserRole, changed_raw)
         item.setData(COL_ACCESSED, Qt.UserRole, accessed_raw)

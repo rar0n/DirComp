@@ -333,7 +333,7 @@ class ContextMenuMixin:
         selected rows; off: only the selected rows) and the File Filter /
         List Files / List Directories settings."""
         from PySide6.QtWidgets import QTreeWidgetItemIterator
-        from listing_ops import COL_NAME, COL_SIZE, COL_TYPE, _DATE_FIELD_TO_COLUMN, _DATE_FIELD_TO_ENTRY_KEY
+        from listing_ops import COL_COUNT, COL_NAME, COL_SIZE, COL_TYPE, _DATE_FIELD_TO_COLUMN, _DATE_FIELD_TO_ENTRY_KEY
         tree = pane.tree
         date_field = self._pane_diff_date_field(pane)
         date_col = _DATE_FIELD_TO_COLUMN.get(date_field, 3)
@@ -352,6 +352,10 @@ class ContextMenuMixin:
         if not rows:
             return
         base = min(d for d, _ in rows)
+        # The Duplicate Finder's "Unique files only" list shows a Count
+        # column (right after Size); include it where it is visible.
+        show_count = not tree.isColumnHidden(COL_COUNT)
+        right_cols = {1, 2} if show_count else {1}
         info_line = None
         records = []  # (depth, [columns]) -- laid out at the end, per Settings
         digest_kind = getattr(self, "_cmp_type", None) if with_digests else None
@@ -361,8 +365,8 @@ class ContextMenuMixin:
             key = self._hash_key_for(CMP_FINGERPRINT)
             info_line = (f"Fingerprint: {HASH_ALGORITHMS[key[1]]}, file size + first {key[2]} kB + last {key[3]} kB")
 
-        def add_line(depth, name, size, type_, date, path, is_dir):
-            cols = [name, size, type_, date]
+        def add_line(depth, name, size, type_, date, path, is_dir, count=""):
+            cols = [name, size, count, type_, date] if show_count else [name, size, type_, date]
             if digest_kind is not None and path and not is_dir:
                 key = self._hash_key_for(digest_kind)
                 word = "fingerprint" if digest_kind == CMP_FINGERPRINT else "hash"
@@ -384,7 +388,7 @@ class ContextMenuMixin:
                 continue
             is_dir = bool(item.data(0, IS_DIR_ROLE))
             add_line(depth - base, item.text(COL_NAME), item.text(COL_SIZE), item.text(COL_TYPE),
-                     item.text(date_col), path, is_dir)
+                     item.text(date_col), path, is_dir, item.text(COL_COUNT))
             if not (recursive and is_dir and path):
                 continue
             # explicit stack (not recursion): very deep trees; entries are
@@ -393,18 +397,19 @@ class ContextMenuMixin:
             while stack:
                 d, e = stack.pop()
                 emitted.add(e["full_path"])
+                count = e.get("dup_count")
                 add_line(d, e["name"], e["size_str"], e["type_str"], e[entry_key],
-                         e["full_path"], e["is_dir"])
+                         e["full_path"], e["is_dir"], "" if count is None else str(count))
                 if e["is_dir"]:
                     stack.extend((d + 1, c) for c in reversed(self._build_entries(e["full_path"], pane=pane) or []))
-        lines = self._format_flv_records(records)
+        lines = self._format_flv_records(records, right_cols)
         if info_line:
             lines.insert(0, info_line)
         QApplication.clipboard().setText("\n".join(lines))
         n = len(records)
         self._set_upper_status(pane, f"Copied list data of {n} item{'s' if n != 1 else ''}")
 
-    def _format_flv_records(self, records) -> list:
+    def _format_flv_records(self, records, right_cols=frozenset({1})) -> list:
         """Lay out (depth, columns) records as text lines per Settings ->
         Context Menu -> Copy File List formatting: tab-separated with no
         indentation, or spaces (folder indentation per depth, column
@@ -423,7 +428,7 @@ class ContextMenuMixin:
                     widths.append(0)
                 widths[i] = max(widths[i], len(cell))
         return [
-            (gap.join((cell.rjust if i == 1 else cell.ljust)(widths[i]) for i, cell in enumerate(r[:-1])) + gap + r[-1]
+            (gap.join((cell.rjust if i in right_cols else cell.ljust)(widths[i]) for i, cell in enumerate(r[:-1])) + gap + r[-1]
              if len(r) > 1 else r[0])
             for r in rows
         ]

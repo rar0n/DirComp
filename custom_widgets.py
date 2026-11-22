@@ -2275,6 +2275,11 @@ class CenterSplitLayout(QLayout):
         # own geometry is -- so whoever is notified by a cell's resize reads
         # a width that already agrees with it (see side_width).
         self.total_width = 0
+        # Whether each side cell may reach into the free space under the
+        # center item (see extra_width): the left one always, the right one
+        # only where its content is anchored to its right edge.
+        self.extend_left = True
+        self.extend_right = True
         self.setContentsMargins(0, 0, 0, 0)
 
     def addItem(self, item):
@@ -2301,6 +2306,20 @@ class CenterSplitLayout(QLayout):
         if len(self._items) < 3:
             return 0
         return self._items[1].sizeHint().width()
+
+    def center_height(self) -> int:
+        """Height of the center item (top-aligned): below it the middle is free."""
+        if len(self._items) < 3:
+            return 0
+        return self._items[1].sizeHint().height()
+
+    def extra_width(self) -> int:
+        """How far a side cell's lower rows may reach toward the middle,
+        below the center item: half of the center item plus the gap, so the
+        two sides stay a gap apart there."""
+        if len(self._items) < 3:
+            return 0
+        return (self.center_width() + self._gap) // 2
 
     def side_width(self, total_width: int) -> int:
         """Width each side cell gets when the whole row is `total_width`
@@ -2334,7 +2353,18 @@ class CenterSplitLayout(QLayout):
         center_w = self.center_width()
         # Odd leftover pixels go into the gap before the right cell.
         leftover = max(0, area.width() - 2 * side - center_w - 2 * self._gap)
-        left.setGeometry(QRect(area.x(), area.y(), side, area.height()))
+        # The side cells are widened toward the middle (extra_width): their
+        # rows above the center item's bottom never use that part (the
+        # arrangement is chosen for `side`), the lower ones may.
+        extra = self.extra_width()
+        extra_l = extra if self.extend_left else 0
+        extra_r = extra if self.extend_right else 0
+        left.setGeometry(QRect(area.x(), area.y(), side + extra_l, area.height()))
         center_x = area.x() + side + self._gap
         center.setGeometry(QRect(center_x, area.y(), center_w, min(area.height(), center.sizeHint().height())))
-        right.setGeometry(QRect(center_x + center_w + self._gap + leftover, area.y(), side, area.height()))
+        right_x = center_x + center_w + self._gap + leftover
+        right.setGeometry(QRect(right_x - extra_r, area.y(), side + extra_r, area.height()))
+        # The widened cells overlap the center one: keep it on top so its
+        # buttons stay clickable.
+        if center.widget() is not None:
+            center.widget().raise_()

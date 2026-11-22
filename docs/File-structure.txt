@@ -6,7 +6,7 @@ binning.py             -   573 - Pluggable "nice" binning strategies (time, size
 comparison_copy.py     -   234 - Main-tab copy of the Comparison Options group for Duplicate Finder mode (ComparisonCopyMixin)
 constants.py           -   313 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
 context_menu_ops.py    -   639 - File List View right-click menu (ContextMenuMixin)
-custom_widgets.py      - 2340 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
+custom_widgets.py      - 2370 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
 diff_engine.py         -  1021 - comparison types, hash pairing, diff tags (DiffEngineMixin)
 dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)
 dnd_widgets.py         -   956 - drag-and-drop widgets: folder entry combo box, file list tree
@@ -20,7 +20,7 @@ pane_builder.py        - 1483 - one pane's widgets, Statistics panel, splitter (
 name_filter_ops.py     -   190 - Global File Filter matching: terms with * / ? wildcards, any part of a file/folder name, Invert, ignore case, filtered folder counts (NameFilterMixin)
 panes.py               -   169 - a plain state holder for DirectoryPane
 progress.py            -   187 - cancellable progress-bar helper
-responsive_layout.py   - 451 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
+responsive_layout.py   - 464 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
 selection_ops.py       - 2279 - Select group buttons and the recursive search behind them (SelectionMixin)
 settings_ops.py        -   657 - Save / Load Settings to the JSON settings file (SettingsMixin)
 settings_tab.py        - 2792 - Settings tab construction and helpers (SettingsTabMixin)
@@ -32,7 +32,7 @@ sync_views.py          -   693 - Synchronize Views: mirrors navigation, selectio
 theme_ops.py           - 1,390 - color/theme handlers, palette, color sets (ThemeOpsMixin)
 transfer_ops.py        - 1,256 - Clipboard group, Move/Copy, New Folder, transfers and the central progress bar (TransferMixin)
 trash_compat.py        -    15 - optional send2trash shim for Delete
-ui_builder.py          - 1972 - window skeleton, status line, filter and global options (UiBuilderMixin)
+ui_builder.py          - 1977 - window skeleton, status line, filter and global options (UiBuilderMixin)
 
 
 

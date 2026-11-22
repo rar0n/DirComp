@@ -639,6 +639,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         row = QWidget()
         layout = CenterSplitLayout(row, _PANE_GAP)
         layout.setContentsMargins(_PANE_SIDE_MARGIN, 0, _PANE_SIDE_MARGIN, 0)
+        # Lower button rows may reach into the free middle under the Both Panes
+        # group -- with two panes only when the right one is mirrored (its
+        # buttons are anchored to the right edge); with one pane (Duplicate
+        # Finder) the left cluster may always.
+        layout.extend_right = self._dual_pane_enabled and bool(self._symmetrical_buttons)
         if self._dual_pane_enabled:
             layout.addWidget(self.left.cluster_container)
             layout.addWidget(self._build_folder_op_group())

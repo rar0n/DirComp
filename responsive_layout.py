@@ -34,6 +34,12 @@ next one (Select instead wraps whole semantic columns). The mirrored right
 pane (Symmetrical GUI on) is the exact mirror image: groups right-aligned,
 rows starting at the right edge.
 
+Free middle: the central Both Panes group is short, so below it the space
+between the two clusters is free. A row that starts under that group (a
+group alone on its own row in a "B" topology) may borrow half of that space
+for each pane (CenterSplitLayout.extra_width) -- only with Symmetrical GUI
+on (the right pane's rows are anchored to its right edge) or with one pane.
+
 Adding a button later only means appending it to its group's list in
 _group_buttons -- the wrapping takes care of the rest.
 """
@@ -248,6 +254,14 @@ class ResponsiveLayoutMixin:
                     return cols
             return 1
 
+        # Below the central group the middle is free: rows that start under
+        # it may be `ext` px wider than the side (see CenterSplitLayout).
+        row_layout = getattr(self, "_cluster_row_layout", None)
+        ext = 0
+        if row_layout is not None and (not self._dual_pane_enabled or row_layout.extend_right):
+            ext = row_layout.extra_width()
+        center_bottom = row_layout.center_height() + vgap if row_layout is not None else 0
+
         def evaluate(index, select_cols):
             kind, structure = _TOPOLOGIES[index]
             cols = {}
@@ -266,14 +280,19 @@ class ResponsiveLayoutMixin:
                     widths.append(max(sizes[(k, cols[k])][0] for k in stack))
                     heights.append(sum(sizes[(k, cols[k])][1] for k in stack) + vgap * (len(stack) - 1))
                 return sum(widths) + gap * (len(widths) - 1), max(heights), cols
+            top = 0
             for row in structure:
+                row_ext = ext if top >= center_bottom else 0
                 if len(row) == 1 and row[0] != "select":
-                    cols[row[0]] = widest_fit(row[0], avail)
+                    cols[row[0]] = widest_fit(row[0], avail + row_ext)
                 else:
                     for key in row:
                         cols[key] = natural(key)
-                widths.append(sum(sizes[(k, cols[k])][0] for k in row) + gap * (len(row) - 1))
+                # width less what this row may borrow from the middle, so
+                # the caller's `<= avail` test holds per row
+                widths.append(sum(sizes[(k, cols[k])][0] for k in row) + gap * (len(row) - 1) - row_ext)
                 heights.append(max(sizes[(k, cols[k])][1] for k in row))
+                top += heights[-1] + vgap
             return max(widths), sum(heights) + vgap * (len(heights) - 1), cols
 
         for select_cols in reversed(_VALID_COLS["select"]):

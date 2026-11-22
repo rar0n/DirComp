@@ -26,7 +26,7 @@ settings_ops.py        -   650 - Save / Load Settings to the JSON settings file 
 settings_tab.py        -  2677 - Settings tab construction and helpers (SettingsTabMixin)
 snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   900 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
-statistics_widget.py   -  2417 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
+statistics_widget.py   -  2436 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
 swap_ops.py            -   105 - Main-tab Swap button: swaps root folders + histories (SwapOpsMixin)
 sync_views.py          -   693 - Synchronize Views: mirrors navigation, selection, expand and scroll (SyncMixin)
 theme_ops.py           - 1,386 - color/theme handlers, palette, color sets (ThemeOpsMixin)

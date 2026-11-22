@@ -543,7 +543,10 @@ class TimelineWidget(QWidget):
 
         self._path_of = path_of if path_of is not None else (lambda r: getattr(r, "path", None))
         self._size_of = size_of if size_of is not None else (lambda r: float(getattr(r, "size", 0) or 0))
-        self._total_size = sum(self._size_of(r) for r in records) if records else 0.0
+        # Each file once, even if the host lists it more than once (the
+        # File Filter types metric puts a name matching several entries in
+        # each of their bins).
+        self._total_size = self._unique_size_sum(records)
 
         if not records:
             self.global_start = self.global_end = None
@@ -572,6 +575,19 @@ class TimelineWidget(QWidget):
             self.global_start = mid - pad
             self.global_end = mid + pad
         self.reset_view()
+
+    def _unique_size_sum(self, records) -> float:
+        """Combined size of `records`, counting every path only once."""
+        seen = set()
+        total = 0.0
+        for rec in records:
+            path = self._path_of(rec)
+            if path is not None:
+                if path in seen:
+                    continue
+                seen.add(path)
+            total += self._size_of(rec)
+        return total
 
     def set_bin_count(self, n: int):
         """Target number of bins. When `nice_bins` is on this is a hint fed
@@ -1276,11 +1292,14 @@ class TimelineWidget(QWidget):
             return
         lo = self.bin_edges[0] if self.bin_edges else None
         hi = self.bin_edges[-1] if self.bin_edges else None
+        counted = set()
         for rec in self.records:
             path = self._path_of(rec)
             if path is None or path not in self.selected_paths:
                 continue
-            self._selected_size += self._size_of(rec)
+            if path not in counted:  # a record listed in several bins: size once
+                counted.add(path)
+                self._selected_size += self._size_of(rec)
             if n == 0 or lo is None:
                 continue
             v = self._value_of(rec)

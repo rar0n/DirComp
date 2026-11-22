@@ -285,15 +285,17 @@ class ContextMenuMixin:
         add(copy_metadata, "Copy File Name",
             lambda t=(node["name"] if node else None): self._copy_text(pane, clicked_path, t, "file name"),
             node is not None)
+        selected_kind = getattr(self, "_cmp_type", None)
         for kind, label in ((CMP_HASH, "Copy Hash"), (CMP_FINGERPRINT, "Copy Fingerprint")):
             info = file_digests.get(kind)
             add(copy_metadata, label, lambda k=kind, i=info: self._copy_digest(pane, clicked_path, k, i),
-                info is not None)
+                info is not None and kind == selected_kind)
         copy_metadata.addSeparator()
         add(copy_metadata, "Copy File List View Data",
             lambda: self._copy_flv_data(pane, False), bool(selected))
         add(copy_metadata, "Copy File List View Data + Hash / Fingerprint",
-            lambda: self._copy_flv_data(pane, True), bool(selected))
+            lambda: self._copy_flv_data(pane, True),
+            bool(selected) and selected_kind in (CMP_HASH, CMP_FINGERPRINT))
         add(menu, "Cut", lambda: self.cut_to_clipboard(pane), has_sel)
         add(menu, "Paste", lambda: self.paste_from_clipboard(pane, targets[0]),
             can_paste and len(targets) == 1)
@@ -327,8 +329,11 @@ class ContextMenuMixin:
         Metric picks (tab separated). Each level of nesting below the
         shallowest selected row indents the name by 2 spaces. With
         `with_digests`, a file's already-known hash / fingerprint is
-        appended as "<algorithm> hash|fingerprint<TAB><value>" (nothing is
-        computed). Follows Recursive Folder Selections (on: a selected
+        appended as "<algorithm> hash|fingerprint<TAB><value>" -- only the
+        type selected as the comparison type, "-- not calculated --" where
+        the file has no value yet (nothing is computed here). For a
+        fingerprint, an info line at the top gives algorithm and chunk
+        sizes. Follows Recursive Folder Selections (on: a selected
         folder brings its whole contents, de-duplicated against other
         selected rows; off: only the selected rows) and the File Filter /
         List Files / List Directories settings."""
@@ -353,14 +358,21 @@ class ContextMenuMixin:
             return
         base = min(d for d, _ in rows)
         lines = []
+        digest_kind = getattr(self, "_cmp_type", None) if with_digests else None
+        if digest_kind not in (CMP_HASH, CMP_FINGERPRINT):
+            digest_kind = None
+        if digest_kind == CMP_FINGERPRINT:
+            key = self._hash_key_for(CMP_FINGERPRINT)
+            lines.append(f"Fingerprint: {HASH_ALGORITHMS[key[1]]}, file size + first {key[2]} kB + last {key[3]} kB")
 
         def add_line(depth, name, size, type_, date, path, is_dir):
             cols = [("  " * depth) + name, size, type_, date]
-            if with_digests and path and not is_dir:
-                for kind, word in ((CMP_HASH, "hash"), (CMP_FINGERPRINT, "fingerprint")):
-                    info = self._stored_digest_info(path, kind)
-                    if info is not None:
-                        cols += [f"{HASH_ALGORITHMS[info[0][1]]} {word}", info[1]]
+            if digest_kind is not None and path and not is_dir:
+                key = self._hash_key_for(digest_kind)
+                word = "fingerprint" if digest_kind == CMP_FINGERPRINT else "hash"
+                info = self._stored_digest_info(path, digest_kind)
+                value = info[1] if info is not None and tuple(info[0]) == key else "-- not calculated --"
+                cols += [f"{HASH_ALGORITHMS[key[1]]} {word}", value]
             lines.append("\t".join(cols))
 
         # With Recursive Folder Selections on, a selected folder stands for

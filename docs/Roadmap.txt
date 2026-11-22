@@ -35,9 +35,10 @@ Views and statistics (extends the Statistics View):
   - multi-select copies several lines of FLV entries as plain text.
 
 
-- Change File Filter input box to also use for general file name filtering as well as file extensions (asterisk as wildcard like normal file searches, etc).
-New options: "Fle Filter options" section:
-- Editable field with list of file filter extensions drop-down list
-- RegEx?
+- Change File Filter input box to also use general file name filtering, not just file extensions.
 
+New tab: "Fle Filter" for File Filter settings.
+- Editable field with list of file filter extensions drop-down list
+- Simple matching wildcars (Asterisks, question-mark? Others?)
+- Later: RegEx?
 

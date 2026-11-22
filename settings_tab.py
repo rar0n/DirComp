@@ -2305,7 +2305,7 @@ class SettingsTabMixin:
         # button colors rather than a fixed design color of their own
         # (see _main_button_color_for) until customized here. ----
         clipboard_colors_group = self._main_button_color_table([
-            ("copy", "Copy"), ("cut", "Cut"), ("paste", "Paste"), ("paste_folders", "Paste Folders"),
+            ("copy", "Copy"), ("copy_flat", "Copy flat"), ("cut", "Cut"), ("paste", "Paste"), ("paste_folders", "Paste Folders"),
             ("copy_across", "Copy -->"), ("move_across", "Move -->"),
         ])
         file_op_colors_group = self._main_button_color_table(

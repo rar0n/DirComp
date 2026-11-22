@@ -25,7 +25,7 @@ TIMELINE_SCROLLBAR_RANGE = 100_000
 
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
 # counting the versions made on the same day (1, 2, ...). Bump on every batch.
-APP_VERSION = "2026.11.22.37"
+APP_VERSION = "2026.11.22.38"
 
 # st_ctime means different things on different platforms (same split as
 # Timeline Explorer's file_scanner.py, which this mirrors so the two

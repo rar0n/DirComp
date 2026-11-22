@@ -70,12 +70,12 @@ _DATE_COLUMNS = (COL_MODIFIED, COL_CHANGED, COL_ACCESSED)
 _GROUP_KEYS = ("select", "file_op", "clipboard")
 # Columns each group has when there is room for everything (Select: 4
 # semantic columns of 4 cells; File Op: one vertical stack; Clipboard: 2
-# columns of 3 rows).
+# columns of 4 rows).
 _NATURAL_COLS = {"select": 4, "file_op": 1, "clipboard": 2}
 # The column counts a group may use, so no row is left ragged (File Op: 3
-# buttons -> 1 or 3 columns; Clipboard: 6 buttons -> 1, 2, 3 or 6 columns;
+# buttons -> 1 or 3 columns; Clipboard: 7 buttons -> 1, 2, 4 or 7 columns, empty cells allowed;
 # Select wraps whole semantic columns, so any count up to 4 works).
-_VALID_COLS = {"select": (1, 2, 3, 4), "file_op": (1, 3), "clipboard": (1, 2, 3, 6)}
+_VALID_COLS = {"select": (1, 2, 3, 4), "file_op": (1, 3), "clipboard": (1, 2, 4, 7)}
 _MAX_COLS = {key: max(cols) for key, cols in _VALID_COLS.items()}
 # Cells per semantic Select column (the last one is empty in the first column).
 _SELECT_COLUMN_HEIGHT = 4
@@ -168,16 +168,16 @@ class ResponsiveLayoutMixin:
             return [pane.rename_button, pane.new_folder_button, pane.delete_button]
         b = pane._clipboard_buttons
         across = pane._across_buttons
-        # Clipboard: the order depends on how many columns it wraps into
-        # (read row by row):
-        #   2 columns (3 rows): Cut, Copy-->  /  Copy, Move-->  /  Paste, Paste Folders
-        #   3 columns (2 rows): Cut, Copy, Copy-->  /  Paste, Paste Folders, Move-->
-        #   6 columns (1 row) and 1 column: Cut, Copy, Paste, Paste Folders, Move-->, Copy-->
+        # Clipboard (7 buttons; None = empty cell): the order depends on how
+        # many columns it wraps into (read row by row):
+        #   2 columns (4 rows): Cut, Copy-->  /  Copy, Move-->  /  Copy flat, -  /  Paste, Paste Folders
+        #   4 columns (2 rows): Cut, Copy, Copy flat, Copy-->  /  Paste, Paste Folders, Move-->, -
+        #   7 columns (1 row) and 1 column: Cut, Copy, Copy flat, Paste, Paste Folders, Move-->, Copy-->
         if cols == 2:
-            return [b["cut"], across["copy"], b["copy"], across["move"], b["paste"], b["paste_folders"]]
-        if cols == 3:
-            return [b["cut"], b["copy"], across["copy"], b["paste"], b["paste_folders"], across["move"]]
-        return [b["cut"], b["copy"], b["paste"], b["paste_folders"], across["move"], across["copy"]]
+            return [b["cut"], across["copy"], b["copy"], across["move"], b["copy_flat"], None, b["paste"], b["paste_folders"]]
+        if cols == 4:
+            return [b["cut"], b["copy"], b["copy_flat"], across["copy"], b["paste"], b["paste_folders"], across["move"], None]
+        return [b["cut"], b["copy"], b["copy_flat"], b["paste"], b["paste_folders"], across["move"], across["copy"]]
 
     @staticmethod
     def _cell_positions(key: str, count: int, cols: int, mirrored: bool) -> list:

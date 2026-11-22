@@ -1060,8 +1060,15 @@ class PaneBuilderMixin:
         paste_folders_button.setIconSize(QSize(14, 14))
         paste_folders_button.setFixedHeight(uniform_h)
 
+        # Copy flat: Copy without the folder structure (see
+        # TransferMixin.copy_flat_to_clipboard).
+        copy_flat_button = QPushButton("Copy flat")
+        copy_flat_button.clicked.connect(lambda checked=False, p=pane: self.copy_flat_to_clipboard(p))
+        copy_flat_button.setIconSize(QSize(14, 14))
+        copy_flat_button.setFixedSize(uniform_w, uniform_h)
+
         pane._clipboard_buttons = {
-            "copy": copy_button, "cut": cut_button, "paste": paste_button,
+            "copy": copy_button, "copy_flat": copy_flat_button, "cut": cut_button, "paste": paste_button,
             "paste_folders": paste_folders_button,
         }
         # Colors (and icons, for the four with one) come from

@@ -170,6 +170,8 @@ _DEFAULT_SELECT_COLORS = {
 # Buttons tables.
 _DEFAULT_MAIN_BUTTON_COLORS = {
     "copy": ["#D0D0D0", "black"],
+    # Copy flat: Copy's light grey nudged toward blue-grey -- a sibling of Copy.
+    "copy_flat": ["#B5C7D3", "black"],
     "cut": ["#FFA0A0", "black"],
     "paste": ["#A9784B", "#F5F5F5"],
     "paste_folders": ["#6E6694", "#F5F5F5"],
@@ -185,7 +187,7 @@ _DEFAULT_MAIN_BUTTON_COLORS = {
 # kind passed to _make_icon for whichever of the above (or "rename",
 # which has none) also draws an icon -- so a color change updates the
 # icon's fg right along with the button's own.
-_MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "paste": "paste", "paste_folders": "paste", "delete": "delete"}
+_MAIN_BUTTON_ICON_KINDS = {"cut": "cut", "copy": "copy", "copy_flat": "copy", "paste": "paste", "paste_folders": "paste", "delete": "delete"}
 
 # Main-tab buttons whose color is customizable (self._main_button_colors)
 # but that have no fixed design color of their own -- each starts as None,

@@ -297,6 +297,14 @@ class ResponsiveLayoutMixin:
                 else:
                     for key in row:
                         cols[key] = natural(key)
+                    if "clipboard" in row:
+                        # Clipboard shares the row (with File Op): it takes
+                        # the most columns -- i.e. the fewest rows -- that
+                        # fit in what the others leave, not just its
+                        # natural 2 columns.
+                        others = sum(sizes[(k, cols[k])][0] for k in row if k != "clipboard")
+                        left = avail + row_ext - others - gap * (len(row) - 1)
+                        cols["clipboard"] = widest_fit("clipboard", left)
                 # width less what this row may borrow from the middle, so
                 # the caller's `<= avail` test holds per row
                 widths.append(sum(sizes[(k, cols[k])][0] for k in row) + gap * (len(row) - 1) - row_ext)

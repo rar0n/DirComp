@@ -31,7 +31,8 @@ import os
 import shutil
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QPushButton, QStyle,
+                               QVBoxLayout)
 
 from trash_compat import send2trash, SEND2TRASH_AVAILABLE
 
@@ -225,8 +226,8 @@ class FolderSyncMixin:
                 problems.append(f"Not enough free space in {esc(dest_dir)}: needs {fmt(need)}, {fmt(free)} free.")
         trashed = sum(1 for op in plan["ops"] if op["kind"] == "update")
 
-        html = ["<p style='color:#C0392B'><b>WARNING: this changes files in BOTH folders.</b><br>"
-                "Check that these are the right two folders:</p>",
+        html = [self._sync_banner("WARNING: this changes files in BOTH folders.<br>"
+                                  "Check that these are the right two folders:"),
                 f"<p><b>Left:</b> {esc(left_dir)}<br><b>Right:</b> {esc(right_dir)}</p>"]
         html.append("<p>" + "<br>".join(lines) + "</p>")
         if trashed:
@@ -241,7 +242,7 @@ class FolderSyncMixin:
                         + f"): only matching files are synced; {plan['filtered']} otherwise-needed "
                         f"cop{'y is' if plan['filtered'] == 1 else 'ies are'} left out.</p>")
         for problem in problems:
-            html.append(f"<p style='color:#C0392B'><b>{problem}</b></p>")
+            html.append(self._sync_banner(problem))
 
         detail = []
         for op in plan["ops"][:_MAX_DETAIL_LINES]:
@@ -252,32 +253,72 @@ class FolderSyncMixin:
         for path, why in plan["conflicts"][:_MAX_DETAIL_LINES]:
             detail.append(f"[SKIPPED] {path}: {why}")
 
-        box = QMessageBox(self)
-        box.setWindowTitle("Sync folders")
-        box.setTextFormat(Qt.RichText)
         if no_ops:
-            box.setIcon(QMessageBox.Information)
-            box.setText("<p><b>Nothing to sync</b> -- every file that exists on both sides has the same Modified "
-                        "date, and neither side lacks anything"
-                        + (" (within the File Filter)" if name_filter.active else "") + ".</p>"
-                        + ("".join(html[-2:]) if plan["conflicts"] else ""))
-            if detail:
-                box.setDetailedText("\n".join(detail))
-            box.setStandardButtons(QMessageBox.Ok)
-            box.exec()
-            return False
-        box.setIcon(QMessageBox.Warning)
-        box.setText("".join(html))
+            return self._sync_dialog(
+                "<p><b>Nothing to sync</b> -- every file that exists on both sides has the same Modified "
+                "date, and neither side lacks anything"
+                + (" (within the File Filter)" if name_filter.active else "") + ".</p>"
+                + ("".join(html[-2:]) if plan["conflicts"] else ""),
+                "\n".join(detail), proceed=False, warning=False)
+        return self._sync_dialog("".join(html), "\n".join(detail), proceed=not problems, warning=True)
+
+    def _sync_dialog(self, html: str, detail: str, proceed: bool, warning: bool) -> bool:
+        """The overview dialog (wide, with a roomy collapsible details list).
+        True = Continue was clicked; Cancel is the default."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Sync folders")
+        dialog.setMinimumWidth(820)
+        outer = QVBoxLayout(dialog)
+        top = QHBoxLayout()
+        icon = QLabel()
+        style = self.style()
+        icon.setPixmap(style.standardIcon(
+            QStyle.SP_MessageBoxWarning if warning else QStyle.SP_MessageBoxInformation).pixmap(40, 40))
+        icon.setAlignment(Qt.AlignTop)
+        top.addWidget(icon)
+        label = QLabel(html)
+        label.setTextFormat(Qt.RichText)
+        label.setWordWrap(True)
+        label.setMinimumWidth(740)
+        top.addWidget(label, 1)
+        outer.addLayout(top)
+        details = QPlainTextEdit(detail)
+        details.setReadOnly(True)
+        details.setLineWrapMode(QPlainTextEdit.NoWrap)
+        details.setMinimumHeight(320)
+        details.setVisible(False)
+        outer.addWidget(details, 1)
+        buttons = QHBoxLayout()
+        toggle = None
         if detail:
-            box.setDetailedText("\n".join(detail))
-        cancel = box.addButton("Cancel", QMessageBox.RejectRole)
-        proceed = None
-        if not problems:
-            proceed = box.addButton("Continue", QMessageBox.AcceptRole)
-        box.setDefaultButton(cancel)
-        box.setEscapeButton(cancel)
-        box.exec()
-        return proceed is not None and box.clickedButton() is proceed
+            toggle = QPushButton("Show Details...")
+            toggle.setCheckable(True)
+
+            def on_toggle(checked):
+                toggle.setText("Hide Details" if checked else "Show Details...")
+                details.setVisible(checked)
+                dialog.adjustSize()
+            toggle.toggled.connect(on_toggle)
+            buttons.addWidget(toggle)
+        buttons.addStretch(1)
+        cancel = QPushButton("Cancel" if proceed else "Close")
+        cancel.clicked.connect(dialog.reject)
+        if proceed:
+            go = QPushButton("Continue")
+            go.clicked.connect(dialog.accept)
+            buttons.addWidget(go)
+        buttons.addWidget(cancel)
+        cancel.setDefault(True)
+        cancel.setAutoDefault(True)
+        outer.addLayout(buttons)
+        dialog.adjustSize()
+        return dialog.exec() == QDialog.Accepted and proceed
+
+    @staticmethod
+    def _sync_banner(text: str) -> str:
+        """White bold text on a dark red block -- readable on any theme."""
+        return ("<table width='100%' cellpadding='8' cellspacing='0'><tr><td bgcolor='#8B1A1A'>"
+                f"<font color='#FFFFFF'><b>{text}</b></font></td></tr></table>")
 
     def _sync_execute(self, plan):
         ops = plan["ops"]

@@ -1746,12 +1746,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # amount below it).
             _recursive_indent, expand_extra_indent = self._global_options_row_indents(row1, row2)
             row2.addSpacing(expand_extra_indent)
-            row2.addWidget(self.expand_matching_cb)
+            row2.addWidget(self.main_comparison_type_combo)
             row2.addStretch(1)
 
             row1.addWidget(self.recursive_folder_contents_cb)
             row1.addStretch(1)
-            row1.addWidget(self.main_comparison_type_combo)
+            row1.addWidget(self.expand_matching_cb)
             row1.addWidget(self.refresh_button)
 
             outer.addLayout(row1)

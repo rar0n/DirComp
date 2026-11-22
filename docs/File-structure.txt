@@ -4,26 +4,26 @@ File                   - Lines - Comment
 --------------------------------------------------------------------------------------
 binning.py             -   512 - Pluggable "nice" binning strategies for the Statistics View
 comparison_copy.py     -   234 - Main-tab copy of the Comparison Options group for Duplicate Finder mode (ComparisonCopyMixin)
-constants.py           -   284 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
+constants.py           -   285 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
 context_menu_ops.py    -   482 - File List View right-click menu (ContextMenuMixin)
 custom_widgets.py      - 2,337 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
-diff_engine.py         - 1,028 - comparison types, hash pairing, diff tags (DiffEngineMixin)
+diff_engine.py         -  1028 - comparison types, hash pairing, diff tags (DiffEngineMixin)
 dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)
 dnd_widgets.py         -   956 - drag-and-drop widgets: folder entry combo box, file list tree
 duplicate_ops.py       -   696 - Duplicate Finder mode: duplicate groups, colors, the right-pane list (DuplicateFinderMixin)
-file_filter_tab.py     -   244 - File Filter tab: editable file type list behind the Global File Filter drop-down (FileFilterTabMixin)
+file_filter_tab.py     -   247 - File Filter tab: editable file type list behind the Global File Filter drop-down (FileFilterTabMixin)
 hash_cache_store.py    -   384 - persistent hash cache: one SQLite file (HashCacheStore), no Qt
 hash_ops.py            -   692 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
-listing_ops.py         - 1,964 - populating, refreshing and sorting each pane's file list (ListingMixin)
+listing_ops.py         -  1965 - populating, refreshing and sorting each pane's file list (ListingMixin)
 main.py                -   143 - entry point: composes the app from the mixins
 pane_builder.py        - 1,451 - one pane's widgets, Statistics panel, splitter (PaneBuilderMixin)
-name_filter_ops.py     -   159 - Global File Filter matching: terms with * / ? wildcards, any part of a file/folder name, Invert, ignore case (NameFilterMixin)
+name_filter_ops.py     -   190 - Global File Filter matching: terms with * / ? wildcards, any part of a file/folder name, Invert, ignore case, filtered folder counts (NameFilterMixin)
 panes.py               -   169 - a plain state holder for DirectoryPane
 progress.py            -   187 - cancellable progress-bar helper
 responsive_layout.py   -   448 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
 selection_ops.py       - 2,242 - Select group buttons and the recursive search behind them (SelectionMixin)
-settings_ops.py        -   648 - Save / Load Settings to the JSON settings file (SettingsMixin)
-settings_tab.py        - 2,646 - Settings tab construction and helpers (SettingsTabMixin)
+settings_ops.py        -   650 - Save / Load Settings to the JSON settings file (SettingsMixin)
+settings_tab.py        -  2661 - Settings tab construction and helpers (SettingsTabMixin)
 snapshot_ops.py        -   455 - .fss folder snapshots: save, load, virtual paths (SnapshotOpsMixin)
 statistics_ops.py      -   856 - feeds each pane's Statistics View from its snapshot (TimelineOpsMixin)
 statistics_widget.py   - 2,408 - the zoomable, selectable bar-chart widget of the Statistics View (TimelineWidget)
@@ -265,7 +265,7 @@ splitter handling (_apply_file_list_ratio_to_splitter, _set_file_list_ratio,
 name_filter_ops.py 
 ----------------------
 NameFilterMixin: the Global File Filter's matching rules in one place. The
-filter text is a list of terms separated by "|"; a name passes when any term
+filter text is a list of terms separated by "/"; a name passes when any term
 matches (Invert flips that, "Ignore UPPER / lowercase" makes it
 case-insensitive). A plain term matches anywhere in the name; a term with
 * or ? must match the whole name (*.txt). A folder row stays listed if its own name passes or

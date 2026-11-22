@@ -48,6 +48,9 @@ class FileFilterTabMixin:
         self._file_filter_types = list(DEFAULT_FILE_FILTER_TYPES)
         self._file_filter_working = list(DEFAULT_FILE_FILTER_TYPES)
         self._file_filter_list = None
+        # "Folder counts include subfolders" (Settings tab); lives here so
+        # it survives a UI rebuild, like the comparison settings do.
+        self._folder_counts_include_subfolders = False
         self._file_filter_status_label = None
 
     # ----------------------------------------------------------- Building

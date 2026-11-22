@@ -590,6 +590,7 @@ class ListingMixin:
             self.file_filter_entry.text(),
             self.invert_filter_cb.isChecked(),
             self._filter_ignore_case(),
+            getattr(self, "_folder_counts_include_subfolders", False),
             self.list_directories_cb.isChecked(),
             self.list_files_cb.isChecked(),
             self.sort_directories_first_cb.isChecked(),
@@ -1352,7 +1353,7 @@ class ListingMixin:
                     continue
                 if not name_filter.dir_passes(child):
                     continue
-                item_count = len(child["children"] or {})
+                item_count = self._folder_item_count(child, name_filter)
                 entries.append(dict(
                     name=name, full_path=full_path, is_dir=True,
                     size_str=f"{item_count} items", type_str="Folder", date_str=date_str,

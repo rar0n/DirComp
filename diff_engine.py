@@ -638,7 +638,7 @@ class DiffEngineMixin:
             return None, None
         other_date_str = datetime.datetime.fromtimestamp(other_node[date_field]).strftime("%Y-%m-%d %H:%M:%S")
         if is_dir:
-            other_size_str = f"{len(other_node['children'] or {})} items"
+            other_size_str = f"{self._folder_item_count(other_node)} items"
         else:
             other_size_str = self.format_size(other_node["size"])
 

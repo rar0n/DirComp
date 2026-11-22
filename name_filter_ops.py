@@ -2,7 +2,7 @@
 NameFilterMixin: the Global File Filter's matching rules, in one place.
 
 The filter text is a list of terms separated by constants.FILTER_SEPARATOR
-("|"). A name passes when ANY term matches it, or -- with Invert on -- when
+("/"). A name passes when ANY term matches it, or -- with Invert on -- when
 none does. "Ignore UPPER / lowercase" (on by default) makes the comparison
 case-insensitive. Applies to file names and folder names alike.
 
@@ -113,6 +113,37 @@ class NameFilter:
 
 
 class NameFilterMixin:
+    def _folder_item_count(self, node, name_filter=None) -> int:
+        """The "N items" a folder row shows: its entries that are actually
+        listed under the current settings -- List Directories / List Files
+        and the name filter (a subfolder counts if ListingMixin._build_entries
+        would list it). With "Folder counts include subfolders" on, the
+        entries of every listed subfolder count too (files and folders
+        alike), at any depth."""
+        children = node["children"] or {}
+        include_sub = getattr(self, "_folder_counts_include_subfolders", False)
+        list_dirs = self.list_directories_cb.isChecked()
+        list_files = self.list_files_cb.isChecked()
+        nf = name_filter if name_filter is not None else self._name_filter()
+        if not include_sub and list_dirs and list_files and not nf.active:
+            return len(children)
+        count = 0
+        stack = [node]
+        while stack:
+            current = stack.pop()
+            for child in (current["children"] or {}).values():
+                if child["is_dir"]:
+                    if not (list_dirs and nf.dir_passes(child)):
+                        continue
+                    count += 1
+                    if include_sub:
+                        stack.append(child)
+                elif list_files and nf.name_passes(child["name"]):
+                    count += 1
+            if not include_sub:
+                break
+        return count
+
     def _filter_terms(self) -> list:
         entry = getattr(self, "file_filter_entry", None)
         text = entry.text() if entry is not None else ""

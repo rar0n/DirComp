@@ -446,6 +446,17 @@ class SettingsTabMixin:
         clear_history_button.setToolTip("Removes every entry from both panes' folder-history drop-downs.")
         clear_history_button.clicked.connect(self._on_clear_folder_history)
         history_row.addWidget(clear_history_button)
+        history_row.addSpacing(30)
+        self.folder_counts_include_subfolders_cb = QCheckBox("Folder counts include subfolders")
+        self.folder_counts_include_subfolders_cb.setChecked(self._folder_counts_include_subfolders)
+        self.folder_counts_include_subfolders_cb.setToolTip(
+            "The \"N items\" shown for a folder in the File List View. Off: only the "
+            "folder's own entries. On: everything in it at any depth, files and "
+            "folders alike. Either way only what the File Filter and List "
+            "Directories / List Files let through is counted."
+        )
+        self.folder_counts_include_subfolders_cb.toggled.connect(self._on_folder_counts_subfolders_toggled)
+        history_row.addWidget(self.folder_counts_include_subfolders_cb)
         history_row.addStretch(1)
         self._aligned_option_rows.append((history_label, self.file_list_history_limit_spin))
         global_grid.addLayout(history_row, 8, 0, 1, 7)
@@ -2320,6 +2331,10 @@ class SettingsTabMixin:
         tab_layout.addLayout(save_load_row)
         tab_layout.addWidget(self.settings_status_label)
         return tab_container
+
+    def _on_folder_counts_subfolders_toggled(self, checked):
+        self._folder_counts_include_subfolders = bool(checked)
+        self.apply_filter()  # relists (deferred, see there) so the counts update
 
     def _build_save_load_row(self, reset_text: str, reset_handler, reset_tooltip: str):
         """The Save Settings / Load Settings / <reset> button row shared by

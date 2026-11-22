@@ -57,6 +57,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
     "cache_hashed_folders",
+    "folder_counts_include_subfolders",
     "ignore_empty_files", "ignore_hard_links", "scan_expanded_folders", "hash_same_size_files", "extra_copies_keep",
 })
 
@@ -120,6 +121,7 @@ class SettingsMixin:
             "extra_copies_keep": getattr(self, "extra_copies_keep_combo", None),
             "hash_same_size_files": getattr(self, "hash_same_size_cb", None),
             "ignore_hard_links": getattr(self, "ignore_hard_links_cb", None),
+            "folder_counts_include_subfolders": getattr(self, "folder_counts_include_subfolders_cb", None),
         }
         for side in ("left", "right"):
             pane = getattr(self, side, None)

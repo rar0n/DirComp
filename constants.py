@@ -25,7 +25,7 @@ TIMELINE_SCROLLBAR_RANGE = 100_000
 
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
 # counting the versions made on the same day (1, 2, ...). Bump on every batch.
-APP_VERSION = "2026.11.22.7"
+APP_VERSION = "2026.11.22.8"
 
 # st_ctime means different things on different platforms (same split as
 # Timeline Explorer's file_scanner.py, which this mirrors so the two
@@ -269,10 +269,11 @@ DEFAULT_FINGERPRINT_CHUNK_KB = 64
 MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB = 1, 1024
 
 # Separates the terms in the Global File Filter's text field (a name that
-# matches ANY of them is shown). A pipe: it reads as "or", cannot be part of
-# a file name on Windows and is very rare in one elsewhere -- unlike the
-# comma it replaced, which file names do contain.
-FILTER_SEPARATOR = "|"
+# matches ANY of them is shown). A slash: the one character no file name can
+# contain on Windows, Linux or macOS (it is the path separator; the comma and
+# the pipe both can be part of a name on Linux), and it reads as "or"
+# ("jpg/png"). The filter only looks at names, never at whole paths.
+FILTER_SEPARATOR = "/"
 
 # The File Type dropdown's built-in list (Main tab, Global File Filter) --
 # every entry is one complete search term. Also what the File Filter tab's

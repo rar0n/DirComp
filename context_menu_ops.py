@@ -328,11 +328,17 @@ class ContextMenuMixin:
         shallowest selected row indents the name by 2 spaces. With
         `with_digests`, a file's already-known hash / fingerprint is
         appended as "<algorithm> hash|fingerprint<TAB><value>" (nothing is
-        computed)."""
+        computed). Follows Recursive Folder Selections (on: a selected
+        folder brings its whole contents, de-duplicated against other
+        selected rows; off: only the selected rows) and the File Filter /
+        List Files / List Directories settings."""
         from PySide6.QtWidgets import QTreeWidgetItemIterator
-        from listing_ops import COL_NAME, COL_SIZE, COL_TYPE, _DATE_FIELD_TO_COLUMN
+        from listing_ops import COL_NAME, COL_SIZE, COL_TYPE, _DATE_FIELD_TO_COLUMN, _DATE_FIELD_TO_ENTRY_KEY
         tree = pane.tree
-        date_col = _DATE_FIELD_TO_COLUMN.get(self._pane_diff_date_field(pane), 3)
+        date_field = self._pane_diff_date_field(pane)
+        date_col = _DATE_FIELD_TO_COLUMN.get(date_field, 3)
+        entry_key = _DATE_FIELD_TO_ENTRY_KEY.get(date_field, "date_str")
+        recursive = self._recursive_folder_contents_enabled()
         rows = []  # (depth, item) in visual (tree) order
         it = QTreeWidgetItemIterator(tree, QTreeWidgetItemIterator.Selected)
         while it.value():
@@ -347,16 +353,42 @@ class ContextMenuMixin:
             return
         base = min(d for d, _ in rows)
         lines = []
-        for depth, item in rows:
-            cols = [("  " * (depth - base)) + item.text(COL_NAME), item.text(COL_SIZE),
-                    item.text(COL_TYPE), item.text(date_col)]
-            path = item.data(0, PATH_ROLE)
-            if with_digests and path and not item.data(0, IS_DIR_ROLE):
+
+        def add_line(depth, name, size, type_, date, path, is_dir):
+            cols = [("  " * depth) + name, size, type_, date]
+            if with_digests and path and not is_dir:
                 for kind, word in ((CMP_HASH, "hash"), (CMP_FINGERPRINT, "fingerprint")):
                     info = self._stored_digest_info(path, kind)
                     if info is not None:
                         cols += [f"{HASH_ALGORITHMS[info[0][1]]} {word}", info[1]]
             lines.append("\t".join(cols))
+
+        # With Recursive Folder Selections on, a selected folder stands for
+        # everything inside it (as for Copy and the Select group), so its
+        # whole contents are listed from the snapshot -- through the same
+        # List Files/Directories + File Filter rules the list itself uses --
+        # even where the folder is collapsed. Anything already listed that
+        # way is skipped when it turns up again as a selected row.
+        emitted = set()
+        for depth, item in rows:
+            path = item.data(0, PATH_ROLE)
+            if path in emitted:
+                continue
+            is_dir = bool(item.data(0, IS_DIR_ROLE))
+            add_line(depth - base, item.text(COL_NAME), item.text(COL_SIZE), item.text(COL_TYPE),
+                     item.text(date_col), path, is_dir)
+            if not (recursive and is_dir and path):
+                continue
+            # explicit stack (not recursion): very deep trees; entries are
+            # pushed reversed so they pop in list order, depth-first
+            stack = [(depth - base + 1, e) for e in reversed(self._build_entries(path, pane=pane) or [])]
+            while stack:
+                d, e = stack.pop()
+                emitted.add(e["full_path"])
+                add_line(d, e["name"], e["size_str"], e["type_str"], e[entry_key],
+                         e["full_path"], e["is_dir"])
+                if e["is_dir"]:
+                    stack.extend((d + 1, c) for c in reversed(self._build_entries(e["full_path"], pane=pane) or []))
         QApplication.clipboard().setText("\n".join(lines))
         n = len(lines)
         self._set_upper_status(pane, f"Copied list data of {n} item{'s' if n != 1 else ''}")

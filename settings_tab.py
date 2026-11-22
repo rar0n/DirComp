@@ -104,7 +104,7 @@ class SettingsTabMixin:
         container = QWidget()
         layout = QVBoxLayout(container)
         title_font = QFont(self.font())
-        title_font.setPointSize(pt)
+        title_font.setPointSizeF(float(pt))
         title_font.setBold(True)
         layout.setContentsMargins(0, QFontMetrics(title_font).height() * bands if space_above else 0, 0, 0)
         layout.setSpacing(4)

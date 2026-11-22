@@ -1,11 +1,16 @@
 """
 NameFilterMixin: the Global File Filter's matching rules, in one place.
 
-The filter text is a comma-separated list of terms. A name passes when ANY
-term occurs anywhere in it (substring match, extension included), or --
-with Invert on -- when none does. "Ignore UPPER / lowercase" (on by
-default) makes the comparison case-insensitive. Applies to file names and
-folder names alike.
+The filter text is a list of terms separated by constants.FILTER_SEPARATOR
+("|"). A name passes when ANY term matches it, or -- with Invert on -- when
+none does. "Ignore UPPER / lowercase" (on by default) makes the comparison
+case-insensitive. Applies to file names and folder names alike.
+
+A term without wildcards matches anywhere in the name (extension included).
+A term with a wildcard -- "*" for any run of characters, "?" for exactly one
+-- must match the WHOLE name: "*.txt" is every name ending in .txt,
+"rep?rt*" every name starting rep, any character, rt. Nothing else is
+special (brackets and dots are plain characters).
 
 A folder row is kept when its own name passes OR something inside it
 passes, so the path down to every hit stays reachable:
@@ -16,10 +21,28 @@ passes, so the path down to every hit stays reachable:
 
 Everything that used to compare file extensions (ListingMixin._build_entries,
 the Statistics View's visibility check, the Duplicate Finder's scope) asks
-this module instead. Wildcards are meant to slot into NameFilter.name_matches.
+this module instead. The matching of a single term is _compile_term.
 """
 
 import os
+import re
+
+from constants import FILTER_SEPARATOR
+
+
+def _compile_term(term: str, ignore_case: bool):
+    """One filter term as a predicate on a name -- see module docstring."""
+    if "*" in term or "?" in term:
+        pattern = "".join(
+            ".*" if ch == "*" else "." if ch == "?" else re.escape(ch) for ch in term
+        )
+        flags = re.DOTALL | (re.IGNORECASE if ignore_case else 0)
+        regex = re.compile(pattern, flags)
+        return lambda name: regex.fullmatch(name) is not None
+    if ignore_case:
+        low = term.lower()
+        return lambda name: low in name.lower()
+    return lambda name: term in name
 
 
 class NameFilter:
@@ -28,7 +51,8 @@ class NameFilter:
 
     def __init__(self, terms, invert, ignore_case, recursive, expanded_getter, memo):
         self.ignore_case = ignore_case
-        self.terms = [t.lower() for t in terms] if ignore_case else list(terms)
+        self.terms = list(terms)
+        self._matchers = [_compile_term(t, ignore_case) for t in self.terms]
         self.invert = invert
         self.recursive = recursive
         self._expanded_getter = expanded_getter
@@ -41,9 +65,7 @@ class NameFilter:
 
     def name_matches(self, name: str) -> bool:
         """Does any term occur in `name` (ignoring Invert)."""
-        if self.ignore_case:
-            name = name.lower()
-        return any(term in name for term in self.terms)
+        return any(match(name) for match in self._matchers)
 
     def name_passes(self, name: str) -> bool:
         """Does `name` pass the filter (Invert applied). True when the
@@ -94,7 +116,7 @@ class NameFilterMixin:
     def _filter_terms(self) -> list:
         entry = getattr(self, "file_filter_entry", None)
         text = entry.text() if entry is not None else ""
-        return [t.strip() for t in text.split(",") if t.strip()]
+        return [t.strip() for t in text.split(FILTER_SEPARATOR) if t.strip()]
 
     def _filter_ignore_case(self) -> bool:
         cb = getattr(self, "ignore_case_filter_cb", None)

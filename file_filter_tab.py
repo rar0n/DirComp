@@ -23,21 +23,22 @@ from PySide6.QtWidgets import (
     QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
-from constants import DEFAULT_FILE_FILTER_TYPES
+from constants import DEFAULT_FILE_FILTER_TYPES, FILTER_SEPARATOR
 from custom_widgets import _bevel_button_stylesheet
 
 
 def _clean_types(types) -> list:
-    """Extensions as the filter wants them: no surrounding spaces, no
-    leading dot or comma, no blanks, no repeats (case-insensitive,
-    first spelling wins), order kept."""
+    """The entries as search terms: surrounding spaces removed, no blanks,
+    no repeats (case-insensitive, first spelling wins), order kept. An
+    entry is used exactly as written, so it cannot contain the filter's
+    separator."""
     seen = set()
     result = []
     for raw in types:
-        ext = str(raw).strip().strip(",").strip().lstrip(".").strip()
-        if ext and ext.lower() not in seen:
-            seen.add(ext.lower())
-            result.append(ext)
+        term = str(raw).strip()
+        if term and FILTER_SEPARATOR not in term and term.lower() not in seen:
+            seen.add(term.lower())
+            result.append(term)
     return result
 
 
@@ -63,11 +64,13 @@ class FileFilterTabMixin:
         group = QGroupBox("")
         group_layout = QVBoxLayout(group)
         group_layout.addWidget(self._make_italic_note(
-            "The extensions offered in the Global File Filter's drop-down on the "
-            "Main tab. Double-click an entry to edit it, or use Add. Written without "
-            "a dot (txt, not .txt) -- the drop-down adds the dot when you pick one. "
-            "The drop-down is updated by Save Settings, Load Settings and Load "
-            "Defaults, not while you edit."
+            "The entries of the Global File Filter's drop-down on the Main tab. Each "
+            "entry is one complete search term, used exactly as written: *.txt is "
+            "every name ending in .txt, while a plain term like report matches "
+            "anywhere in a name (* = any characters, ? = one character; with one of "
+            "them the term must match the whole name). Double-click an entry to edit "
+            "it, or use Add. The drop-down is updated by Save Settings, Load Settings "
+            "and Load Defaults, not while you edit."
         ))
 
         body = QHBoxLayout()

@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
 # on purpose: other modules may still import them via ui_builder.
 from constants import IS_DIR_ROLE, CHANGED_FIELD_LABEL, TIMELINE_SCROLLBAR_RANGE, TAG_COLORS
 from constants import CMP_NAME_SIZE_DATE, DEFAULT_HASH_ALGORITHM, DEFAULT_FINGERPRINT_CHUNK_KB
-from constants import COMPARISON_TYPE_ITEMS
+from constants import COMPARISON_TYPE_ITEMS, FILTER_SEPARATOR
 from panes import DirectoryPane
 from snapshot_ops import is_snapshot_file_name
 from dnd_widgets import DirDropLineEdit, DirDropTreeWidget
@@ -1456,6 +1456,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # nothing) plus the column stretch below makes the entry the one
         # that grows/narrows with the window.
         self.file_filter_entry.setMinimumWidth(40)
+        self.file_filter_entry.setToolTip(
+            f"Search terms, separated by {FILTER_SEPARATOR}  (a name that matches any "
+            "of them is shown). A plain term matches anywhere in a file or folder "
+            "name; * (any characters) and ? (one character) make it match the "
+            "whole name, e.g. *.txt or rep?rt*.")
         self.file_filter_entry.returnPressed.connect(self.apply_filter)
         grid.addWidget(self.file_filter_entry, 0, 2)
         grid.setColumnStretch(2, 1)
@@ -1896,12 +1901,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         selected_type = self.file_type_dropdown.currentText()
         if not selected_type:
             return
-        # The filter matches any part of a name, so a bare "txt" would
-        # also hit "context.doc"; with the dot it means the extension.
-        selected_type = "." + selected_type
         current = self.file_filter_entry.text().strip()
         if current:
-            self.file_filter_entry.setText(f"{current}, {selected_type}")
+            self.file_filter_entry.setText(f"{current} {FILTER_SEPARATOR} {selected_type}")
         else:
             self.file_filter_entry.setText(selected_type)
         self.file_type_dropdown.blockSignals(True)

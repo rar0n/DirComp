@@ -4,20 +4,20 @@ File                   - Lines - Comment
 --------------------------------------------------------------------------------------
 binning.py             -   512 - Pluggable "nice" binning strategies for the Statistics View
 comparison_copy.py     -   234 - Main-tab copy of the Comparison Options group for Duplicate Finder mode (ComparisonCopyMixin)
-constants.py           -   277 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
+constants.py           -   284 - shared constants: item data roles, tag colors, ranks, MIME type, layout/style values
 context_menu_ops.py    -   482 - File List View right-click menu (ContextMenuMixin)
 custom_widgets.py      - 2,337 - custom-painted widgets: bevel buttons, themed scrollbars with selection markers, spin-box sliders
 diff_engine.py         - 1,028 - comparison types, hash pairing, diff tags (DiffEngineMixin)
 dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)
 dnd_widgets.py         -   956 - drag-and-drop widgets: folder entry combo box, file list tree
 duplicate_ops.py       -   696 - Duplicate Finder mode: duplicate groups, colors, the right-pane list (DuplicateFinderMixin)
-file_filter_tab.py     -   241 - File Filter tab: editable file type list behind the Global File Filter drop-down (FileFilterTabMixin)
+file_filter_tab.py     -   244 - File Filter tab: editable file type list behind the Global File Filter drop-down (FileFilterTabMixin)
 hash_cache_store.py    -   384 - persistent hash cache: one SQLite file (HashCacheStore), no Qt
 hash_ops.py            -   692 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
 listing_ops.py         - 1,964 - populating, refreshing and sorting each pane's file list (ListingMixin)
 main.py                -   143 - entry point: composes the app from the mixins
 pane_builder.py        - 1,451 - one pane's widgets, Statistics panel, splitter (PaneBuilderMixin)
-name_filter_ops.py     -   137 - Global File Filter matching: any part of a file/folder name, Invert, ignore case (NameFilterMixin)
+name_filter_ops.py     -   159 - Global File Filter matching: terms with * / ? wildcards, any part of a file/folder name, Invert, ignore case (NameFilterMixin)
 panes.py               -   169 - a plain state holder for DirectoryPane
 progress.py            -   187 - cancellable progress-bar helper
 responsive_layout.py   -   448 - resize-driven layout of the button groups and columns (ResponsiveLayoutMixin)
@@ -32,7 +32,7 @@ sync_views.py          -   693 - Synchronize Views: mirrors navigation, selectio
 theme_ops.py           - 1,386 - color/theme handlers, palette, color sets (ThemeOpsMixin)
 transfer_ops.py        - 1,256 - Clipboard group, Move/Copy, New Folder, transfers and the central progress bar (TransferMixin)
 trash_compat.py        -    15 - optional send2trash shim for Delete
-ui_builder.py          - 1,959 - window skeleton, status line, filter and global options (UiBuilderMixin)
+ui_builder.py          -  1961 - window skeleton, status line, filter and global options (UiBuilderMixin)
 
 
 
@@ -265,9 +265,10 @@ splitter handling (_apply_file_list_ratio_to_splitter, _set_file_list_ratio,
 name_filter_ops.py 
 ----------------------
 NameFilterMixin: the Global File Filter's matching rules in one place. The
-filter text is a comma-separated list of terms; a name passes when any term
-occurs anywhere in it (Invert flips that, "Ignore UPPER / lowercase" makes it
-case-insensitive). A folder row stays listed if its own name passes or
+filter text is a list of terms separated by "|"; a name passes when any term
+matches (Invert flips that, "Ignore UPPER / lowercase" makes it
+case-insensitive). A plain term matches anywhere in the name; a term with
+* or ? must match the whole name (*.txt). A folder row stays listed if its own name passes or
 something inside it does -- the whole tree with Recursive Folder Selections
 on, only the currently expanded folders with it off.
 

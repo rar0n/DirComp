@@ -2209,14 +2209,14 @@ class SettingsTabMixin:
             rows.setSpacing(2)
             file_row = QHBoxLayout()
             file_row.addWidget(spin_slider_inline(
-                file_label, file_spin, SpinSlider(file_spin, width=90),
+                file_label, file_spin, SpinSlider(file_spin),
             ), 0, Qt.AlignVCenter)
             file_row.addStretch(1)
             rows.addLayout(file_row)
 
             folder_row = QHBoxLayout()
             folder_row.addWidget(spin_slider_inline(
-                folder_label, folder_spin, SpinSlider(folder_spin, width=90),
+                folder_label, folder_spin, SpinSlider(folder_spin),
             ), 0, Qt.AlignVCenter)
             folder_row.addStretch(1)
             rows.addLayout(folder_row)
@@ -2301,7 +2301,7 @@ class SettingsTabMixin:
         color_tuning_layout.addLayout(ranged_opacity_rows)
         color_tuning_layout.addLayout(hover_opacity_rows)
         color_tuning_layout.addLayout(partial_lerp_rows)
-        color_tuning_block = self._l2_block("Color tuning", color_tuning_group, "half")
+        color_tuning_block = self._l2_block("Color tuning", color_tuning_group, "two_thirds")
 
         # The upper-left readout's text, split by which of its segments
         # each color paints -- see TimelineWidget._draw_readout_segments

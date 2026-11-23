@@ -79,7 +79,7 @@ class FileFilterTabMixin:
         )
         self._file_filter_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._file_filter_list.setMinimumHeight(260)
-        self._file_filter_list.setMaximumWidth(260)
+        self._file_filter_list.setMinimumWidth(90)
         self._ff_fill_list(self._file_filter_working)
         # Edits (typing in an item) and everything else both end up here.
         self._file_filter_list.itemChanged.connect(lambda _item: self._ff_sync_working())

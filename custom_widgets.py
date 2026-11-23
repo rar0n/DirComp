@@ -1283,7 +1283,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
 # lines up. A huge range (800-5000, 2-500) therefore has fewer pixels
 # than values and leans on its arrow buttons, the spin box itself and,
 # where it makes sense, a coarser slider_step.
-_SPIN_SLIDER_WIDTH = 200
+_SPIN_SLIDER_WIDTH = 160
 # Older names, kept in case anything still imports them: same value.
 _SPIN_SLIDER_MIN_WIDTH = _SPIN_SLIDER_MAX_WIDTH = _SPIN_SLIDER_WIDTH
 # Left indent (px) of a slider that sits under its spin box's title: none,

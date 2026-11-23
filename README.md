@@ -184,13 +184,15 @@ Most file listings depend on:
 - Recursive Folder Selections setting (whether or not to scan inside non-expanded folders in the upper view)
 
 
-### Compare Folders
+## Main modes
 
+### Compare Folders
 Basically, you set two "root" folders, one in each pane (left / right pane) view, and can compare their contents, copy / move files or folders between them, etc.
 
 The entries in the drop-down history list above the file view can be deleted by hovering over them and press "DEL", or "Clear History" button under "Global Settings" - "Options", in Settings tab.
 
 You can also save a folder in a "Snapshot" file (similar to a cache), and later load it (To e.g. compare differences, but ofc any cut/copy/paste to/from a Snapshot isn't possible)
+
 
 ### Duplicate Finder
 
@@ -199,23 +201,87 @@ The other main mode. The right side pane is re-used, listing duplicates found in
 
 
 
-### Settings tab
+## Buttons
+The buttons at the bottom part is divided into a few groups
+- Select
+- File Op
+- Clipboard
+- Both Panes (central group applying to both panes)
 
-Sets Theme, lots of custom colors for highigths and other stuff.
 
-#### Global Settings
+### Select buttons
 
-##### Options
+Most are **additive**, each select button adds to the current selection.
+If you want to select from a "blank slate" (nothing selected at first), then press Clear (in this group) first!
+This group differs slightly in the two main modes:
 
-###### Comparison type
- - Name, size and date
- - Hash value (A few different to choose between)
- - Fingerprint
+Compare Folders mode
+- Missing (Select files that exist here but are missing on the other pane)
+- Matching (Selelct files that exists in both panes)
+- Newer (Files exist in both panes but this pane's is newer)
+- Older (As above but this is older)
+- Smaller (Files exists in both panes but this has a smaller filesize)
+- Larger (As above except this side has the larger filesize)
+It is implied that the files are compared to the same relative locations on the other pane / folder.
+
+Duplicate Finder mode
+- Duplicates (Select all files that are duplicates of each other)
+- Extra copies (As above, except un-select 1 copy of each duplicate set, so as to not delete all of them for example)
+- Sel. Dups (From a selection, select all files that have duplicates, ignoring un-selected items)
+- Sel. Extras (As above, but leave 1 file in each duplicate set un-selected)
+
+Common:
+Your basic Select All, Clear, Invert (selection) and a couple of auxillaries:
+- All Parents - Select an items parents all the way up to the top of the pane's root folder
+- All Childs - The reverse of the above, selects everything inside a folder
+- Item Parent - Select an item's (file or folder) parent folder
+- Item Child - Select a folders content, but only one level down
+
+
+### Clipboard buttons
+There's the basic cut/copy/paste, except it's not as basic perhaps, as it will re-create any parent folders of any selected item that is pasted.
+So if you select a file or folder deeply nested, it will paste the item in the same deeply nested folder structure, re-creating it.
+Exception is if you paste in an ordinary file explorer instead of in DirComp.
+Other buttons:
+- Paste Folders - as the name implies, pastes only folders of the selection, ignoring the files
+- Paste Flat - Pastes everything in one folder (ignoring the folder structure)
+- Move--> - Simply moves the selection to the other pane
+- Copy--> - As above but copies it
+
+### File Op
+Self explanatory, rudimentary implemented for now.
+
+### Both Panes buttons
+Just two functions for now:
+- Sync - A powerful button, be very careful!! That is, be **SURE** that the left and right folders should be copies of each other! Newest file wins if the same file exists in both panes.
+- Swap - Just swaps left and right. If done in "Duplicate Finder", swaps the hidden right side with the visible left, for finding duplicate files.
+
+
+
+
+
+## Settings tab
+Sets Theme, lots of custom colors for highigths and other stuff. Basically a zillion settings there now :P (Lots of colors and theming, but not everything)
+
+
+### Comparison Options
+(Settings tab, Global Settngs)
+
+Which files are considered "counterparts" of each other is set here.
+- Name, size and date - they all must match
+- Name and size
+- Name
+  - With any of the Name types, you may ignore file extension(s).
+- Hash value (Slow, a selection of hashing algorithms available. Most accurate)
+  - Hash value is the slowest by far initially as it needs to hash the complete files.
+- Fingerprint (Quickly hash only a subset + file size)
 
 Name, size and date is the most basic method. It might mistake same-named files for the same file (but shows date or size difference). It might be sufficient, depending on use case.
-
-Hash value is the slowest by far initially as it needs to hash the complete files.
+Perhaps you only want a visual comparison of file sets that differs only with file extensions, for example.
 
 Fingerprint is a shortened hash value, very fast but it's only hashing the file size and start and end chunks of a file (conceivably it could be altered in the middle while still having the same file size and fingerprint value, and a difference will be unnoticed and ignored as such).
+
+
+
 
 

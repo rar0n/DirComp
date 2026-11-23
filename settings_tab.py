@@ -1623,11 +1623,60 @@ class SettingsTabMixin:
         self.indent_line_style_block = self._settings_subsubsection("Line style", indent_style_group)
         indent_line_outer.addWidget(self.indent_line_style_block)
 
+        # ---- Selected folders indentation line highlight (Level 3): the
+        # lines of folders that are selected (and expanded) get thicker.
+        # Everything but its own Enable is greyed while that is off. ----
+        indent_sel_group = QGroupBox("")
+        indent_sel_outer = QVBoxLayout(indent_sel_group)
+        self.indent_sel_enabled_cb = QCheckBox("Enable")
+        self.indent_sel_enabled_cb.setToolTip(
+            "Make the indentation line of every selected, expanded folder "
+            "thicker, so its contents stand out."
+        )
+        self.indent_sel_enabled_cb.setChecked(self._indent_sel_enabled)
+        self.indent_sel_enabled_cb.toggled.connect(
+            lambda checked: self._on_indent_sel_option_changed("_indent_sel_enabled", bool(checked))
+        )
+        indent_sel_outer.addWidget(self.indent_sel_enabled_cb)
+        self.indent_sel_increase_label = QLabel("Line thickness increase:")
+        self.indent_sel_increase_spin = SliderSpinBox()
+        self.indent_sel_increase_spin.setRange(
+            0, max(0, self._tree_indentation - self._indent_line_thickness))
+        self.indent_sel_increase_spin.setSuffix(" px")
+        self.indent_sel_increase_spin.setValue(self._indent_sel_increase)
+        self.indent_sel_increase_spin.setStyleSheet(_DISABLED_SPINBOX_STYLE)
+        self.indent_sel_increase_spin.setToolTip(
+            "How many pixels thicker the line gets. At most the indentation "
+            "minus the normal line thickness, so it never reaches the next "
+            "indentation level."
+        )
+        self.indent_sel_increase_spin.valueChanged.connect(
+            lambda value: self._on_indent_sel_option_changed("_indent_sel_increase", int(value))
+        )
+        indent_sel_outer.addWidget(spin_slider_inline(
+            self.indent_sel_increase_label, self.indent_sel_increase_spin,
+            SpinSlider(self.indent_sel_increase_spin),
+        ))
+        self.indent_sel_ticks_cb = QCheckBox("Include tickmarks")
+        self.indent_sel_ticks_cb.setToolTip(
+            "Tick marks on the highlighted lines get thicker too."
+        )
+        self.indent_sel_ticks_cb.setChecked(self._indent_sel_ticks)
+        self.indent_sel_ticks_cb.toggled.connect(
+            lambda checked: self._on_indent_sel_option_changed("_indent_sel_ticks", bool(checked))
+        )
+        indent_sel_outer.addWidget(self.indent_sel_ticks_cb)
+        self._sync_indent_sel_enabled_states()
+        self.indent_sel_block = self._settings_subsubsection(
+            "Selected folders indentation line highlight", indent_sel_group)
+        indent_line_outer.addWidget(self.indent_sel_block)
+
         # Everything below Enable, greyed out together while it's off.
         self._indent_line_dependents = [
             self.tree_indent_label, self.tree_indentation_spin,
             self.indent_line_thickness_label, self.indent_line_thickness_spin,
             self.indent_line_colors_block, self.indent_line_style_block,
+            self.indent_sel_block,
         ]
         self._sync_indent_line_enabled_states()
 

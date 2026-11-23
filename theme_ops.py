@@ -42,6 +42,12 @@ _INDENT_TICK_STATE = (
     ("_indent_tick_folders", "indent_tick_folders", False),
     ("_indent_tick_folders_left", "indent_tick_folders_left", True),
     ("_indent_tick_folder_length", "indent_tick_folder_length", 6),
+    # Selected folders indentation line highlight (Indentation Line ->
+    # that L3 group); these three must stay last: the tree's provider
+    # reads them as values 16-18 (see DirDropTreeWidget._line_settings).
+    ("_indent_sel_enabled", "indent_sel_enabled", False),
+    ("_indent_sel_increase", "indent_sel_increase", 2),
+    ("_indent_sel_ticks", "indent_sel_ticks", False),
 )
 
 # Their Settings-tab controls (attribute names, see _build_settings_tab).
@@ -51,6 +57,10 @@ _INDENT_TICK_CHECKBOXES = (
     ("indent_tick_files_left_cb", "_indent_tick_files_left"),
     ("indent_tick_folders_cb", "_indent_tick_folders"),
     ("indent_tick_folders_left_cb", "_indent_tick_folders_left"),
+)
+_INDENT_SEL_CHECKBOXES = (
+    ("indent_sel_enabled_cb", "_indent_sel_enabled"),
+    ("indent_sel_ticks_cb", "_indent_sel_ticks"),
 )
 _INDENT_TICK_SPINS = (
     ("indent_tick_length_spin", "_indent_tick_length"),
@@ -302,6 +312,7 @@ class ThemeOpsMixin:
                 style_group.blockSignals(False)
         # Tick marks: same reasoning again (see _sync_indent_tick_widgets).
         self._sync_indent_tick_widgets()
+        self._sync_indent_sel_widgets()
         self._sync_indent_line_enabled_states()
         self._refresh_indent_line_display()
         # Statistics View Colors: swatches are covered by
@@ -544,7 +555,56 @@ class ThemeOpsMixin:
 
     def _on_indent_line_thickness_changed(self, value):
         self._indent_line_thickness = int(value)
+        self._sync_indent_sel_limit()
         self._refresh_indent_line_display()
+
+    def _on_indent_sel_option_changed(self, attr, value):
+        """A "Selected folders indentation line highlight" option changed."""
+        setattr(self, attr, value)
+        self._sync_indent_sel_enabled_states()
+        self._refresh_indent_line_display()
+
+    def _sync_indent_sel_enabled_states(self):
+        """Everything in the highlight group but its Enable checkbox is
+        available only while Enable is on. Set explicitly on each control
+        (like the tick controls), so the group keeps its own state when
+        the whole Indentation Line is re-enabled."""
+        on = bool(getattr(self, "_indent_sel_enabled", False))
+        for name in ("indent_sel_increase_label", "indent_sel_increase_spin",
+                     "indent_sel_ticks_cb"):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.setEnabled(on)
+
+    def _sync_indent_sel_limit(self):
+        """The thickness increase may be at most the indentation minus the
+        line thickness, so the highlighted line never reaches the next
+        indentation level (the paint code caps it the same way). Qt
+        clamps the spin box's value itself when the maximum drops, which
+        fires its handler and keeps the attribute in step."""
+        spin = getattr(self, "indent_sel_increase_spin", None)
+        if spin is not None:
+            thickness = int(getattr(self, "_indent_line_thickness", 1))
+            spin.setMaximum(max(0, int(self._tree_indentation) - thickness))
+
+    def _sync_indent_sel_widgets(self):
+        """Puts the highlight controls back to the live attributes
+        (signals blocked) -- after a reset/load."""
+        self._ensure_indent_tick_state()
+        for name, attr in _INDENT_SEL_CHECKBOXES:
+            box = getattr(self, name, None)
+            if box is not None:
+                box.blockSignals(True)
+                box.setChecked(getattr(self, attr))
+                box.blockSignals(False)
+        spin = getattr(self, "indent_sel_increase_spin", None)
+        if spin is not None:
+            spin.blockSignals(True)
+            self._sync_indent_sel_limit()
+            spin.setValue(self._indent_sel_increase)
+            self._indent_sel_increase = spin.value()
+            spin.blockSignals(False)
+        self._sync_indent_sel_enabled_states()
 
     def _sync_indent_thickness_limit(self):
         """Line thickness may be at most one less than the tree's
@@ -560,6 +620,7 @@ class ThemeOpsMixin:
             tick_spin = getattr(self, name, None)
             if tick_spin:
                 tick_spin.setMaximum(max(1, self._tree_indentation - 1))
+        self._sync_indent_sel_limit()
 
     def _on_indent_line_steps_changed(self, value):
         self._indent_line_steps = int(value)

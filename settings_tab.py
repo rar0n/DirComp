@@ -998,7 +998,7 @@ class SettingsTabMixin:
         # that one is built further down).
         flv_flow = self._settings_subsection_flow()
         date_col_outer.addLayout(flv_flow)
-        flv_flow.addWidget(self._l2_block("General", flv_general_group, "half"))
+        flv_flow.addWidget(self._l2_block("General", flv_general_group, "two_thirds"))
 
         # ---- Row 3: File List View Colors -- same Item | Fg | Bg
         # table shape as Misc Colors (see there); a row with only one
@@ -1223,7 +1223,7 @@ class SettingsTabMixin:
             SpinSlider(self.selection_tint_opacity_spin),
         ), 0, Qt.AlignVCenter)
         tint_row.addStretch(1)
-        flv_scrollbar_outer.addLayout(tint_row)
+        flv_general_outer.addLayout(tint_row)
         self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
 
         # ---- Scrollbar handle opacity: how much of the handle's own
@@ -1287,7 +1287,7 @@ class SettingsTabMixin:
         # inverted, so e.g. a black row on a dark track stays visible
         # (custom_widgets._contrasting_marker_color). 0 = off. Per theme. ----
         marker_luma_row = QHBoxLayout()
-        self.scrollbar_marker_luma_label = QLabel("Marker luminance threshold:")
+        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference:")
         self.scrollbar_marker_luma_spin = SliderSpinBox()
         self.scrollbar_marker_luma_spin.setRange(0, 255)
         self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])

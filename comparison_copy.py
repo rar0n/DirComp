@@ -178,6 +178,9 @@ class ComparisonCopyMixin:
         keep_row.addWidget(self._mirror_combo(self.extra_copies_keep_combo))
         keep_row.addStretch(1)
         outer.addLayout(keep_row)
+        # The group is as tall as the block (like Quick Options beside it);
+        # its rows stay at the top.
+        outer.addStretch(1)
         return group
 
     def _fill_quick_options(self):
@@ -207,9 +210,10 @@ class ComparisonCopyMixin:
     def _fill_comparison_copy_holder(self):
         """Fills the Duplicate Finder mode block at the lower right of the
         Main tab (see UiBuilderMixin._build_cluster_row): the Comparison
-        Options copy at its left, bottom-aligned, and at its right end Quick
-        Options, as tall as the block so Refresh ends up in the lower right
-        corner, just above the progress bar. Both are left/right-anchored
+        Options copy at its left and at its right end Quick Options, both as
+        tall as the block (so both start level with the button groups on the
+        left, and Refresh ends up in the lower right corner, just above the
+        progress bar). Both are left/right-anchored
         whatever Symmetrical GUI says. Needs the Settings tab to exist, so it
         runs after both tabs are built."""
         holder = getattr(self, "_cmp_copy_holder", None)
@@ -217,7 +221,6 @@ class ComparisonCopyMixin:
             return
         self._fill_quick_options()
         layout = holder.layout()
-        # Stretch 1: takes all the width left of Quick Options (bottom
-        # alignment only limits the height).
-        layout.addWidget(self._build_comparison_options_copy(), 1, Qt.AlignBottom)
+        # Stretch 1: takes all the width left of Quick Options.
+        layout.addWidget(self._build_comparison_options_copy(), 1)
         layout.addWidget(self.global_options_group)

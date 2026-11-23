@@ -2149,11 +2149,6 @@ class SettingsTabMixin:
         # above: exists only to give "Statistics View Colors" its Level
         # 2 frame around the Graph/Info/Buttons blocks, which are
         # already framed themselves.
-        stats_colors_group = QGroupBox("")
-        stats_colors_group.setFlat(True)
-        stats_colors_outer = QVBoxLayout(stats_colors_group)
-        stats_colors_outer.setContentsMargins(0, 0, 0, 0)
-
         def _build_stats_color_table(rows) -> QTableWidget:
             """One "Item / File Mode / Folder Mode" swatch table for the
             given (stats_colors key, row label) pairs -- shared by the
@@ -2295,14 +2290,18 @@ class SettingsTabMixin:
             self.stats_file_partial_lerp_spin, self.stats_folder_partial_lerp_spin,
         )
 
-        graph_colors_container = QWidget()
-        graph_colors_layout = QVBoxLayout(graph_colors_container)
-        graph_colors_layout.setContentsMargins(0, 0, 0, 0)
-        graph_colors_layout.addWidget(graph_colors_table)
-        graph_colors_layout.addLayout(ranged_opacity_rows)
-        graph_colors_layout.addLayout(hover_opacity_rows)
-        graph_colors_layout.addLayout(partial_lerp_rows)
-        graph_colors_block = self._settings_subsubsection("Graph colors", graph_colors_container)
+        graph_colors_group = QGroupBox("")
+        QVBoxLayout(graph_colors_group).addWidget(graph_colors_table)
+        graph_colors_block = self._l2_block("Graph colors", graph_colors_group, "half")
+
+        # "Color tuning" (Level 2): the opacity/lerp rows that go with the
+        # Graph colors above.
+        color_tuning_group = QGroupBox("")
+        color_tuning_layout = QVBoxLayout(color_tuning_group)
+        color_tuning_layout.addLayout(ranged_opacity_rows)
+        color_tuning_layout.addLayout(hover_opacity_rows)
+        color_tuning_layout.addLayout(partial_lerp_rows)
+        color_tuning_block = self._l2_block("Color tuning", color_tuning_group, "half")
 
         # The upper-left readout's text, split by which of its segments
         # each color paints -- see TimelineWidget._draw_readout_segments
@@ -2314,7 +2313,9 @@ class SettingsTabMixin:
             ("stripped_info_color", "Stripped Info"),
         ]
         info_colors_table = _build_stats_color_table(_INFO_COLOR_ROWS)
-        info_colors_block = self._settings_subsubsection("Info text colors", info_colors_table)
+        info_colors_group = QGroupBox("")
+        QVBoxLayout(info_colors_group).addWidget(info_colors_table)
+        info_colors_block = self._l2_block("Info text colors", info_colors_group, "half")
 
         # ---- Buttons -- every button in the Statistics view: Files/
         # Folders and Zoom to/Reset in its title line, Fit Range and the
@@ -2343,13 +2344,14 @@ class SettingsTabMixin:
                 lambda hexc, k=key: self._on_stats_button_color_changed(k, True, hexc),
             )))
         self._size_table_to_contents(stats_buttons_table)
-        buttons_block = self._settings_subsubsection("Buttons", stats_buttons_table)
+        stats_buttons_group = QGroupBox("")
+        QVBoxLayout(stats_buttons_group).addWidget(stats_buttons_table)
+        buttons_block = self._l2_block("Buttons", stats_buttons_group, "third")
 
-        stats_colors_outer.addLayout(
-            self._settings_subsection_flow(graph_colors_block, info_colors_block, buttons_block)
-        )
-
-        stats_flow.addWidget(self._settings_subsection("Colors (both panes)", stats_colors_group))
+        # The former "Colors (both panes)" container is gone: its tables
+        # and the tuning rows are Level 2 blocks of their own.
+        for block in (graph_colors_block, color_tuning_block, info_colors_block, buttons_block):
+            stats_flow.addWidget(block)
 
         # ---- Panel Button Colors -- Theme and Misc Colors live in Global
         # Settings at the top of the tab (see there); what's here is

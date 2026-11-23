@@ -934,8 +934,6 @@ class SettingsTabMixin:
         misc_buttons_group = self._main_button_color_table([
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
-            ("swap_pane", "Swap"),
-            ("sync", "Sync"),
             ("filter_clear", "File Filter: Clear"),
             ("filter_apply", "File Filter: Apply"),
         ])
@@ -2413,7 +2411,13 @@ class SettingsTabMixin:
             [("rename", "Rename"), ("new_folder", "New Folder"), ("delete", "Delete")]
         )
 
-        # "Panel Button Colors" is one section whose frame holds the three
+        # Both Panes Buttons: the central Both Panes group's Swap and Sync
+        # (moved here from Misc Buttons).
+        both_panes_colors_group = self._main_button_color_table(
+            [("swap_pane", "Swap"), ("sync", "Sync")]
+        )
+
+        # "Panel Button Colors" is one section whose frame holds the
         # tables side by side, each with its own Level 2 title (see
         # _settings_subsection) since together they form one section
         # rather than three independent ones.
@@ -2423,6 +2427,7 @@ class SettingsTabMixin:
             self._l2_block("Select Buttons", select_colors_group, "third"),
             self._l2_block("Clipboard Buttons", clipboard_colors_group, "third"),
             self._l2_block("File Op Buttons", file_op_colors_group, "third"),
+            self._l2_block("Both Panes Buttons", both_panes_colors_group, "third"),
         ))
         outer.addWidget(self._settings_section("Panel Button Colors", buttons_group))
 

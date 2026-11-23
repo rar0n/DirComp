@@ -7,6 +7,12 @@
 
 WIP! (Work in progress)
 
+## **IMPORTANT NOTE !**
+**Use this at your own risk!**
+I take no responsibility if you delete any files or folders you didn't want to, or otherwise mess up anything using this program!
+Back up your files! Also your folders!
+
+
 ### Compare Folders:
 
 <img width="1675" height="1181" alt="image" src="https://github.com/user-attachments/assets/584abe04-8bea-49bf-8fcd-4bac5a41b922" />
@@ -167,7 +173,7 @@ python main.py
 So for now I will simply suggest that you make 2 dummy test folders with unimportant files and folders in them, some of which are copies of each other's contents. Then just play with the software to see how it works.
 
 
-### **IMPORTANT NOTE !**
+### **IMPORTANT NOTE ! (Again)**
 **Use this at your own risk!**
 I take no responsibility if you delete any files or folders you didn't want to, or otherwise mess up anything using this program!
 Back up your files! Also your folders!

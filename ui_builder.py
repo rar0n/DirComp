@@ -434,7 +434,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
-        self.tabs.addTab(self._build_file_filter_tab(), "File Filter")
         self.tabs.setCurrentIndex(previous_tab)
         if not self._dual_pane_enabled:
             self._fill_comparison_copy_holder()
@@ -1046,8 +1045,8 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
 
     def _apply_group_borders(self):
-        """Restyles every Main-tab group box's edge (Settings tab -> Misc
-        Colors -> "Group border")."""
+        """Restyles every Main-tab group box's edge, and the Settings
+        page's (Settings tab -> Misc Colors -> "Group border")."""
         groups = [
             getattr(self, "both_panes_group", None),
             getattr(self, "filter_frame_group", None),
@@ -1058,6 +1057,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
                 groups.append(getattr(pane, attr, None))
         for group in groups:
             self._style_group_border(group)
+        page = getattr(self, "_settings_page", None)
+        if page is not None:
+            try:
+                page.setStyleSheet(self._settings_page_stylesheet())
+            except RuntimeError:
+                pass  # the page from before a UI rebuild, already deleted
 
     def _apply_status_line_colors(self):
         """Re-applies the two status-line colors to both panes' summary
@@ -1174,6 +1179,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if refresh is not None:
             refresh.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("refresh")))
         self._apply_mode_button_colors()
+        for attr, key in (("clear_filter_button", "filter_clear"), ("apply_filter_button", "filter_apply")):
+            button = getattr(self, attr, None)
+            if button is not None:
+                button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for(key)))
         for pane in (self.left, self.right):
             across = getattr(pane, "_across_buttons", {})
             buttons = {
@@ -1509,12 +1518,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.filter_frame_group = frame
         grid = QGridLayout(frame)
 
-        default_bg, default_fg = self._default_button_colors()
         uniform_w, uniform_h = self._uniform_button_size()
 
         self.clear_filter_button = QPushButton("Clear")
         self.clear_filter_button.setFixedSize(uniform_w, uniform_h)
-        self.clear_filter_button.setStyleSheet(_bevel_button_stylesheet(default_bg, default_fg))
+        self.clear_filter_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("filter_clear")))
         self.clear_filter_button.clicked.connect(self.clear_filter)
         grid.addWidget(self.clear_filter_button, 0, 0)
 
@@ -1539,7 +1547,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
         self.apply_filter_button = QPushButton("Apply")
         self.apply_filter_button.setFixedSize(uniform_w, uniform_h)
-        self.apply_filter_button.setStyleSheet(_bevel_button_stylesheet(default_bg, default_fg))
+        self.apply_filter_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("filter_apply")))
         self.apply_filter_button.clicked.connect(self.apply_filter)
 
         # Row 2, directly below the text entry: Invert on the left, Apply

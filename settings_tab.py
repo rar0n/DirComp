@@ -244,7 +244,8 @@ class SettingsTabMixin:
         # possibly a native-style QSS quirk on QGroupBox::title; if 18pt
         # still doesn't show, the title's font is getting overridden
         # somewhere else entirely and this stylesheet isn't the culprit).
-        page.setStyleSheet("QGroupBox::title { font-size: 14pt; font-weight: bold; }")
+        self._settings_page = page
+        page.setStyleSheet(self._settings_page_stylesheet())
 
         # ---- Theme (Level 2, first block of Global Settings) -- applies
         # a hand-built dark/light QPalette, then
@@ -904,6 +905,11 @@ class SettingsTabMixin:
         sync_settings_block = self._settings_subsection("Sync Settings", self._build_sync_settings_group())
         global_settings_flow.addWidget(context_menu_block)
         global_settings_flow.addWidget(sync_settings_block)
+        # File type list: the entries of the Main tab's Global File Filter
+        # drop-down (this used to be the File Filter tab).
+        global_settings_flow.addWidget(
+            self._settings_subsection("File type list", self._build_file_filter_group())
+        )
         global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
@@ -917,6 +923,8 @@ class SettingsTabMixin:
             ("mode_pressed", "Mode switch (pressed)"),
             ("swap_pane", "Swap"),
             ("sync", "Sync"),
+            ("filter_clear", "File Filter: Clear"),
+            ("filter_apply", "File Filter: Apply"),
         ])
         global_settings_flow.addWidget(self._settings_subsection("Misc Buttons", misc_buttons_group))
 
@@ -2569,12 +2577,23 @@ class SettingsTabMixin:
         self._folder_counts_include_subfolders = bool(checked)
         self.apply_filter()  # relists (deferred, see there) so the counts update
 
+    def _settings_page_stylesheet(self) -> str:
+        """The Settings page's stylesheet: the bold group titles, and every
+        group's edge in the Misc Colors "Group border" color. The groups
+        here have no title of their own (see _settings_section), hence no
+        title margin, and no title-position handling like the Main tab's
+        (_style_group_border) is needed."""
+        return (
+            "QGroupBox::title { font-size: 14pt; font-weight: bold; } "
+            f"QGroupBox {{ border: 1px solid {self._group_border_color};"
+            " border-radius: 3px; margin-top: 0; }"
+        )
+
     def _build_save_load_row(self, reset_text: str, reset_handler, reset_tooltip: str):
-        """The Save Settings / Load Settings / <reset> button row shared by
-        the Settings tab and the File Filter tab (same look, same spot:
-        centered under the tab's scroll area). Save and Load always act on
-        the one settings file for the whole program; only the reset button
-        is tab-specific (`reset_text`/`reset_handler`/`reset_tooltip`).
+        """The Save Settings / Load Settings / <reset> button row centered
+        under the Settings tab's scroll area. Save and Load act on the one
+        settings file for the whole program (the file type list included);
+        the reset button is set by `reset_text`/`reset_handler`/`reset_tooltip`.
         Returns (the row layout, (save, load, reset buttons))."""
         uniform_w, uniform_h = self._uniform_button_size()
         status_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("M")

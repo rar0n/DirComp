@@ -1,7 +1,8 @@
 """
 ComparisonCopyMixin: a second copy of the Settings tab's "Comparison Options"
 group, shown on the Main tab in Duplicate Finder mode (below the right pane,
-where the button groups sit in Compare Folders mode; no title), together with
+where the button groups sit in Compare Folders mode; titled "Comparison
+Options excerpt" -- it leaves out the hash cache controls), together with
 that mode's Quick Options column beside it -- see
 UiBuilderMixin._build_cluster_row.
 
@@ -15,7 +16,7 @@ Settings tab greys its copy too.
 
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from constants import _CLUSTER_GROUP_PAD
@@ -122,8 +123,8 @@ class ComparisonCopyMixin:
                 layout.addSpacing(indent)
             return layout
 
-        # No title (saves a line of height).
-        group = QGroupBox("")
+        group = QGroupBox("Comparison Options excerpt")
+        self.comparison_copy_group = group  # gets the Group border color
         outer = QVBoxLayout(group)
         margins = outer.contentsMargins()
         outer.setContentsMargins(_CLUSTER_GROUP_PAD, margins.top(), _CLUSTER_GROUP_PAD, margins.bottom())
@@ -171,18 +172,6 @@ class ComparisonCopyMixin:
         ignore_row.addWidget(self._mirror_checkbox(self.ignore_hard_links_cb))
         ignore_row.addStretch(1)
         outer.addLayout(ignore_row)
-
-        cache_row = row()
-        cache_row.addWidget(self._mirror_checkbox(self.cache_hashed_folders_cb))
-        cache_row.addSpacing(12)
-        clear_button = QPushButton("Clear cache")
-        clear_button.setToolTip(
-            "Deletes every stored hash (the cache file's contents) and the "
-            "hashes held in memory, so open folders show as unhashed.")
-        clear_button.clicked.connect(self._on_clear_hash_cache)
-        cache_row.addWidget(clear_button)
-        cache_row.addStretch(1)
-        outer.addLayout(cache_row)
 
         keep_row = row()
         keep_row.addWidget(QLabel("Extra copies keep:"))

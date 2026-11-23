@@ -1051,6 +1051,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             getattr(self, "both_panes_group", None),
             getattr(self, "filter_frame_group", None),
             getattr(self, "global_options_group", None),
+            getattr(self, "comparison_copy_group", None),
         ]
         for pane in (self.left, self.right):
             for attr in ("select_group", "file_op_group", "clipboard_group"):

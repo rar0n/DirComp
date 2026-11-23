@@ -954,7 +954,7 @@ class SettingsTabMixin:
         # Row 1: font size of both file lists (per theme; see
         # _apply_flv_font).
         flv_font_row = QHBoxLayout()
-        flv_font_row.addWidget(QLabel("Font size:"))
+        self.flv_font_size_label = QLabel("Font size:")
         self.flv_font_size_spin = SliderSpinBox()
         self.flv_font_size_spin.setRange(6, 32)
         self.flv_font_size_spin.setValue(self._default_flv_font_pt())
@@ -963,12 +963,15 @@ class SettingsTabMixin:
             "headers). The default is the application's own font size."
         )
         self.flv_font_size_spin.valueChanged.connect(self._on_flv_font_size_changed)
-        flv_font_row.addWidget(self.flv_font_size_spin)
-        flv_font_row.addSpacing(12)
         # Not live: re-fonting both (possibly huge) file lists on every step
-        # of a drag would stall it -- applied on release.
-        flv_font_row.addWidget(SpinSlider(self.flv_font_size_spin, live=False))
+        # of a drag would stall it -- applied on release. In the aligned
+        # rows, so its spin box and slider line up with Selection opacity's.
+        flv_font_row.addWidget(spin_slider_inline(
+            self.flv_font_size_label, self.flv_font_size_spin,
+            SpinSlider(self.flv_font_size_spin, live=False),
+        ), 0, Qt.AlignVCenter)
         flv_font_row.addStretch(1)
+        self._aligned_option_rows.append((self.flv_font_size_label, self.flv_font_size_spin))
         flv_general_outer.addLayout(flv_font_row)
         # The trees were built before this spin box existed, at the
         # application's own size -- bring them to whatever it holds now
@@ -1008,18 +1011,18 @@ class SettingsTabMixin:
         # text color is its Default File/Folder Fg, so there's no Fg
         # here), Default File, Default Folder and the lists' scrollbars.
         _FLV_COLOR_ROWS = [
-            ("Default Background",
+            ("Background (Default)",
              None, lambda: self._effective_flv_bg(),
              None, self._on_flv_bg_color_changed),
-            ("Default Selection",
+            ("Selection (Default)",
              None, lambda: self._selection_tint_color,
              None, self._on_selection_tint_color_changed),
-            ("Default File",
+            ("File (Default)",
              lambda: TAG_COLORS.get("file", (None, None))[1] or "#000000",
              lambda: TAG_COLORS.get("file", (None, None))[0] or "#FFFFFF",
              lambda hexc: self._on_default_file_color_changed(True, hexc),
              lambda hexc: self._on_default_file_color_changed(False, hexc)),
-            ("Default Folder",
+            ("Folder (Default)",
              lambda: self._folder_color[0], lambda: self._folder_color[1],
              lambda hexc: self._on_folder_color_changed(True, hexc),
              lambda hexc: self._on_folder_color_changed(False, hexc)),
@@ -1062,8 +1065,8 @@ class SettingsTabMixin:
         )
         flv_colors_table.item(1, 0).setToolTip(
             "Highlight color of selected rows (see Selection opacity "
-            "below). The text color of a selected row is its Default File / Default "
-            "Folder Fg."
+            "below). The text color of a selected row is its File / Folder (Default) "
+            "Fg."
         )
         flv_colors_table.item(4, 0).setToolTip(
             "Files that have more than one hard link, while Options -> Ignore "
@@ -1079,12 +1082,12 @@ class SettingsTabMixin:
         flv_colors_table.item(6, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: a folder with no "
             "files anywhere below it. Its background follows the file list's own "
-            "(Default Background) until you pick one here."
+            "(Background (Default)) until you pick one here."
         )
         flv_colors_table.item(7, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: the color of a "
             "plain folder. Its background follows the file list's own "
-            "(Default Background) until you pick one here, so folders do not "
+            "(Background (Default)) until you pick one here, so folders do not "
             "look like highlighted finds next to the duplicate groups."
         )
         self._size_table_to_contents(flv_colors_table)
@@ -1209,7 +1212,7 @@ class SettingsTabMixin:
         self.selection_tint_opacity_spin.setSuffix("%")
         self.selection_tint_opacity_spin.setValue(self._selection_tint_opacity)
         self.selection_tint_opacity_spin.setToolTip(
-            "How strongly the Default Selection color covers a selected row. Lower "
+            "How strongly the Selection (Default) color covers a selected row. Lower "
             "tints each row's own diff-tag color toward it, so a selected row still "
             "shows what its diff outcome was; the indentation area to the left of "
             "the names is tinted the same way, from the list background. 100% is "

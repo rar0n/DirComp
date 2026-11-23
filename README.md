@@ -10,7 +10,7 @@ WIP! (Work in progress)
 ## **IMPORTANT NOTE !**
 **Use this at your own risk!**
 I take no responsibility if you delete any files or folders you didn't want to, or otherwise mess up anything using this program!
-Back up your files! Also your folders!
+Back up your files! And also your folders!
 
 
 ### Compare Folders:
@@ -29,7 +29,7 @@ Back up your files! Also your folders!
    - Compare Folders
      - Compare two folders side-by-side (manually synchronize their contents)
    - Duplicate finder
-     - Re-use right-side pane to display duplicate files instead of another folder.
+     - Re-uses right-side pane to display duplicate files that are in the left pane
      - Two view modes
        - Tree structure: Show duplicate files inside their parent folders
        - Flat list: Only show duplicate files and a duplicate count.
@@ -49,11 +49,11 @@ Back up your files! Also your folders!
      - Two modes in Statistics View
        - Files
        - Folders
-     - Bar chart overview of file
-       - Timeline
+     - Bar chart overview of files or folders
+       - Timeline from oldest to newest item
        - File sizes
        - File Filter entries (E.G. file extension statistics counts)
- - Color coded for at-a-glance for which files are missing from either side
+ - Color coded for at-a-glance for which items are missing from either side
  - Synchronize Views (Same selection in both panes, if the corresponding item (file or folder) exists in the other pane)
  - Pastes multi-selected files from one pane and automatically re-create their folder structure (copying their relative path)
  - Symmetrical (ish) GUI, or not, depending on settings.
@@ -176,7 +176,7 @@ So for now I will simply suggest that you make 2 dummy test folders with unimpor
 ### **IMPORTANT NOTE ! (Again)**
 **Use this at your own risk!**
 I take no responsibility if you delete any files or folders you didn't want to, or otherwise mess up anything using this program!
-Back up your files! Also your folders!
+Back up your files! And also your folders!
 
 ### NOTE!
 Most file listings depend on:

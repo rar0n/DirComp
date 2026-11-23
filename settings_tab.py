@@ -810,6 +810,10 @@ class SettingsTabMixin:
             ("History: snapshot file",
              lambda: self._history_snapshot_color, None,
              lambda hexc: self._on_history_color_changed(True, hexc), None),
+            # Edge of the Main tab's button groups (Fg only).
+            ("Group border",
+             lambda: self._group_border_color, None,
+             self._on_group_border_color_changed, None),
         ]
         default_colors_table = QTableWidget(len(_DEFAULT_COLOR_ROWS), 3)
         self._style_table_widget(default_colors_table, ["Item", "Fg", "Bg"])
@@ -869,6 +873,10 @@ class SettingsTabMixin:
         )
         default_colors_table.item(10, 0).setToolTip(
             "Text color of folder-snapshot (.fss) entries in each pane's folder-history drop-down."
+        )
+        default_colors_table.item(11, 0).setToolTip(
+            "Color of the edge around the Main tab's button groups (Select, File Op, "
+            "Clipboard, Both Panes, Quick Options, Global File Filter)."
         )
         # (Default Folder/Default File and Scrollbar used to be rows here --
         # they moved to File List View -> File List View Colors below,

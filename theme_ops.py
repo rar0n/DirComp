@@ -216,6 +216,7 @@ class ThemeOpsMixin:
         self._apply_main_button_colors()
         # Each pane's status-line summary (Selected info/Unselected colors).
         self._apply_status_line_colors()
+        self._apply_group_borders()
         self._refresh_color_swatches()
         self._apply_selection_highlight_color(self._selection_tint_color)
         self._apply_flv_background()
@@ -871,6 +872,12 @@ class ThemeOpsMixin:
         the next warning shown."""
         self._status_warning_color = hex_color
 
+    def _on_group_border_color_changed(self, hex_color: str):
+        """Settings tab -> Misc Colors -> "Group border": edge color of the
+        Main tab's button groups."""
+        self._group_border_color = hex_color
+        self._apply_group_borders()
+
     def _on_history_color_changed(self, snapshot: bool, hex_color: str):
         """Settings tab -> Misc Colors -> "History: live folder" /
         "History: snapshot file": text color of that kind of entry in the
@@ -1081,6 +1088,7 @@ class ThemeOpsMixin:
             # Folder-history drop-down text (Misc Colors): live folders
             # and snapshot (.fss) files. Fg only.
             "status_warning_color": "#C00000" if theme == "light" else "#FF5050",
+            "group_border_color": "#5A5A5A" if theme == "light" else "#8C8C8C",
             "history_live_color": "#000000" if theme == "light" else "#FFFFFF",
             "history_snapshot_color": "#707070" if theme == "light" else "#C8C8C8",
             "indent_line_color1": "#909090" if theme == "light" else "#A0A0A0",
@@ -1146,6 +1154,7 @@ class ThemeOpsMixin:
             "status_selected_color": self._status_selected_color,
             "status_unselected_color": self._status_unselected_color,
             "status_warning_color": self._status_warning_color,
+            "group_border_color": self._group_border_color,
             "history_live_color": self._history_live_color,
             "history_snapshot_color": self._history_snapshot_color,
             "indent_line_color1": self._indent_line_color1,
@@ -1237,6 +1246,7 @@ class ThemeOpsMixin:
         self._status_selected_color = cs.get("status_selected_color", "#F5D400")
         self._status_unselected_color = cs.get("status_unselected_color")
         self._status_warning_color = cs.get("status_warning_color", "#FF5050")
+        self._group_border_color = cs.get("group_border_color", "#8C8C8C")
         self._history_live_color = cs.get("history_live_color", "#FFFFFF")
         self._history_snapshot_color = cs.get("history_snapshot_color", "#C8C8C8")
         self._indent_line_color1 = cs["indent_line_color1"]

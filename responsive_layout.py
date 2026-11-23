@@ -226,6 +226,7 @@ class ResponsiveLayoutMixin:
             if buttons[i] is not None:
                 grid.addWidget(buttons[i], row, col, alignment=align)
         group.setAlignment(Qt.AlignRight if mirrored else Qt.AlignLeft)
+        self._style_group_border(group)  # its title position follows the alignment
 
     def _ensure_cluster_sizes(self, pane: DirectoryPane):
         """Measures every group at every column count once (and keeps the

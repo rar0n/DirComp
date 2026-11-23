@@ -404,6 +404,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # file" (Fg only): drop-down text colors of the entry combos.
             self._history_live_color = "#FFFFFF"
             self._history_snapshot_color = "#C8C8C8"
+        if not hasattr(self, "_group_border_color"):
+            # Misc Colors -> "Group border": edge color of the Main tab's
+            # button groups (Select/File Op/Clipboard/Both Panes/Quick
+            # Options/Global File Filter). Per theme (see _builtin_color_set).
+            self._group_border_color = "#8C8C8C"
         if not hasattr(self, "_color_sets"):
             # One full set of every color setting per theme (see
             # _builtin_color_set). Only the *inactive* theme's entry is
@@ -442,6 +447,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # resizeEvent/showEvent keep this current from here on, but
         # neither is guaranteed to fire before the first paint.
         self._update_responsive_layout(force=True)
+        self._apply_group_borders()
 
         if not hasattr(self, "_widget_defaults"):
             # The per-theme widgets' values exactly as this very first
@@ -1016,6 +1022,42 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         widget's own palette text color)."""
         color = self._status_selected_color if has_selection else self._status_unselected_color
         return f"color: {color}; padding: 2px 0;" if color else "padding: 2px 0;"
+
+    def _style_group_border(self, group):
+        """Gives one Main-tab group box an edge in self._group_border_color.
+        A stylesheet'd QGroupBox ignores setAlignment() for its title, so
+        the title position is spelled out here from the group's current
+        alignment -- hence this must be re-run whenever that changes
+        (see ResponsiveLayoutMixin._fill_group)."""
+        if group is None:
+            return
+        align = group.alignment()
+        if align & Qt.AlignRight:
+            position, offset = "top right", "right: 8px;"
+        elif align & Qt.AlignHCenter:
+            position, offset = "top center", ""
+        else:
+            position, offset = "top left", "left: 8px;"
+        group.setStyleSheet(
+            f"QGroupBox {{ border: 1px solid {self._group_border_color};"
+            " border-radius: 3px; margin-top: 1.2ex; }"
+            f" QGroupBox::title {{ subcontrol-origin: margin;"
+            f" subcontrol-position: {position}; {offset} padding: 0 3px; }}"
+        )
+
+    def _apply_group_borders(self):
+        """Restyles every Main-tab group box's edge (Settings tab -> Misc
+        Colors -> "Group border")."""
+        groups = [
+            getattr(self, "both_panes_group", None),
+            getattr(self, "filter_frame_group", None),
+            getattr(self, "global_options_group", None),
+        ]
+        for pane in (self.left, self.right):
+            for attr in ("select_group", "file_op_group", "clipboard_group"):
+                groups.append(getattr(pane, attr, None))
+        for group in groups:
+            self._style_group_border(group)
 
     def _apply_status_line_colors(self):
         """Re-applies the two status-line colors to both panes' summary

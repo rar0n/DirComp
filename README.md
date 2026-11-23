@@ -168,9 +168,10 @@ python main.py
 ```
 
 ## Instructions
-(Very much missing atm, sorry!  Atm these short instructions will have to do)
+(WIP - Not finished writing yet, sorry!  Atm these short instructions will have to do)
 
-So for now I will simply suggest that you make 2 dummy test folders with unimportant files and folders in them, some of which are copies of each other's contents. Then just play with the software to see how it works.
+In any case, I will suggest that you make 2 dummy test folders with unimportant files and folders in them, some of which are copies of each other's contents.
+Add each folder to it's own left / right pane, and just play with the software to see how it works.
 
 
 ### **IMPORTANT NOTE ! (Again)**
@@ -198,6 +199,7 @@ You can also save a folder in a "Snapshot" file (similar to a cache), and later 
 
 The other main mode. The right side pane is re-used, listing duplicates found in the left pane's folder..
 
+In this mode, the right pane's button groups is swapped for most of the **Comparison Options** settings.
 
 
 

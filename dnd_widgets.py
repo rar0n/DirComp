@@ -245,7 +245,7 @@ def _line_path(kind, style, h, height):
 
 
 def _tick_rects(path, outer_path, has_outer, x0, indent, thickness, length,
-                left_side, y1, y2):
+                left_side, y1, y2, bar=None):
     """The tick mark beside a row, as a list of QRects to fill (empty
     if there's no room for one): a horizontal bar `thickness` tall,
     centered on the row, attached to its parent's guide line and
@@ -282,9 +282,12 @@ def _tick_rects(path, outer_path, has_outer, x0, indent, thickness, length,
 
     reach = int(math.floor(x0 + line_x(path, height / 2.0) + 0.5))
     far = reach - length if left_side else min(reach + thickness + length, x0 + indent)
-    top = (y1 + y2 - thickness) // 2
+    # `thickness` is the parent line's width (where the tick starts and
+    # how far it reaches); `bar` the tick's own height (default: the same).
+    bar = thickness if bar is None else int(bar)
+    top = (y1 + y2 - bar) // 2
     runs = []  # [start, end, first_row, row_count], consecutive equal rows merged
-    for row in range(top, top + thickness):
+    for row in range(top, top + bar):
         u = row + 0.5 - y1
         centre = x0 + line_x(path, u) + thickness / 2.0
         if left_side:
@@ -559,7 +562,26 @@ class DirDropTreeWidget(QTreeWidget):
                      bool(values[13]), bool(values[14]), int(values[15]))
         else:
             ticks = (False, True, False, 0, False, True, 0)
-        return values[:8] + (style,) + ticks
+        if len(values) >= 19:
+            sel = (bool(values[16]), int(values[17]), bool(values[18]))
+        else:
+            sel = (False, 0, False)
+        return values[:8] + (style,) + ticks + sel
+
+    @staticmethod
+    def _effective_thickness(owner, thickness, indent, sel_enabled, sel_increase):
+        """Width of the guide line owned by `owner`: `thickness`, plus
+        the selected-folder highlight increase when that is on and the
+        owning folder is selected (it is expanded if its line is drawn).
+        Capped so the line never reaches the next indentation level."""
+        if sel_enabled and sel_increase > 0 and owner.isSelected():
+            return max(thickness, min(thickness + int(sel_increase), indent - 1))
+        return thickness
+
+    def selectionChanged(self, selected, deselected):
+        super().selectionChanged(selected, deselected)
+        # The lines of a folder's descendants change with its selection.
+        self.viewport().update()
 
     def _row_line_context(self, item, index):
         """(ancestor chain, first_child, next_depth) for the row at
@@ -626,6 +648,9 @@ class DirDropTreeWidget(QTreeWidget):
         # the diagonal/curved styles the arrow sits in the right half of
         # its column, after the line's own shifted position (see
         # drawBranches), so that's where the cut-off moves to.
+        if shifted and settings is not None:
+            thickness = self._effective_thickness(
+                chain[-1], thickness, indent, settings[16], settings[17])
         arrow_left = depth * indent + (half + thickness if shifted else 0)
         if x >= arrow_left:
             return None, None
@@ -784,7 +809,8 @@ class DirDropTreeWidget(QTreeWidget):
         (enabled, thickness, steps, color1, color2, reverse,
          hover_color, hover_opacity, style, tick_enabled, tick_files,
          tick_files_left, tick_file_length, tick_folders,
-         tick_folders_left, tick_folder_length) = settings
+         tick_folders_left, tick_folder_length,
+         sel_enabled, sel_increase, sel_ticks) = settings
         chain, first_child, next_depth = self._row_line_context(item, index)
         depth = len(chain)
         indent = self.indentation()
@@ -795,6 +821,11 @@ class DirDropTreeWidget(QTreeWidget):
         thickness = max(1, min(int(thickness), indent - 1))
         half = _line_shift(indent)
         shifted = bool(enabled) and style in (LINE_STYLE_DIAGONAL,) + _CURVED_STYLES
+        # Per-level line widths: a line whose owning folder is selected
+        # (and expanded, as it has visible rows below it) is thicker by
+        # the highlight increase, never past the next indentation level.
+        widths = [self._effective_thickness(owner, thickness, indent, sel_enabled, sel_increase)
+                  for owner in chain]
         if enabled and depth > 0:
             painter.save()
             if shifted:
@@ -805,6 +836,7 @@ class DirDropTreeWidget(QTreeWidget):
             parent_color = None
             for level in range(depth):
                 base_color = _indent_wheel_color(color1, color2, steps, level, reverse)
+                line_w = widths[level]
                 if chain[level] is self._hover_ancestor:
                     base_color = _press_blend(
                         base_color.name(), hover_color, hover_opacity / 100.0,
@@ -825,16 +857,16 @@ class DirDropTreeWidget(QTreeWidget):
                     # Leftmost pixel column always at x (where the line
                     # has always been), so a thicker line grows to the
                     # right.
-                    painter.fillRect(QRect(x, y1, thickness, y2 - y1), base_color)
+                    painter.fillRect(QRect(x, y1, line_w, y2 - y1), base_color)
                     continue
                 kind = _line_kind(level, depth, first_child, next_depth)
                 if kind == "mid":
-                    painter.fillRect(QRect(x + half, y1, thickness, y2 - y1), base_color)
+                    painter.fillRect(QRect(x + half, y1, line_w, y2 - y1), base_color)
                 else:
                     painter.setPen(Qt.NoPen)
                     painter.setBrush(base_color)
                     painter.drawPolygon(_shifted_line_polygon(
-                        kind, style, x, half, thickness, y1, y2,
+                        kind, style, x, half, line_w, y1, y2,
                     ))
             if tick_enabled and parent_color is not None:
                 is_dir = bool(index.sibling(index.row(), 0).data(IS_DIR_ROLE))
@@ -861,8 +893,9 @@ class DirDropTreeWidget(QTreeWidget):
                                 style, half, height,
                             )
                     for tick in _tick_rects(
-                        path, outer_path, depth >= 2, x0, indent, thickness, length,
+                        path, outer_path, depth >= 2, x0, indent, widths[-1], length,
                         left_side, y1, y2,
+                        bar=widths[-1] if sel_ticks else thickness,
                     ):
                         painter.fillRect(tick, parent_color)
             painter.restore()
@@ -883,7 +916,7 @@ class DirDropTreeWidget(QTreeWidget):
             # Diagonal/curved: the parent's line now runs through the
             # middle of this column, so the arrow gets the part of the
             # column to its right instead of the whole width.
-            arrow_shift = (half + thickness) if shifted else 0
+            arrow_shift = (half + (widths[-1] if widths else thickness)) if shifted else 0
             opt = QStyleOptionViewItem()
             opt.rect = QRect(
                 rect.left() + indent * depth + arrow_shift, rect.top(),

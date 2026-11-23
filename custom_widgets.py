@@ -200,6 +200,7 @@ _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
     "rename", "copy_across", "move_across", "refresh",
     "up", "select_dir", "clear_view", "expand_all", "collapse_all", "hash", "pane_refresh", "save_snapshot",
     "mode_unpressed", "swap_pane", "sync", "dup_list_unpressed",
+    "filter_clear", "filter_apply",
 )
 
 # Statistics View buttons (self._stats_button_colors, Settings tab ->
@@ -1282,7 +1283,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
 # lines up. A huge range (800-5000, 2-500) therefore has fewer pixels
 # than values and leans on its arrow buttons, the spin box itself and,
 # where it makes sense, a coarser slider_step.
-_SPIN_SLIDER_WIDTH = 200
+_SPIN_SLIDER_WIDTH = 160
 # Older names, kept in case anything still imports them: same value.
 _SPIN_SLIDER_MIN_WIDTH = _SPIN_SLIDER_MAX_WIDTH = _SPIN_SLIDER_WIDTH
 # Left indent (px) of a slider that sits under its spin box's title: none,
@@ -1922,8 +1923,9 @@ class FlowLayout(QLayout):
     makes it taller; that is the recursion -- a nested layout is asked for
     its height at the width the outer one is trying.
 
-    With `reorder` on, the order of the items is tried in every
-    permutation as well, and the lowest overall result wins, as long as
+    With `reorder` on, the order of the items is searched as well (every
+    order is a candidate, though hopeless ones are cut off early -- see
+    _search), and the lowest overall result wins, as long as
     nothing goes below its minimum width. What an order may NOT do is
     swap blocks that end up side by side at the same height: those always
     keep the original left-to-right order -- a block only comes before an
@@ -1941,9 +1943,19 @@ class FlowLayout(QLayout):
     See SettingsTabMixin._settings_subsection_flow."""
 
     # Above this many items only the original order is tried (still with
-    # the gap-filling placement) -- n! orders grow fast, and every
-    # Settings-tab flow is well below it.
-    _MAX_REORDER_ITEMS = 5
+    # the gap-filling placement); below it the orders are searched with
+    # pruning (_search), which is fast in practice.
+    _MAX_REORDER_ITEMS = 12
+    # Up to this many items every order is tried (6 -> 120 orders).
+    _EXACT_MAX_ITEMS = 6
+    # Seconds the order search (_search) may run for one width before it
+    # settles for the best arrangement found so far.
+    _SEARCH_BUDGET = 0.03
+    # ... and where one search serves a whole stretch of widths (see
+    # _breakpoints) it may take longer.
+    _SEARCH_BUDGET_BUCKETED = 0.4
+    # Above this many items the breakpoint shortcut (_breakpoints) is off.
+    _MAX_BREAKPOINT_ITEMS = 12
 
     def __init__(
         self, parent=None, h_spacing: int = 16, v_spacing: int = 0, reorder: bool = True,
@@ -2056,23 +2068,25 @@ class FlowLayout(QLayout):
             self._height_cache[key] = height
         return height
 
-    def _pack(self, entries, avail: int):
-        """Places `entries`, in this order, into a content width of
-        `avail` -- see the class docstring. Returns ([(entry, x, y, width,
-        height)] relative to the content area's top-left, total height),
-        or None if some item can't be placed anywhere without going below
-        its minimum width."""
+    def _place(self, entry, placed, avail: int):
+        """Where `entry` goes given what is already `placed`: the spot where
+        its bottom edge ends up highest -- ties to the higher, then the more
+        leftward, then the wider. Returns (entry, x, y, width, height), or
+        None if it can't be placed anywhere without going below its minimum
+        width."""
         hs, vs = self._h_spacing, self._v_spacing
-        placed = []
-        for entry in entries:
-            _index, pref, min_width, reflows = entry
-            best = None
-            # Where it could start: the left edge, or just right of
-            # something already placed (with the usual gap).
-            for x in sorted({0} | {px + pw + hs for _e, px, _py, pw, _ph in placed}):
-                # How wide: its preferred width, or -- if it can reflow --
-                # narrowed to end at the content edge, or just short of
-                # something already placed further right.
+        _index, pref, min_width, reflows = entry
+        best = None
+        fixed_width = not reflows or min_width >= pref  # can only ever be `pref` wide
+        # Where it could start: the left edge, or just right of
+        # something already placed (with the usual gap).
+        for x in sorted({0} | {px + pw + hs for _e, px, _py, pw, _ph in placed}):
+            # How wide: its preferred width, or -- if it can reflow --
+            # narrowed to end at the content edge, or just short of
+            # something already placed further right.
+            if fixed_width:
+                widths = {pref} if pref <= avail - x else set()
+            else:
                 widths = set()
                 for bound in {avail} | {px - hs for _e, px, _py, _pw, _ph in placed if px > x}:
                     room = bound - x
@@ -2080,26 +2094,39 @@ class FlowLayout(QLayout):
                         widths.add(pref)
                     elif reflows and room >= min_width:
                         widths.add(room)
-                if not widths and x == 0:
-                    # Alone on a line and still too wide: one that can't
-                    # reflow keeps its own width (overflowing, as a single
-                    # too-wide block always has); one that can goes down
-                    # to its minimum.
-                    widths.add(pref if not reflows else min_width)
-                for width in widths:
-                    # Just below whatever it would otherwise overlap.
-                    y = 0
-                    for _e, px, py, pw, ph in placed:
-                        if px < x + width + hs and x < px + pw + hs:
-                            y = max(y, py + ph + vs)
-                    height = self._item_height(entry, width)
-                    key = (y + height, y, x, -width)
-                    if best is None or key < best[0]:
-                        best = (key, x, y, width, height)
-            if best is None:
+            if not widths and x == 0:
+                # Alone on a line and still too wide: one that can't
+                # reflow keeps its own width (overflowing, as a single
+                # too-wide block always has); one that can goes down
+                # to its minimum.
+                widths.add(pref if not reflows else min_width)
+            for width in widths:
+                # Just below whatever it would otherwise overlap.
+                y = 0
+                for _e, px, py, pw, ph in placed:
+                    if px < x + width + hs and x < px + pw + hs:
+                        y = max(y, py + ph + vs)
+                height = self._item_height(entry, width)
+                key = (y + height, y, x, -width)
+                if best is None or key < best[0]:
+                    best = (key, x, y, width, height)
+        if best is None:
+            return None
+        _key, x, y, width, height = best
+        return (entry, x, y, width, height)
+
+    def _pack(self, entries, avail: int):
+        """Places `entries`, in this order, into a content width of
+        `avail` -- see the class docstring. Returns ([(entry, x, y, width,
+        height)] relative to the content area's top-left, total height),
+        or None if some item can't be placed anywhere without going below
+        its minimum width."""
+        placed = []
+        for entry in entries:
+            spot = self._place(entry, placed, avail)
+            if spot is None:
                 return None
-            _key, x, y, width, height = best
-            placed.append((entry, x, y, width, height))
+            placed.append(spot)
         total = max((py + ph for _e, _px, py, _pw, ph in placed), default=0)
         return placed, total
 
@@ -2118,42 +2145,158 @@ class FlowLayout(QLayout):
         """How far `order` (item indexes) is from the original order."""
         return sum(1 for i in range(len(order)) for j in range(i + 1, len(order)) if order[i] > order[j])
 
+    @staticmethod
+    def _result_key(placed, height):
+        """What decides between two complete placements: lowest, then
+        narrowest, then fewest blocks moved out of the original order,
+        then everything as far up and then left as possible."""
+        return (
+            height,
+            max(px + pw for _e, px, _py, pw, _ph in placed),
+            FlowLayout._inversions([e[0] for e, _x, _y, _w, _h in placed]),
+            sum(py for _e, _px, py, _pw, _ph in placed),
+            sum(px for _e, px, _py, _pw, _ph in placed),
+        )
+
+    def _search(self, entries, avail: int, budget: float):
+        """The best placement over the orders of `entries` (see the class
+        docstring for the rules). Up to _EXACT_MAX_ITEMS items every order
+        is tried. Beyond that, a depth-first branch-and-bound: items are
+        placed one at a time, and a branch is dropped as soon as it can no
+        longer beat the best complete placement found so far. Pass 1 looks
+        only for the lowest height, pass 2 then picks, among placements of
+        that height, the best by the finer criteria (see _result_key).
+        Seeded with the original order and a few good guesses so the bound
+        is tight from the start, and stops after `budget` seconds with the
+        best found by then."""
+        from itertools import permutations
+        from time import perf_counter
+        head = entries[:1] if self._pin_first else ()
+        tail = entries[1:] if self._pin_first else entries
+        best = {"key": None, "result": ([], 0)}
+
+        def consider(placed, height):
+            key = self._result_key(placed, height)
+            if best["key"] is None or key < best["key"]:
+                best["key"], best["result"] = key, (placed, height)
+
+        def pack_order(order):
+            result = self._pack(list(order), avail)
+            if result is None:
+                return
+            placed, height = result
+            if order != entries and not self._same_row_order_kept(placed):
+                return
+            consider(placed, height)
+
+        if len(entries) <= self._EXACT_MAX_ITEMS:
+            for rest in permutations(tail):
+                pack_order(head + rest)
+            return best["result"]
+
+        deadline = perf_counter() + budget
+        for order in (
+            entries,
+            head + tuple(sorted(tail, key=lambda e: -self._item_height(e, e[1]))),
+            head + tuple(sorted(tail, key=lambda e: -e[1])),
+        ):
+            pack_order(order)
+
+        def dfs(placed, remaining, total, right, inversions, sum_y, sum_x, height_only):
+            if perf_counter() > deadline:
+                return
+            if not remaining:
+                consider(list(placed), total)
+                return
+            options = []
+            for i, entry in enumerate(remaining):
+                spot = self._place(entry, placed, avail)
+                if spot is None:
+                    continue
+                _e, x, y, w, h = spot
+                # Items side by side at the same height keep their
+                # original left-to-right order.
+                if any(py == y and (px < x) != (pe[0] < entry[0]) for pe, px, py, _pw, _ph in placed):
+                    continue
+                new_total = max(total, y + h)
+                new_right = max(right, x + w)
+                new_inversions = inversions + sum(1 for pe, *_rest in placed if pe[0] > entry[0])
+                new_sum_y, new_sum_x = sum_y + y, sum_x + x
+                if best["key"] is not None:
+                    if height_only:
+                        # Pass 1: only a lower arrangement is of interest.
+                        if new_total >= best["key"][0]:
+                            continue
+                    elif (new_total, new_right, new_inversions, new_sum_y, new_sum_x) > best["key"]:
+                        # Every part of the key only grows as items are
+                        # added: already worse than the best, part by part.
+                        continue
+                options.append((new_total, y, x, i, spot, new_right, new_inversions, new_sum_y, new_sum_x))
+            options.sort(key=lambda o: o[:4])
+            for new_total, _y, _x, i, spot, new_right, new_inversions, new_sum_y, new_sum_x in options:
+                dfs(placed + [spot], remaining[:i] + remaining[i + 1:], new_total, new_right,
+                    new_inversions, new_sum_y, new_sum_x, height_only)
+
+        placed = []
+        for entry in head:
+            spot = self._place(entry, placed, avail)
+            if spot is None:
+                return best["result"]
+            placed.append(spot)
+        total = max((py + ph for _e, _px, py, _pw, ph in placed), default=0)
+        right = max((px + pw for _e, px, _py, pw, _ph in placed), default=0)
+        sum_y = sum(py for _e, _px, py, _pw, _ph in placed)
+        sum_x = sum(px for _e, px, _py, _pw, _ph in placed)
+        dfs(placed, tuple(tail), total, right, 0, sum_y, sum_x, True)
+        dfs(placed, tuple(tail), total, right, 0, sum_y, sum_x, False)
+        return best["result"]
+
+    def _breakpoints(self, entries):
+        """The sorted content widths at which some combination of items
+        starts to fit side by side (every sum of item widths plus gaps) --
+        None if that can't be said (an item can change its width, so widths
+        vary continuously, or there are too many items). With no such item
+        the arrangement only changes at these widths. (An item that can
+        reflow but has a minimum width equal to its preferred one -- a
+        block of fixed width -- doesn't change its width either.)"""
+        if len(entries) > self._MAX_BREAKPOINT_ITEMS or any(e[3] and e[2] < e[1] for e in entries):
+            return None
+        sums = {0}
+        for _index, pref, _min, _reflows in entries:
+            sums |= {s + pref + (self._h_spacing if s else 0) for s in sums}
+        return sorted(sums)
+
     def _arrange(self, avail: int):
         """The lowest placement of the visible items for a content width
         of `avail`: ([(entry, x, y, width, height)], total height). Cached
-        per width until the next invalidate()."""
+        per width until the next invalidate() -- and, where the items can't
+        reflow, per stretch of widths between two breakpoints, so dragging
+        the window edge only re-searches when something starts to fit or
+        stops fitting."""
         cached = self._arrange_cache.get(avail)
         if cached is not None:
             return cached
-        from itertools import permutations
         entries = tuple(self._item_info())
+        breakpoints = self._breakpoints(entries)
+        bucket = None
+        if breakpoints is not None:
+            from bisect import bisect_right
+            bucket = ("bucket", bisect_right(breakpoints, avail))
+            cached = self._arrange_cache.get(bucket)
+            if cached is not None:
+                self._arrange_cache[avail] = cached
+                return cached
         if self._reorder and 1 < len(entries) <= self._MAX_REORDER_ITEMS:
-            if self._pin_first:
-                # The first item stays first (and so top-left); only the
-                # rest are permuted.
-                orders = (entries[:1] + rest for rest in permutations(entries[1:]))
-            else:
-                orders = permutations(entries)
+            # A search per width is only affordable where widths between
+            # breakpoints share one result (bucketed); otherwise stay brief.
+            budget = self._SEARCH_BUDGET_BUCKETED if bucket is not None else self._SEARCH_BUDGET
+            best = self._search(entries, avail, budget)
         else:
-            orders = (entries,)
-        best_key, best = None, ([], 0)
-        for order in orders:
-            result = self._pack(list(order), avail)
-            if result is None:
-                continue
-            placed, height = result
-            if order != entries and not self._same_row_order_kept(placed):
-                continue
-            key = (
-                height,
-                max(px + pw for _e, px, _py, pw, _ph in placed),
-                self._inversions([e[0] for e in order]),
-                sum(py for _e, _px, py, _pw, _ph in placed),
-                sum(px for _e, px, _py, _pw, _ph in placed),
-            )
-            if best_key is None or key < best_key:
-                best_key, best = key, (placed, height)
+            result = self._pack(list(entries), avail)
+            best = result if result is not None else ([], 0)
         self._arrange_cache[avail] = best
+        if bucket is not None:
+            self._arrange_cache[bucket] = best
         return best
 
     def _do_layout(self, rect, apply: bool) -> int:

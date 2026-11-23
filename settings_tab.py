@@ -15,7 +15,7 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics
 from PySide6.QtWidgets import (
     QAbstractItemView, QAbstractScrollArea, QButtonGroup, QCheckBox, QColorDialog, QComboBox,
     QFrame, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QPushButton, QRadioButton,
-    QScrollArea, QSizePolicy, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QScrollArea, QSizePolicy, QSpinBox, QStyle, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from constants import (
@@ -233,6 +233,13 @@ class SettingsTabMixin:
         # leading checkbox, a color swatch, ...) opt out of this and
         # keep their own local alignment instead -- see each site.
         self._aligned_option_rows = []
+        # (block, group, width class) of every Level 2 block that takes part
+        # in the width grid -- see _l2_block / _apply_l2_widths.
+        self._l2_blocks = []
+        self._l2_base_block = None
+        # Label/spin box pairs whose labels share one width (Comparison
+        # Options, Context Menu, Sync Settings -- the two-thirds class).
+        self._sibling_aligned_rows = []
 
         page = QWidget()
         outer = QVBoxLayout(page)
@@ -244,7 +251,8 @@ class SettingsTabMixin:
         # possibly a native-style QSS quirk on QGroupBox::title; if 18pt
         # still doesn't show, the title's font is getting overridden
         # somewhere else entirely and this stylesheet isn't the culprit).
-        page.setStyleSheet("QGroupBox::title { font-size: 14pt; font-weight: bold; }")
+        self._settings_page = page
+        page.setStyleSheet(self._settings_page_stylesheet())
 
         # ---- Theme (Level 2, first block of Global Settings) -- applies
         # a hand-built dark/light QPalette, then
@@ -290,7 +298,7 @@ class SettingsTabMixin:
         global_settings_flow = self._settings_subsection_flow()
         global_settings_outer.addLayout(global_settings_flow)
         outer.addWidget(self._settings_section("Global Settings", global_settings_group, space_above=False))
-        global_settings_flow.addWidget(self._settings_subsection("Theme", theme_group))
+        global_settings_flow.addWidget(self._l2_block("Theme", theme_group, "two_thirds"))
 
         # ---- Global Options (Level 2 of Global Settings; synced with
         # the Main tab's own group) ----
@@ -603,6 +611,9 @@ class SettingsTabMixin:
                   self.fingerprint_end_label.sizeHint().width())
         self.fingerprint_start_label.setFixedWidth(_lw)
         self.fingerprint_end_label.setFixedWidth(_lw)
+        # Same label column as Context Menu / Sync Settings (same width class).
+        self._sibling_aligned_rows.append((self.fingerprint_start_label, self.fingerprint_start_spin))
+        self._sibling_aligned_rows.append((self.fingerprint_end_label, self.fingerprint_end_spin))
         comparison_grid.addLayout(fp_start_row, 16, 0, 1, 7)
         comparison_grid.addLayout(fp_end_row, 17, 0, 1, 7)
 
@@ -782,7 +793,7 @@ class SettingsTabMixin:
             # the numbers in titles all over the Main tab (item counts, sizes,
             # the "Free:" figure), not just the file lists. Its Bg cell holds
             # the Bold checkbox instead of a swatch -- built specially below.
-            ("Title Numeric", None, None, None, None),
+            ("Numeric titles", None, None, None, None),
             # The two colors of each pane's status-line summary at the bottom
             # of the Main tab (see SelectionMixin.update_selection_count) --
             # Fg only. Unselected shows the GUI's own text color until one is
@@ -810,20 +821,26 @@ class SettingsTabMixin:
             ("History: snapshot file",
              lambda: self._history_snapshot_color, None,
              lambda hexc: self._on_history_color_changed(True, hexc), None),
+            # Edge of the Main tab's button groups (Fg only).
+            ("Group border",
+             lambda: self._group_border_color, None,
+             self._on_group_border_color_changed, None),
         ]
         default_colors_table = QTableWidget(len(_DEFAULT_COLOR_ROWS), 3)
         self._style_table_widget(default_colors_table, ["Item", "Fg", "Bg"])
 
         for i, (label, get_fg, get_bg, on_fg, on_bg) in enumerate(_DEFAULT_COLOR_ROWS):
             default_colors_table.setItem(i, 0, self._table_item(label))
-            if label == "Title Numeric":
+            if label == "Numeric titles":
                 default_colors_table.setCellWidget(
                     i, 1,
                     self._center_in_cell(self._make_color_swatch(
                         lambda: self._title_numeric_color, self._on_title_numeric_color_changed,
                     )),
                 )
-                title_numeric_bold_cb = QCheckBox("Bold")
+                # Just "B" (in bold): the Bg column is only as wide as a swatch.
+                title_numeric_bold_cb = QCheckBox("B")
+                title_numeric_bold_cb.setStyleSheet("font-weight: bold;")
                 title_numeric_bold_cb.setToolTip(
                     "Show the numeric values in the titles (item counts, sizes, "
                     "file and folder totals, free space) in bold. When off, they're "
@@ -870,6 +887,10 @@ class SettingsTabMixin:
         default_colors_table.item(10, 0).setToolTip(
             "Text color of folder-snapshot (.fss) entries in each pane's folder-history drop-down."
         )
+        default_colors_table.item(11, 0).setToolTip(
+            "Color of the edge around the Main tab's button groups (Select, File Op, "
+            "Clipboard, Both Panes, Quick Options, Global File Filter)."
+        )
         # (Default Folder/Default File and Scrollbar used to be rows here --
         # they moved to File List View -> File List View Colors below,
         # since they only color the file lists. Title Numeric started in
@@ -885,18 +906,24 @@ class SettingsTabMixin:
         default_colors_group_outer.addWidget(default_colors_table)
 
         # Level 2 blocks of Global Settings: Theme, Options, Comparison Options, Misc Colors.
-        global_settings_flow.addWidget(self._settings_subsection("Options", global_group))
-        global_settings_flow.addWidget(self._settings_subsection("Comparison Options", comparison_group))
+        options_block = self._l2_block("Options", global_group, "full")
+        self._l2_base_block = options_block  # its width is the grid's base (L2BW)
+        global_settings_flow.addWidget(options_block)
+        global_settings_flow.addWidget(self._l2_block("Comparison Options", comparison_group, "two_thirds"))
         # Context Menu and Sync Settings have the same kind of rows: their
         # labels, spin boxes and sliders, and the two groups themselves,
         # are made equally wide below (see _align_sibling_groups) so that
         # they line up when they sit above each other.
-        self._sibling_aligned_rows = []
-        context_menu_block = self._settings_subsection("Context Menu", self._build_context_menu_group())
-        sync_settings_block = self._settings_subsection("Sync Settings", self._build_sync_settings_group())
+        context_menu_block = self._l2_block("Context Menu", self._build_context_menu_group(), "two_thirds")
+        sync_settings_block = self._l2_block("Sync Settings", self._build_sync_settings_group(), "two_thirds")
         global_settings_flow.addWidget(context_menu_block)
         global_settings_flow.addWidget(sync_settings_block)
-        global_settings_flow.addWidget(self._settings_subsection("Misc Colors", default_colors_group))
+        # File type list: the entries of the Main tab's Global File Filter
+        # drop-down (this used to be the File Filter tab).
+        global_settings_flow.addWidget(
+            self._l2_block("File type list", self._build_file_filter_group(), "third")
+        )
+        global_settings_flow.addWidget(self._l2_block("Misc Colors", default_colors_group, "third"))
 
         # ---- Misc Buttons (Level 2 of Global Settings, after Misc Colors):
         # colors of the Main tab's mode switch (Duplicate finder / Compare
@@ -909,8 +936,10 @@ class SettingsTabMixin:
             ("mode_pressed", "Mode switch (pressed)"),
             ("swap_pane", "Swap"),
             ("sync", "Sync"),
+            ("filter_clear", "File Filter: Clear"),
+            ("filter_apply", "File Filter: Apply"),
         ])
-        global_settings_flow.addWidget(self._settings_subsection("Misc Buttons", misc_buttons_group))
+        global_settings_flow.addWidget(self._l2_block("Misc Buttons", misc_buttons_group, "third"))
 
         # ---- File List View (Settings-tab only -- no Main-tab copy,
         # unlike everything else in this section) ----
@@ -1966,7 +1995,7 @@ class SettingsTabMixin:
         stats_options_outer.addLayout(stats_week_row)
 
         stats_footer_row = QHBoxLayout()
-        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons and options in Symmetrical (ish) GUI")
+        self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons/options in Symmetrical (ish) GUI")
         self.mirror_statistics_buttons_cb.setToolTip(
             "Only while the main Symmetrical (ish) GUI setting is also on: mirror the right "
             "pane's Statistics view footer -- the buttons/options row(s) below the "
@@ -1987,7 +2016,7 @@ class SettingsTabMixin:
         # they fit and wrapping below each other when they don't --
         # the rest are added to this flow where they're built, below.
         stats_flow = self._settings_subsection_flow(
-            self._settings_subsection("General options", stats_options_group)
+            self._l2_block("General options", stats_options_group, "two_thirds")
         )
         stats_group_outer.addLayout(stats_flow)
 
@@ -2044,7 +2073,7 @@ class SettingsTabMixin:
                 self._link_checkboxes(primary, secondary)
                 view_col.addWidget(secondary)
             view_flow.addWidget(self._settings_subsubsection(side_label, view_col_widget))
-        stats_flow.addWidget(self._settings_subsection("Specific options", view_group))
+        stats_flow.addWidget(self._l2_block("Specific options", view_group, "third"))
 
         # ---- Statistics View Colors -- Background/Selection/Bins/Grid/
         # Axis Labels/Hover Info/Selection Info, split by mode (file/
@@ -2330,9 +2359,9 @@ class SettingsTabMixin:
         buttons_group = QGroupBox("")
         buttons_group_outer = QVBoxLayout(buttons_group)
         buttons_group_outer.addLayout(self._settings_subsection_flow(
-            self._settings_subsection("Select Buttons", select_colors_group),
-            self._settings_subsection("Clipboard Buttons", clipboard_colors_group),
-            self._settings_subsection("File Op Buttons", file_op_colors_group),
+            self._l2_block("Select Buttons", select_colors_group, "third"),
+            self._l2_block("Clipboard Buttons", clipboard_colors_group, "third"),
+            self._l2_block("File Op Buttons", file_op_colors_group, "third"),
         ))
         outer.addWidget(self._settings_section("Panel Button Colors", buttons_group))
 
@@ -2352,6 +2381,7 @@ class SettingsTabMixin:
             for label, spin in self._aligned_option_rows:
                 label.setFixedWidth(aligned_label_w)
                 spin.setFixedWidth(aligned_spin_w)
+        self._apply_l2_widths(page)
 
         outer.addStretch(1)
 
@@ -2561,12 +2591,93 @@ class SettingsTabMixin:
         self._folder_counts_include_subfolders = bool(checked)
         self.apply_filter()  # relists (deferred, see there) so the counts update
 
+    def _l2_block(self, title: str, group: QGroupBox, width_class: str) -> QWidget:
+        """A Level 2 block (see _settings_subsection) that takes part in the
+        width grid: `width_class` is "full", "two_thirds", "half" or
+        "third" -- see _apply_l2_widths."""
+        block = self._settings_subsection(title, group)
+        self._l2_blocks.append((block, group, width_class))
+        return block
+
+    def _apply_l2_widths(self, page: QWidget):
+        """The Level 2 width grid. The base width L2BW is the width the
+        Options block needs (its content decides it); the other classes are
+        fractions of it, with the flow's gap taken out so that, e.g.,
+        2/3 + 1/3, 1/2 + 1/2 or three 1/3 blocks fill one full-width row
+        exactly:  third = (B - 2g)/3,  half = (B - g)/2,  2/3 = 2*third + g.
+        Every spin box on the page also gets the one standard width (the
+        widest any of them needs)."""
+        spins = page.findChildren(SliderSpinBox) + page.findChildren(SliderDoubleSpinBox)
+        if spins:
+            spin_w = max(spin.sizeHint().width() for spin in spins)
+            for spin in spins:
+                spin.setFixedWidth(spin_w)
+        base = self._l2_base_block
+        if base is None or not self._l2_blocks:
+            return
+        base.ensurePolished()
+        base_w = max(base.sizeHint().width(), base.minimumSizeHint().width())
+        gap = _SUBSECTION_GAP
+        third = (base_w - 2 * gap) // 3
+        widths = {
+            "full": base_w,
+            "half": (base_w - gap) // 2,
+            "third": third,
+            "two_thirds": 2 * third + gap,
+        }
+        self._l2_widths = widths
+        for block, group, width_class in self._l2_blocks:
+            width = widths[width_class]
+            block.setFixedWidth(width)
+            for table in group.findChildren(QTableWidget):
+                self._fit_table_to_width(group, table, width)
+
+    @staticmethod
+    def _fit_table_to_width(group: QGroupBox, table: QTableWidget, block_width: int):
+        """Makes a content-sized swatch table exactly as wide as its group
+        has room for. Cell padding is tightened, the Fg/Bg columns are set
+        to what their swatches (and header text) need, and the Item column
+        takes up the difference (long names are elided)."""
+        margins = group.layout().contentsMargins()
+        inner = block_width - margins.left() - margins.right() - 2 * group.style().pixelMetric(
+            QStyle.PM_DefaultFrameWidth
+        )
+        table.setStyleSheet(table.styleSheet().replace("padding: 1px 9px", "padding: 1px 4px"))
+        header = table.horizontalHeader()
+        header.setStyleSheet(header.styleSheet().replace("padding: 1px 9px", "padding: 1px 4px"))
+        table.ensurePolished()
+        header.ensurePolished()
+        for col in range(1, table.columnCount()):
+            need = header.sectionSizeHint(col)
+            for row in range(table.rowCount()):
+                cell = table.cellWidget(row, col)
+                if cell is not None:
+                    cell.ensurePolished()
+                    need = max(need, cell.sizeHint().width() + 6)
+            header.setSectionResizeMode(col, QHeaderView.Fixed)
+            table.setColumnWidth(col, need)
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        table.setWordWrap(False)
+        table.setFixedWidth(inner)
+        table.updateGeometry()
+
+    def _settings_page_stylesheet(self) -> str:
+        """The Settings page's stylesheet: the bold group titles, and every
+        group's edge in the Misc Colors "Group border" color. The groups
+        here have no title of their own (see _settings_section), hence no
+        title margin, and no title-position handling like the Main tab's
+        (_style_group_border) is needed."""
+        return (
+            "QGroupBox::title { font-size: 14pt; font-weight: bold; } "
+            f"QGroupBox {{ border: 1px solid {self._group_border_color};"
+            " border-radius: 3px; margin-top: 0; }"
+        )
+
     def _build_save_load_row(self, reset_text: str, reset_handler, reset_tooltip: str):
-        """The Save Settings / Load Settings / <reset> button row shared by
-        the Settings tab and the File Filter tab (same look, same spot:
-        centered under the tab's scroll area). Save and Load always act on
-        the one settings file for the whole program; only the reset button
-        is tab-specific (`reset_text`/`reset_handler`/`reset_tooltip`).
+        """The Save Settings / Load Settings / <reset> button row centered
+        under the Settings tab's scroll area. Save and Load act on the one
+        settings file for the whole program (the file type list included);
+        the reset button is set by `reset_text`/`reset_handler`/`reset_tooltip`.
         Returns (the row layout, (save, load, reset buttons))."""
         uniform_w, uniform_h = self._uniform_button_size()
         status_btn_w = uniform_w + QFontMetrics(self.font()).horizontalAdvance("M")

@@ -422,7 +422,7 @@ class SettingsMixin:
             pane = getattr(self, side, None)
             if pane is not None:
                 data[f"{side}_folder_history"] = list(pane.saved_folder_history)
-        # The File Filter tab's list: program-wide, not per theme. An
+        # The file type list (Settings tab): program-wide, not per theme. An
         # explicit Save Settings commits the list as edited (and reloads
         # the Main tab's drop-down); an automatic quiet save writes the
         # already committed list, never a half-finished edit.
@@ -655,8 +655,3 @@ class SettingsMixin:
             label.setText(message)
         else:
             self._set_transfer_label(message)
-        # The File Filter tab has its own status line under the same
-        # buttons; both tabs report save/load results.
-        ff_label = getattr(self, "_file_filter_status_label", None)
-        if ff_label is not None:
-            ff_label.setText(message)

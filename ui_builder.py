@@ -404,6 +404,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # file" (Fg only): drop-down text colors of the entry combos.
             self._history_live_color = "#FFFFFF"
             self._history_snapshot_color = "#C8C8C8"
+        if not hasattr(self, "_group_border_color"):
+            # Misc Colors -> "Group border": edge color of the Main tab's
+            # button groups (Select/File Op/Clipboard/Both Panes/Quick
+            # Options/Global File Filter). Per theme (see _builtin_color_set).
+            self._group_border_color = "#8C8C8C"
         if not hasattr(self, "_color_sets"):
             # One full set of every color setting per theme (see
             # _builtin_color_set). Only the *inactive* theme's entry is
@@ -429,7 +434,6 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
         self.tabs.addTab(self._build_settings_tab(), "Settings")
-        self.tabs.addTab(self._build_file_filter_tab(), "File Filter")
         self.tabs.setCurrentIndex(previous_tab)
         if not self._dual_pane_enabled:
             self._fill_comparison_copy_holder()
@@ -442,6 +446,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         # resizeEvent/showEvent keep this current from here on, but
         # neither is guaranteed to fire before the first paint.
         self._update_responsive_layout(force=True)
+        self._apply_group_borders()
 
         if not hasattr(self, "_widget_defaults"):
             # The per-theme widgets' values exactly as this very first
@@ -1017,6 +1022,49 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         color = self._status_selected_color if has_selection else self._status_unselected_color
         return f"color: {color}; padding: 2px 0;" if color else "padding: 2px 0;"
 
+    def _style_group_border(self, group):
+        """Gives one Main-tab group box an edge in self._group_border_color.
+        A stylesheet'd QGroupBox ignores setAlignment() for its title, so
+        the title position is spelled out here from the group's current
+        alignment -- hence this must be re-run whenever that changes
+        (see ResponsiveLayoutMixin._fill_group)."""
+        if group is None:
+            return
+        align = group.alignment()
+        if align & Qt.AlignRight:
+            position, offset = "top right", "right: 8px;"
+        elif align & Qt.AlignHCenter:
+            position, offset = "top center", ""
+        else:
+            position, offset = "top left", "left: 8px;"
+        group.setStyleSheet(
+            f"QGroupBox {{ border: 1px solid {self._group_border_color};"
+            " border-radius: 3px; margin-top: 1.2ex; }"
+            f" QGroupBox::title {{ subcontrol-origin: margin;"
+            f" subcontrol-position: {position}; {offset} padding: 0 3px; }}"
+        )
+
+    def _apply_group_borders(self):
+        """Restyles every Main-tab group box's edge, and the Settings
+        page's (Settings tab -> Misc Colors -> "Group border")."""
+        groups = [
+            getattr(self, "both_panes_group", None),
+            getattr(self, "filter_frame_group", None),
+            getattr(self, "global_options_group", None),
+            getattr(self, "comparison_copy_group", None),
+        ]
+        for pane in (self.left, self.right):
+            for attr in ("select_group", "file_op_group", "clipboard_group"):
+                groups.append(getattr(pane, attr, None))
+        for group in groups:
+            self._style_group_border(group)
+        page = getattr(self, "_settings_page", None)
+        if page is not None:
+            try:
+                page.setStyleSheet(self._settings_page_stylesheet())
+            except RuntimeError:
+                pass  # the page from before a UI rebuild, already deleted
+
     def _apply_status_line_colors(self):
         """Re-applies the two status-line colors to both panes' summary
         labels right away -- called by the Settings tab's color swatches
@@ -1132,6 +1180,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if refresh is not None:
             refresh.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("refresh")))
         self._apply_mode_button_colors()
+        for attr, key in (("clear_filter_button", "filter_clear"), ("apply_filter_button", "filter_apply")):
+            button = getattr(self, attr, None)
+            if button is not None:
+                button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for(key)))
         for pane in (self.left, self.right):
             across = getattr(pane, "_across_buttons", {})
             buttons = {
@@ -1467,12 +1519,11 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         self.filter_frame_group = frame
         grid = QGridLayout(frame)
 
-        default_bg, default_fg = self._default_button_colors()
         uniform_w, uniform_h = self._uniform_button_size()
 
         self.clear_filter_button = QPushButton("Clear")
         self.clear_filter_button.setFixedSize(uniform_w, uniform_h)
-        self.clear_filter_button.setStyleSheet(_bevel_button_stylesheet(default_bg, default_fg))
+        self.clear_filter_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("filter_clear")))
         self.clear_filter_button.clicked.connect(self.clear_filter)
         grid.addWidget(self.clear_filter_button, 0, 0)
 
@@ -1497,7 +1548,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
         self.apply_filter_button = QPushButton("Apply")
         self.apply_filter_button.setFixedSize(uniform_w, uniform_h)
-        self.apply_filter_button.setStyleSheet(_bevel_button_stylesheet(default_bg, default_fg))
+        self.apply_filter_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("filter_apply")))
         self.apply_filter_button.clicked.connect(self.apply_filter)
 
         # Row 2, directly below the text entry: Invert on the left, Apply

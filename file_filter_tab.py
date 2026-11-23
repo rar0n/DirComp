@@ -1,12 +1,12 @@
 """
-FileFilterTabMixin: the File Filter tab -- the editable list behind the
-Main tab's Global File Filter drop-down, and the program-wide (not per
-theme) File Filter settings.
+FileFilterTabMixin: the editable file type list behind the Main tab's
+Global File Filter drop-down (Settings tab -> Global Settings -> File
+type list), and the program-wide (not per theme) File Filter settings.
 
 Two copies of the list exist on purpose:
   - self._file_filter_types: the *committed* list. It is what the Main tab's
     drop-down shows and what every save writes to the settings file.
-  - self._file_filter_working: what the list widget on this tab currently
+  - self._file_filter_working: what the list widget currently
     shows, edits included. Kept in step with the widget on every change
     (so a window rebuild, e.g. a theme switch, does not lose unsaved edits).
 It becomes the committed list on Save Settings; Load Settings and Load
@@ -19,8 +19,8 @@ settings_ops.py, which calls the methods below.
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QFrame, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QAbstractItemView, QGroupBox, QHBoxLayout, QListWidget, QListWidgetItem,
+    QPushButton, QVBoxLayout,
 )
 
 from constants import DEFAULT_FILE_FILTER_TYPES, FILTER_SEPARATOR
@@ -51,22 +51,15 @@ class FileFilterTabMixin:
         # "Folder counts include subfolders" (Settings tab); lives here so
         # it survives a UI rebuild, like the comparison settings do.
         self._folder_counts_include_subfolders = False
-        self._file_filter_status_label = None
 
     # ----------------------------------------------------------- Building
 
-    def _build_file_filter_tab(self) -> QWidget:
-        """File Filter tab: a scroll area with the File Filter settings
-        (currently the file type list) and, below it and outside the
-        scroll area, the same Save Settings / Load Settings / Load
-        Defaults row and status line as the Settings tab."""
-        page = QWidget()
-        page.setStyleSheet(
-            "QGroupBox::title { font-size: 14pt; font-weight: bold; } "
-            f"QToolTip {{ font-size: {self.font().pointSize()}pt; font-weight: normal; }}"
-        )
-        outer = QVBoxLayout(page)
-
+    def _build_file_filter_group(self) -> QGroupBox:
+        """The File type list's frame for the Settings tab (Global Settings
+        -> "File type list"; the caller wraps it in a titled block): the
+        list itself and its Add/Remove/Move/Sort/Defaults buttons.
+        Save Settings / Load Settings on the Settings tab commit / reload
+        the list along with everything else."""
         group = QGroupBox("")
         group_layout = QVBoxLayout(group)
         list_tip = (
@@ -76,7 +69,7 @@ class FileFilterTabMixin:
             "anywhere in a name (* = any characters, ? = one character; with one of "
             "them the term must match the whole name).\n"
             "Double-click an entry to edit it, or use Add. The drop-down is updated "
-            "by Save Settings, Load Settings and Load Defaults, not while you edit."
+            "by Save Settings, Load Settings and Defaults, not while you edit."
         )
 
         body = QHBoxLayout()
@@ -86,10 +79,11 @@ class FileFilterTabMixin:
         )
         self._file_filter_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._file_filter_list.setMinimumHeight(260)
-        self._file_filter_list.setMaximumWidth(260)
+        self._file_filter_list.setMinimumWidth(90)
         self._ff_fill_list(self._file_filter_working)
         # Edits (typing in an item) and everything else both end up here.
         self._file_filter_list.itemChanged.connect(lambda _item: self._ff_sync_working())
+        self._file_filter_list.setToolTip(list_tip)
         body.addWidget(self._file_filter_list)
 
         buttons = QVBoxLayout()
@@ -101,6 +95,11 @@ class FileFilterTabMixin:
             ("Move up", "Move the selected entries up one step.", lambda: self._ff_move(-1)),
             ("Move down", "Move the selected entries down one step.", lambda: self._ff_move(1)),
             ("Sort A-Z", "Sort the whole list alphabetically.", self._ff_sort),
+            ("Defaults",
+             "Put the list back to the program's built-in file types and update the "
+             "drop-down on the Main tab. The saved settings file isn't touched; Save "
+             "Settings afterward if you want the reset to stick.",
+             self._reset_file_filter_defaults),
         ):
             button = QPushButton(text)
             button.setFixedSize(uniform_w, uniform_h)
@@ -111,36 +110,7 @@ class FileFilterTabMixin:
         buttons.addStretch(1)
         body.addLayout(buttons)
         group_layout.addLayout(body)
-
-        block = self._settings_section("File type list", group, space_above=False)
-        # The tooltip belongs to the list box only.
-        self._file_filter_list.setToolTip(list_tip)
-        outer.addWidget(block, 0, Qt.AlignLeft | Qt.AlignTop)
-        outer.addStretch(1)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(page)
-        scroll.setFrameShape(QFrame.NoFrame)
-
-        row, (self.ff_save_button, self.ff_load_button, self.ff_reset_button) = self._build_save_load_row(
-            "Load Defaults", self._reset_file_filter_defaults,
-            "Put the File Filter settings (the file type list) back to the program's "
-            "built-in defaults and update the drop-down on the Main tab. The saved "
-            "settings file isn't touched; Save Settings afterward if you want the "
-            "reset to stick.",
-        )
-        self._file_filter_status_label = QLabel("")
-        self._file_filter_status_label.setAlignment(Qt.AlignCenter)
-        self._file_filter_status_label.setStyleSheet("padding: 2px 0;")
-
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(scroll, stretch=1)
-        layout.addLayout(row)
-        layout.addWidget(self._file_filter_status_label)
-        return container
+        return group
 
     # ------------------------------------------------------- List editing
 
@@ -235,7 +205,7 @@ class FileFilterTabMixin:
         self._refresh_filter_metric_panes()
 
     def _reset_file_filter_defaults(self):
-        """"Load Defaults" on this tab. Not saved until Save Settings."""
+        """"Defaults" button under the file type list. Not saved until Save Settings."""
         self._file_filter_set(DEFAULT_FILE_FILTER_TYPES)
         self._set_settings_status("File Filter settings reset to defaults.")
 

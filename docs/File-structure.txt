@@ -11,7 +11,7 @@ diff_engine.py         -  1021 - comparison types, hash pairing, diff tags (Diff
 dircomp_settings.json  -   n/a - your saved settings file (local copy, gitignored, not in the repo)
 dnd_widgets.py         -   956 - drag-and-drop widgets: folder entry combo box, file list tree
 duplicate_ops.py       -   696 - Duplicate Finder mode: duplicate groups, colors, the right-pane list (DuplicateFinderMixin)
-file_filter_tab.py     -   249 - File Filter tab: editable file type list behind the Global File Filter drop-down (FileFilterTabMixin)
+file_filter_tab.py     -   249 - File type list (Settings tab) behind the Global File Filter drop-down (FileFilterTabMixin)
 hash_cache_store.py    -   384 - persistent hash cache: one SQLite file (HashCacheStore), no Qt
 hash_ops.py            -   693 - per-pane Hash button: hashing, RAM + persistent cache, progress (HashOpsMixin)
 listing_ops.py         -  1968 - populating, refreshing and sorting each pane's file list (ListingMixin)
@@ -334,11 +334,12 @@ something a single tag captures.
 
 file_filter_tab.py 
 ----------------------
-FileFilterTabMixin: the File Filter tab -- the editable list behind the
-Main tab's Global File Filter drop-down, and the program-wide (not per
-theme) File Filter settings. The committed list (what the drop-down shows
-and what is saved) is separate from the working copy the list widget
-edits; Save Settings commits it, Load Settings / Load Defaults replace both.
+FileFilterTabMixin: the editable file type list behind the Main tab's
+Global File Filter drop-down (Settings tab -> Global Settings -> File type
+list), and the program-wide (not per theme) File Filter settings. The
+committed list (what the drop-down shows and what is saved) is separate
+from the working copy the list widget edits; Save Settings commits it,
+Load Settings / the list's Defaults button replace both.
 
 
 

@@ -934,8 +934,6 @@ class SettingsTabMixin:
         misc_buttons_group = self._main_button_color_table([
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
-            ("swap_pane", "Swap"),
-            ("sync", "Sync"),
             ("filter_clear", "File Filter: Clear"),
             ("filter_apply", "File Filter: Apply"),
         ])
@@ -946,10 +944,15 @@ class SettingsTabMixin:
         date_col_group = QGroupBox("")
         date_col_outer = QVBoxLayout(date_col_group)
 
+        # "General" (Level 2, always first in this section): font size
+        # and the date column option.
+        flv_general_group = QGroupBox("")
+        flv_general_outer = QVBoxLayout(flv_general_group)
+
         # Row 1: font size of both file lists (per theme; see
         # _apply_flv_font).
         flv_font_row = QHBoxLayout()
-        flv_font_row.addWidget(QLabel("Font size:"))
+        self.flv_font_size_label = QLabel("Font size:")
         self.flv_font_size_spin = SliderSpinBox()
         self.flv_font_size_spin.setRange(6, 32)
         self.flv_font_size_spin.setValue(self._default_flv_font_pt())
@@ -958,13 +961,16 @@ class SettingsTabMixin:
             "headers). The default is the application's own font size."
         )
         self.flv_font_size_spin.valueChanged.connect(self._on_flv_font_size_changed)
-        flv_font_row.addWidget(self.flv_font_size_spin)
-        flv_font_row.addSpacing(12)
         # Not live: re-fonting both (possibly huge) file lists on every step
-        # of a drag would stall it -- applied on release.
-        flv_font_row.addWidget(SpinSlider(self.flv_font_size_spin, live=False))
+        # of a drag would stall it -- applied on release. In the aligned
+        # rows, so its spin box and slider line up with Selection opacity's.
+        flv_font_row.addWidget(spin_slider_inline(
+            self.flv_font_size_label, self.flv_font_size_spin,
+            SpinSlider(self.flv_font_size_spin, live=False),
+        ), 0, Qt.AlignVCenter)
         flv_font_row.addStretch(1)
-        date_col_outer.addLayout(flv_font_row)
+        self._aligned_option_rows.append((self.flv_font_size_label, self.flv_font_size_spin))
+        flv_general_outer.addLayout(flv_font_row)
         # The trees were built before this spin box existed, at the
         # application's own size -- bring them to whatever it holds now
         # (same as the Statistics View's font size is applied further
@@ -983,7 +989,7 @@ class SettingsTabMixin:
         self.force_single_date_column_cb.toggled.connect(self._on_force_single_date_column_changed)
         date_col_row.addWidget(self.force_single_date_column_cb)
         date_col_row.addStretch(1)
-        date_col_outer.addLayout(date_col_row)
+        flv_general_outer.addLayout(date_col_row)
 
         # The section's Level 2 blocks (Indentation Line, File List View
         # Colors, Comparison Type Colors, in that order), side by side
@@ -993,6 +999,7 @@ class SettingsTabMixin:
         # that one is built further down).
         flv_flow = self._settings_subsection_flow()
         date_col_outer.addLayout(flv_flow)
+        flv_flow.addWidget(self._l2_block("General", flv_general_group, "two_thirds"))
 
         # ---- Row 3: File List View Colors -- same Item | Fg | Bg
         # table shape as Misc Colors (see there); a row with only one
@@ -1002,18 +1009,18 @@ class SettingsTabMixin:
         # text color is its Default File/Folder Fg, so there's no Fg
         # here), Default File, Default Folder and the lists' scrollbars.
         _FLV_COLOR_ROWS = [
-            ("Default Background",
+            ("Background (Default)",
              None, lambda: self._effective_flv_bg(),
              None, self._on_flv_bg_color_changed),
-            ("Default Selection",
+            ("Selection (Default)",
              None, lambda: self._selection_tint_color,
              None, self._on_selection_tint_color_changed),
-            ("Default File",
+            ("File (Default)",
              lambda: TAG_COLORS.get("file", (None, None))[1] or "#000000",
              lambda: TAG_COLORS.get("file", (None, None))[0] or "#FFFFFF",
              lambda hexc: self._on_default_file_color_changed(True, hexc),
              lambda hexc: self._on_default_file_color_changed(False, hexc)),
-            ("Default Folder",
+            ("Folder (Default)",
              lambda: self._folder_color[0], lambda: self._folder_color[1],
              lambda hexc: self._on_folder_color_changed(True, hexc),
              lambda hexc: self._on_folder_color_changed(False, hexc)),
@@ -1056,8 +1063,8 @@ class SettingsTabMixin:
         )
         flv_colors_table.item(1, 0).setToolTip(
             "Highlight color of selected rows (see Selection opacity "
-            "below). The text color of a selected row is its Default File / Default "
-            "Folder Fg."
+            "below). The text color of a selected row is its File / Folder (Default) "
+            "Fg."
         )
         flv_colors_table.item(4, 0).setToolTip(
             "Files that have more than one hard link, while Options -> Ignore "
@@ -1073,12 +1080,12 @@ class SettingsTabMixin:
         flv_colors_table.item(6, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: a folder with no "
             "files anywhere below it. Its background follows the file list's own "
-            "(Default Background) until you pick one here."
+            "(Background (Default)) until you pick one here."
         )
         flv_colors_table.item(7, 0).setToolTip(
             "Duplicate Finder mode (Compare folders off) only: the color of a "
             "plain folder. Its background follows the file list's own "
-            "(Default Background) until you pick one here, so folders do not "
+            "(Background (Default)) until you pick one here, so folders do not "
             "look like highlighted finds next to the duplicate groups."
         )
         self._size_table_to_contents(flv_colors_table)
@@ -1184,7 +1191,7 @@ class SettingsTabMixin:
         # with Comparison Type Colors inside one merged "File List View
         # Colors" Level 2 block -- see flv_colors_super_block below,
         # built once Comparison Type Colors' own block exists too.
-        flv_default_misc_block = self._settings_subsubsection("Default / Misc colors", flv_colors_group)
+        flv_default_misc_block = self._l2_block("Default / Misc colors", flv_colors_group, "third")
 
         # ---- (Inside the File List View Colors block, below its table.)
         # Selection opacity: how strongly the selection color
@@ -1194,6 +1201,8 @@ class SettingsTabMixin:
         # (see _SelectionColorDelegate/DirDropTreeWidget.drawBranches),
         # so a selected row keeps showing what its diff outcome was.
         # 100% is the plain flat highlight. ----
+        flv_scrollbar_group = QGroupBox("")
+        flv_scrollbar_outer = QVBoxLayout(flv_scrollbar_group)
         tint_row = QHBoxLayout()
         self.selection_tint_opacity_label = QLabel("Selection opacity:")
         self.selection_tint_opacity_spin = SliderSpinBox()
@@ -1201,7 +1210,7 @@ class SettingsTabMixin:
         self.selection_tint_opacity_spin.setSuffix("%")
         self.selection_tint_opacity_spin.setValue(self._selection_tint_opacity)
         self.selection_tint_opacity_spin.setToolTip(
-            "How strongly the Default Selection color covers a selected row. Lower "
+            "How strongly the Selection (Default) color covers a selected row. Lower "
             "tints each row's own diff-tag color toward it, so a selected row still "
             "shows what its diff outcome was; the indentation area to the left of "
             "the names is tinted the same way, from the list background. 100% is "
@@ -1215,7 +1224,7 @@ class SettingsTabMixin:
             SpinSlider(self.selection_tint_opacity_spin),
         ), 0, Qt.AlignVCenter)
         tint_row.addStretch(1)
-        flv_colors_group_outer.addLayout(tint_row)
+        flv_general_outer.addLayout(tint_row)
         self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
 
         # ---- Scrollbar handle opacity: how much of the handle's own
@@ -1242,7 +1251,7 @@ class SettingsTabMixin:
             SpinSlider(self.scrollbar_handle_opacity_spin),
         ), 0, Qt.AlignVCenter)
         handle_opacity_row.addStretch(1)
-        flv_colors_group_outer.addLayout(handle_opacity_row)
+        flv_scrollbar_outer.addLayout(handle_opacity_row)
         self._aligned_option_rows.append((self.scrollbar_handle_opacity_label, self.scrollbar_handle_opacity_spin))
 
         # ---- Scrollbar track opacity: how much the track covers the
@@ -1271,7 +1280,7 @@ class SettingsTabMixin:
             SpinSlider(self.scrollbar_track_opacity_spin),
         ), 0, Qt.AlignVCenter)
         track_opacity_row.addStretch(1)
-        flv_colors_group_outer.addLayout(track_opacity_row)
+        flv_scrollbar_outer.addLayout(track_opacity_row)
 
         # ---- Marker luminance difference threshold: a selection marker
         # in the scrollbar track or handle whose luminance (0..255) is
@@ -1279,7 +1288,7 @@ class SettingsTabMixin:
         # inverted, so e.g. a black row on a dark track stays visible
         # (custom_widgets._contrasting_marker_color). 0 = off. Per theme. ----
         marker_luma_row = QHBoxLayout()
-        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference threshold:")
+        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference:")
         self.scrollbar_marker_luma_spin = SliderSpinBox()
         self.scrollbar_marker_luma_spin.setRange(0, 255)
         self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])
@@ -1299,10 +1308,11 @@ class SettingsTabMixin:
             SpinSlider(self.scrollbar_marker_luma_spin),
         ), 0, Qt.AlignVCenter)
         marker_luma_row.addStretch(1)
-        flv_colors_group_outer.addLayout(marker_luma_row)
+        flv_scrollbar_outer.addLayout(marker_luma_row)
 
         # Duplicate File Colors (built above) closes the Default / Misc colors block.
-        flv_colors_group_outer.addWidget(self._settings_subsubsection("Duplicate File Colors", dup_group))
+        flv_scrollbar_block = self._l2_block("Scrollbar Tweaks", flv_scrollbar_group, "two_thirds")
+        flv_dup_colors_block = self._l2_block("Duplicate File Colors", dup_group, "two_thirds")
         self._aligned_option_rows.append((self.scrollbar_track_opacity_label, self.scrollbar_track_opacity_spin))
         self._aligned_option_rows.append((self.scrollbar_marker_luma_label, self.scrollbar_marker_luma_spin))
 
@@ -1788,7 +1798,7 @@ class SettingsTabMixin:
         )
         self._size_table_to_contents(comparison_colors_table)
         comparison_colors_outer.addWidget(comparison_colors_table)
-        comparison_colors_block = self._settings_subsubsection("Comparison Type Colors", comparison_colors_group)
+        comparison_colors_block = self._l2_block("Comparison Type Colors", comparison_colors_group, "full")
 
         # ---- Duplicate Finder Summary Colors: text colors of the Groups /
         # Duplicate files / Folders / Wasted space figures in the summary under
@@ -1797,7 +1807,7 @@ class SettingsTabMixin:
         dup_summary_group = QGroupBox("")
         dup_summary_outer = QVBoxLayout(dup_summary_group)
         dup_summary_table = QTableWidget(len(DUP_SUMMARY_TYPES), 2)
-        self._style_table_widget(dup_summary_table, ["Summary item", "Summary Text Color"])
+        self._style_table_widget(dup_summary_table, ["Summary item", "Text color"])
         for i, (key, (label, default)) in enumerate(DUP_SUMMARY_TYPES.items()):
             dup_summary_table.setItem(i, 0, self._table_item(label))
             dup_summary_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
@@ -1807,6 +1817,7 @@ class SettingsTabMixin:
         self._size_table_to_contents(dup_summary_table)
         dup_summary_outer.addWidget(dup_summary_table)
         dup_summary_block = self._settings_subsubsection("Duplicate Finder Summary Colors", dup_summary_group)
+        self._l2_blocks.append((dup_summary_block, dup_summary_group, "third"))
 
         # ---- Duplicate Finder Buttons (Level 3, after the summary colors):
         # buttons only that mode has -- for now the Include paths / Unique
@@ -1817,6 +1828,7 @@ class SettingsTabMixin:
             ("dup_list_pressed", "List mode (pressed)"),
         ])
         dup_buttons_block = self._settings_subsubsection("Duplicate Finder Buttons", dup_buttons_group)
+        self._l2_blocks.append((dup_buttons_block, dup_buttons_group, "third"))
 
         # ---- Button Colors (Level 3, after Comparison Type Colors): the
         # buttons around each pane's File List View. They start at the
@@ -1827,28 +1839,26 @@ class SettingsTabMixin:
             ("hash", "Hash new"), ("pane_refresh", "Refresh"), ("clear_view", "Clear View"), ("expand_all", "Expand (+)"),
             ("collapse_all", "Collapse (-)"),
         ])
-        flv_buttons_block = self._settings_subsubsection("Button Colors", flv_buttons_group)
+        flv_buttons_block = self._l2_block("Button Colors", flv_buttons_group, "third")
 
-        # "File List View Colors" (Level 2): Default / Misc colors and
-        # Comparison Type Colors as its two Level 3 blocks, cascading
-        # (Comparison Type Colors stacks below Default / Misc colors,
-        # rather than the whole "File List View Colors" block wrapping
-        # to a new line, once the two no longer fit side by side --
-        # see FlowLayout).
-        # Flat and zero-margin: this box exists only to give "File List
-        # View Colors" its Level 2 frame; it holds nothing of its own,
-        # just the two Level 3 blocks below (each already framed on its
-        # own), so it doesn't need its own inset on top of theirs.
-        flv_colors_super_group = QGroupBox("")
-        flv_colors_super_group.setFlat(True)
-        flv_colors_super_outer = QVBoxLayout(flv_colors_super_group)
-        flv_colors_super_outer.setContentsMargins(0, 0, 0, 0)
-        flv_colors_super_outer.addLayout(
-            self._settings_subsection_flow(
-                flv_default_misc_block, comparison_colors_block, dup_summary_block, dup_buttons_block, flv_buttons_block,
-            )
-        )
-        flv_flow.addWidget(self._settings_subsection("File List View Colors", flv_colors_super_group))
+        # "Duplicate Finder Misc Colors" (Level 2): the summary colors and
+        # the Duplicate Finder buttons as two equally wide Level 3 tables
+        # (a third each, stacked in this 1/3-wide block). Flat and
+        # zero-margin: it only holds the two framed blocks.
+        dup_misc_group = QGroupBox("")
+        dup_misc_group.setFlat(True)
+        dup_misc_outer = QVBoxLayout(dup_misc_group)
+        dup_misc_outer.setContentsMargins(0, 0, 0, 0)
+        dup_misc_outer.addLayout(self._settings_subsection_flow(
+            dup_summary_block, dup_buttons_block, reorder=False,
+        ))
+        dup_misc_block = self._l2_block("Duplicate Finder Misc Colors", dup_misc_group, "third")
+
+        # The former "File List View Colors" Level 2 block is gone: its
+        # parts are Level 2 blocks of their own, packed by the flow.
+        for block in (flv_default_misc_block, flv_scrollbar_block, flv_dup_colors_block,
+                      comparison_colors_block, flv_buttons_block, dup_misc_block):
+            flv_flow.addWidget(block)
 
         outer.addWidget(self._settings_section("File List View", date_col_group))
 
@@ -2139,11 +2149,6 @@ class SettingsTabMixin:
         # above: exists only to give "Statistics View Colors" its Level
         # 2 frame around the Graph/Info/Buttons blocks, which are
         # already framed themselves.
-        stats_colors_group = QGroupBox("")
-        stats_colors_group.setFlat(True)
-        stats_colors_outer = QVBoxLayout(stats_colors_group)
-        stats_colors_outer.setContentsMargins(0, 0, 0, 0)
-
         def _build_stats_color_table(rows) -> QTableWidget:
             """One "Item / File Mode / Folder Mode" swatch table for the
             given (stats_colors key, row label) pairs -- shared by the
@@ -2285,14 +2290,18 @@ class SettingsTabMixin:
             self.stats_file_partial_lerp_spin, self.stats_folder_partial_lerp_spin,
         )
 
-        graph_colors_container = QWidget()
-        graph_colors_layout = QVBoxLayout(graph_colors_container)
-        graph_colors_layout.setContentsMargins(0, 0, 0, 0)
-        graph_colors_layout.addWidget(graph_colors_table)
-        graph_colors_layout.addLayout(ranged_opacity_rows)
-        graph_colors_layout.addLayout(hover_opacity_rows)
-        graph_colors_layout.addLayout(partial_lerp_rows)
-        graph_colors_block = self._settings_subsubsection("Graph colors", graph_colors_container)
+        graph_colors_group = QGroupBox("")
+        QVBoxLayout(graph_colors_group).addWidget(graph_colors_table)
+        graph_colors_block = self._l2_block("Graph colors", graph_colors_group, "half")
+
+        # "Color tuning" (Level 2): the opacity/lerp rows that go with the
+        # Graph colors above.
+        color_tuning_group = QGroupBox("")
+        color_tuning_layout = QVBoxLayout(color_tuning_group)
+        color_tuning_layout.addLayout(ranged_opacity_rows)
+        color_tuning_layout.addLayout(hover_opacity_rows)
+        color_tuning_layout.addLayout(partial_lerp_rows)
+        color_tuning_block = self._l2_block("Color tuning", color_tuning_group, "half")
 
         # The upper-left readout's text, split by which of its segments
         # each color paints -- see TimelineWidget._draw_readout_segments
@@ -2304,7 +2313,9 @@ class SettingsTabMixin:
             ("stripped_info_color", "Stripped Info"),
         ]
         info_colors_table = _build_stats_color_table(_INFO_COLOR_ROWS)
-        info_colors_block = self._settings_subsubsection("Info text colors", info_colors_table)
+        info_colors_group = QGroupBox("")
+        QVBoxLayout(info_colors_group).addWidget(info_colors_table)
+        info_colors_block = self._l2_block("Info text colors", info_colors_group, "half")
 
         # ---- Buttons -- every button in the Statistics view: Files/
         # Folders and Zoom to/Reset in its title line, Fit Range and the
@@ -2333,13 +2344,14 @@ class SettingsTabMixin:
                 lambda hexc, k=key: self._on_stats_button_color_changed(k, True, hexc),
             )))
         self._size_table_to_contents(stats_buttons_table)
-        buttons_block = self._settings_subsubsection("Buttons", stats_buttons_table)
+        stats_buttons_group = QGroupBox("")
+        QVBoxLayout(stats_buttons_group).addWidget(stats_buttons_table)
+        buttons_block = self._l2_block("Buttons", stats_buttons_group, "third")
 
-        stats_colors_outer.addLayout(
-            self._settings_subsection_flow(graph_colors_block, info_colors_block, buttons_block)
-        )
-
-        stats_flow.addWidget(self._settings_subsection("Colors (both panes)", stats_colors_group))
+        # The former "Colors (both panes)" container is gone: its tables
+        # and the tuning rows are Level 2 blocks of their own.
+        for block in (graph_colors_block, color_tuning_block, info_colors_block, buttons_block):
+            stats_flow.addWidget(block)
 
         # ---- Panel Button Colors -- Theme and Misc Colors live in Global
         # Settings at the top of the tab (see there); what's here is
@@ -2401,7 +2413,13 @@ class SettingsTabMixin:
             [("rename", "Rename"), ("new_folder", "New Folder"), ("delete", "Delete")]
         )
 
-        # "Panel Button Colors" is one section whose frame holds the three
+        # Both Panes Buttons: the central Both Panes group's Swap and Sync
+        # (moved here from Misc Buttons).
+        both_panes_colors_group = self._main_button_color_table(
+            [("swap_pane", "Swap"), ("sync", "Sync")]
+        )
+
+        # "Panel Button Colors" is one section whose frame holds the
         # tables side by side, each with its own Level 2 title (see
         # _settings_subsection) since together they form one section
         # rather than three independent ones.
@@ -2411,6 +2429,7 @@ class SettingsTabMixin:
             self._l2_block("Select Buttons", select_colors_group, "third"),
             self._l2_block("Clipboard Buttons", clipboard_colors_group, "third"),
             self._l2_block("File Op Buttons", file_op_colors_group, "third"),
+            self._l2_block("Both Panes Buttons", both_panes_colors_group, "third"),
         ))
         outer.addWidget(self._settings_section("Panel Button Colors", buttons_group))
 
@@ -2679,6 +2698,12 @@ class SettingsTabMixin:
             width = widths[width_class]
             block.setFixedWidth(width)
             for table in group.findChildren(QTableWidget):
+                # A table inside a nested registered block (e.g. the two
+                # tables of "Duplicate Finder Misc Colors") is fitted to
+                # that block, not to this container.
+                if any(other is not group and group.isAncestorOf(other) and other.isAncestorOf(table)
+                       for _b, other, _w in self._l2_blocks):
+                    continue
                 self._fit_table_to_width(group, table, width)
 
     @staticmethod

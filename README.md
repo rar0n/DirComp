@@ -227,10 +227,10 @@ Compare Folders mode
 It is implied that the files are compared to the same relative locations on the other pane / folder.
 
 Duplicate Finder mode
-- Duplicates (Select all files that are duplicates of each other)
+- Duplicates (Select all files in all duplicate file sets (A duplicate file set is just a collection of files that are identical to each other)
 - Extra copies (As above, except un-select 1 copy of each duplicate set, so as to not delete all of them for example)
-- Sel. Dups (From a selection, select all files that have duplicates, ignoring un-selected items)
-- Sel. Extras (As above, but leave 1 file in each duplicate set un-selected)
+- Sel. Dups (From an existing selection, select all duplicate file sets, ignoring un-selected items)
+- Sel. Extras (As above, but leave 1 file in each duplicate set un-selected, to spare 1 copy)
 
 Common:
 Your basic Select All, Clear, Invert (selection) and a couple of auxillaries:

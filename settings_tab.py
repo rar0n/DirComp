@@ -298,7 +298,7 @@ class SettingsTabMixin:
         global_settings_flow = self._settings_subsection_flow()
         global_settings_outer.addLayout(global_settings_flow)
         outer.addWidget(self._settings_section("Global Settings", global_settings_group, space_above=False))
-        global_settings_flow.addWidget(self._l2_block("Theme", theme_group, "half"))
+        global_settings_flow.addWidget(self._l2_block("Theme", theme_group, "two_thirds"))
 
         # ---- Global Options (Level 2 of Global Settings; synced with
         # the Main tab's own group) ----
@@ -793,7 +793,7 @@ class SettingsTabMixin:
             # the numbers in titles all over the Main tab (item counts, sizes,
             # the "Free:" figure), not just the file lists. Its Bg cell holds
             # the Bold checkbox instead of a swatch -- built specially below.
-            ("Title Numeric", None, None, None, None),
+            ("Numeric titles", None, None, None, None),
             # The two colors of each pane's status-line summary at the bottom
             # of the Main tab (see SelectionMixin.update_selection_count) --
             # Fg only. Unselected shows the GUI's own text color until one is
@@ -831,7 +831,7 @@ class SettingsTabMixin:
 
         for i, (label, get_fg, get_bg, on_fg, on_bg) in enumerate(_DEFAULT_COLOR_ROWS):
             default_colors_table.setItem(i, 0, self._table_item(label))
-            if label == "Title Numeric":
+            if label == "Numeric titles":
                 default_colors_table.setCellWidget(
                     i, 1,
                     self._center_in_cell(self._make_color_swatch(

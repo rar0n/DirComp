@@ -54,7 +54,7 @@ Back up your files! Also your folders!
        - File sizes
        - File Filter entries (E.G. file extension statistics counts)
  - Color coded for at-a-glance for which files are missing from either side
- - Synchronize selection of both panes (if the corresponding item (files or folders) exists in the other pane)
+ - Synchronize Views (Same selection in both panes, if the corresponding item (file or folder) exists in the other pane)
  - Pastes multi-selected files from one pane and automatically re-create their folder structure (copying their relative path)
  - Symmetrical (ish) GUI, or not, depending on settings.
  - Color customization (theme colors, custom colors for most buttons etc.)
@@ -62,7 +62,7 @@ Back up your files! Also your folders!
  - Manual Snapshop of folders (see what was there, can also be used for comparisons, selections)
 
 ### Nice-to-have
- - Save selected item list as plain text
+ - Save selected items as a plain text list
 
 
 ### Road map / planned wish list / Maybe

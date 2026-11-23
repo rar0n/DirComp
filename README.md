@@ -190,7 +190,7 @@ Most file listings depend on:
 ### Compare Folders
 Basically, you set two "root" folders, one in each pane (left / right pane) view, and can compare their contents, copy / move files or folders between them, etc.
 
-The entries in the drop-down history list above the file view can be deleted by hovering over them and press "DEL", or "Clear History" button under "Global Settings" - "Options", in Settings tab.
+The entries in the drop-down history list above the file view can be deleted by hovering over them and press "DEL", or "Clear History" button under "Global Settings" - "Options", in Settings tab. You have to press "Save Settings" button in Setttings tab for this to be persistent, however. Otherwise the old contents can be reloaded on next program start, or next time you reload settings (Almost any setting is saved in the settings file, except the cache which use a SQL file)
 
 You can also save a folder in a "Snapshot" file (similar to a cache), and later load it (To e.g. compare differences, but ofc any cut/copy/paste to/from a Snapshot isn't possible)
 

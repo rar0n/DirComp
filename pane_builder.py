@@ -356,7 +356,7 @@ class PaneBuilderMixin:
         # to the left edge for the right pane while Symmetrical GUI is on.
         clear_view_button = QPushButton("Clear view")
         clear_view_button.setToolTip("Empty this pane's file list and timeline, as if starting over.")
-        clear_view_button.setFixedHeight(uniform_h)
+        clear_view_button.setFixedSize(self._view_button_width(), uniform_h)
         clear_view_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("clear_view")))
         clear_view_button.clicked.connect(lambda checked=False, p=pane: self.clear_pane_view(p))
         pane.clear_view_button = clear_view_button
@@ -604,7 +604,8 @@ class PaneBuilderMixin:
         default_bg, default_fg = self._default_button_colors()
         _, uniform_h = self._uniform_button_size()
         reset_button = QPushButton("Reset view")
-        reset_button.setFixedHeight(uniform_h)
+        # Same size as the File List View's Clear view button above it.
+        reset_button.setFixedSize(self._view_button_width(), uniform_h)
         reset_button.setStyleSheet(_bevel_button_stylesheet(*self._stats_button_color_for("reset")))
         pane.tl_reset_button = reset_button
         # "Zoom to" (Zoom to selection) and Reset now sit together at the

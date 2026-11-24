@@ -1252,6 +1252,19 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._uniform_button_dims = (width, height)
         return self._uniform_button_dims
 
+    def _view_button_width(self) -> int:
+        """Shared width of the File List View's "Clear view" and the
+        Statistics View's "Reset view" buttons, which sit one above the
+        other at the pane's outer edge: the wider of the two labels plus
+        the usual bevel and one-average-character padding. Cached --
+        depends only on the app's font."""
+        if not hasattr(self, "_view_button_w"):
+            fm = QFontMetrics(self.font())
+            self._view_button_w = max(
+                fm.horizontalAdvance("Clear view"), fm.horizontalAdvance("Reset view")
+            ) + 14 + fm.averageCharWidth()
+        return self._view_button_w
+
     def _stats_across_button_size(self, kind: str = "copy") -> tuple[int, int]:
         """Fixed size for the Statistics view's Copy--> / Move--> buttons
         -- computed from each action's own actual labels (`kind` is

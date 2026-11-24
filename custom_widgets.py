@@ -649,7 +649,7 @@ _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
 # on a dark track stays visible. 0 = off.
 _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD = 0
 # How the FLV scrollbar handle shows the selection markers beneath it
-# (Settings tab -> Global Options -> "Scrollbar handle style"). Unlike
+# (Settings tab -> File List View -> Scrollbar Tweaks -> "Scrollbar handle style"). Unlike
 # the two opacities above this is NOT per theme -- it's a Global Option,
 # saved once at the top level of the settings file (see
 # settings_ops._SHARED_WIDGET_KEYS). The index of a name here is also

@@ -360,7 +360,7 @@ class FolderSyncMixin:
         heads = ("Missing ratio", "New Files", "Newer files overwriting older", "New Folders",
                  "Total extra size needed")
         pad = "cellpadding='6' cellspacing='0'"
-        out = [f"<table align='center' border='1' {pad} style='border-color:#808080'>",
+        out = ["<br>", f"<table align='center' border='1' {pad} style='border-color:#808080'>",
                "<tr><td></td>" + "".join(f"<td align='center'><b>{h}</b></td>" for h in heads) + "</tr>"]
         for title, *cells in rows:
             out.append(f"<tr><td><b>{title}</b></td>"

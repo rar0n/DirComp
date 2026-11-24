@@ -498,47 +498,6 @@ class SettingsTabMixin:
         self._aligned_option_rows.append((history_label, self.file_list_history_limit_spin))
         global_grid.addLayout(history_row, 8, 0, 1, 7)
 
-        # Row 9-10: how the File List View scrollbar handle shows the
-        # selection markers beneath it -- custom_widgets._SCROLLBAR_STYLE
-        # ["handle_style"], not an attribute of self, so it survives a UI
-        # rebuild by itself (the radios are just re-checked from it
-        # below). A QButtonGroup whose button ids index
-        # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
-        # it as the checked id (see _widget_value), shared, not per
-        # theme, same as the rest of Global Options. Like the history
-        # row, no Main-tab primary -- this control only exists here.
-        scrollbar_gap = QWidget()
-        scrollbar_gap.setFixedHeight(6)
-        global_grid.addWidget(scrollbar_gap, 9, 0, 1, 7)
-
-        scrollbar_style_row = QHBoxLayout()
-        scrollbar_style_row.setContentsMargins(0, 0, 0, 0)
-        scrollbar_style_row.addWidget(QLabel("Scrollbar handle style:"))
-        # Parented to the Global Options box so it goes away with it on
-        # a UI rebuild instead of piling up on the main window.
-        self.scrollbar_handle_style_group = QButtonGroup(global_group)
-        for style_id, text, tip in (
-            (0, "Plain",
-             "No magnification: the selection markers under the scrollbar handle stay "
-             "at their ordinary position on the track."),
-            (1, "Fisheye",
-             "Magnifies the selection markers around the middle of what the File List View "
-             "currently shows, spreading them over the whole handle and easing back to "
-             "normal towards its top and bottom edges."),
-            (2, "Mirrored quarter circle (experimental)",
-             "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
-             "of the view, while markers near the handle's edges bunch together."),
-        ):
-            radio = QRadioButton(text)
-            radio.setToolTip(tip)
-            self.scrollbar_handle_style_group.addButton(radio, style_id)
-            scrollbar_style_row.addWidget(radio)
-            if _SCROLLBAR_HANDLE_STYLES[style_id] == _SCROLLBAR_STYLE["handle_style"]:
-                radio.setChecked(True)
-        scrollbar_style_row.addStretch(1)
-        self.scrollbar_handle_style_group.idToggled.connect(self._on_scrollbar_handle_style_toggled)
-        global_grid.addLayout(scrollbar_style_row, 10, 0, 1, 7)
-
         # Rows 11-14: how two files are judged "the same" (see
         # DiffEngineMixin._comparison_key). Shared by both panes, no
         # Main-tab primary. The state lives in self._cmp_* (so it
@@ -1226,6 +1185,43 @@ class SettingsTabMixin:
         tint_row.addStretch(1)
         flv_general_outer.addLayout(tint_row)
         self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
+
+        # ---- Scrollbar handle style: how the File List View scrollbar handle shows the
+        # selection markers beneath it -- custom_widgets._SCROLLBAR_STYLE
+        # ["handle_style"], not an attribute of self, so it survives a UI
+        # rebuild by itself (the radios are just re-checked from it
+        # below). A QButtonGroup whose button ids index
+        # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
+        # it as the checked id (see _widget_value), shared, not per
+        # theme, like the Global Options. No Main-tab primary -- this
+        # control only exists here. ----
+        scrollbar_style_row = QHBoxLayout()
+        scrollbar_style_row.setContentsMargins(0, 0, 0, 0)
+        scrollbar_style_row.addWidget(QLabel("Scrollbar handle style:"))
+        # Parented to the Scrollbar Tweaks box so it goes away with it on
+        # a UI rebuild instead of piling up on the main window.
+        self.scrollbar_handle_style_group = QButtonGroup(flv_scrollbar_group)
+        for style_id, text, tip in (
+            (0, "Plain",
+             "No magnification: the selection markers under the scrollbar handle stay "
+             "at their ordinary position on the track."),
+            (1, "Fisheye",
+             "Magnifies the selection markers around the middle of what the File List View "
+             "currently shows, spreading them over the whole handle and easing back to "
+             "normal towards its top and bottom edges."),
+            (2, "Mirrored quarter circle (experimental)",
+             "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
+             "of the view, while markers near the handle's edges bunch together."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.scrollbar_handle_style_group.addButton(radio, style_id)
+            scrollbar_style_row.addWidget(radio)
+            if _SCROLLBAR_HANDLE_STYLES[style_id] == _SCROLLBAR_STYLE["handle_style"]:
+                radio.setChecked(True)
+        scrollbar_style_row.addStretch(1)
+        self.scrollbar_handle_style_group.idToggled.connect(self._on_scrollbar_handle_style_toggled)
+        flv_scrollbar_outer.addLayout(scrollbar_style_row)
 
         # ---- Scrollbar handle opacity: how much of the handle's own
         # color covers whatever sits under it in the scrollbar track

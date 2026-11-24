@@ -2487,10 +2487,9 @@ class SettingsTabMixin:
         save_load_row, (self.save_settings_button, self.load_settings_button,
                         self.reset_settings_button) = self._build_save_load_row(
             "Reload Defaults", self._reset_to_defaults,
-            "Reset the current theme's settings back to the program's defaults -- Dark, Light "
-            "and Gloaming Grey get their own default colors (all buttons, row colors, "
-            "Statistics View, ...); the rest comes from default_settings.json. The other "
-            "themes are left alone, and the saved settings file isn't touched; Save Settings "
+            "Reset the current theme's settings (colors, opacities, line options, sizes, GUI "
+            "colors) back to the program's defaults (default_settings.json). The other themes "
+            "are left alone, and the saved settings file isn't touched; Save Settings "
             "afterward if you want the reset to stick.",
         )
 

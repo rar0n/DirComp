@@ -124,23 +124,6 @@ _THEME_DEFAULTS = {
     },
 }
 _THEMES = tuple(_THEME_DEFAULTS.keys())
-# The themes whose built-in colors are THE defaults ("Default theme colors"
-# button); the others (Gloaming Grey, ...) are free variants.
-_OFFICIAL_THEMES = ("dark", "light")
-# Themes whose "Default theme colors" come from a shipped data file
-# (<theme>_colors.json next to this module) instead of the built-in set.
-_FILE_DEFAULT_THEMES = ("gloaming_grey",)
-# Gloaming Grey: its Comparison Type Colors Bg (File List View row backgrounds)
-# are lerped this share toward the GUI background, for a more muted look.
-_GLOAMING_MUTE_SHARE = 0.5
-# Color-set entries that are not colors (opacities, line options, widget
-# values) -- left alone by "Default theme colors".
-_NON_COLOR_SET_KEYS = frozenset({
-    "selection_tint_opacity", "scrollbar_handle_opacity", "scrollbar_track_opacity",
-    "scrollbar_marker_luma_threshold", "stats_selection_opacity", "indent_line_steps",
-    "indent_line_reverse", "dup_steps", "dup_reverse", "dup_fg_mode", "indent_hover_opacity",
-    "indent_lines_enabled", "indent_line_thickness", "indent_line_style", "widgets",
-})
 
 
 class ThemeOpsMixin:
@@ -1459,100 +1442,12 @@ class ThemeOpsMixin:
         except Exception:
             pass
 
-    @staticmethod
-    def _mix_hex(a: str, b: str, share: float = 0.5) -> str:
-        """`a` blended with `b` (`share` of b), as hex."""
-        ca, cb = QColor(a), QColor(b)
-        mixed = [round(x + (y - x) * share) for x, y in
-                 ((ca.red(), cb.red()), (ca.green(), cb.green()), (ca.blue(), cb.blue()))]
-        return QColor(*mixed).name()
-
-    def _shipped_theme_color_set(self, theme: str):
-        """The color set shipped for `theme` in <theme>_colors.json (laid over
-        the built-in one) and its custom GUI colors ("_gui_colors"):
-        (color set, GUI colors or None), or (None, None) if the file is missing
-        or unreadable. Two changes to what the file holds: the Comparison Type
-        Colors Bg are muted toward the GUI background, and the Statistics View
-        File and Folder graph colors are swapped."""
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{theme}_colors.json")
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                shipped = json.load(f)
-        except (OSError, ValueError):
-            return None, None
-        if not isinstance(shipped, dict):
-            return None, None
-        merged = self._merged_color_set(theme, shipped)
-        gui = shipped.get("_gui_colors")
-        gui = tuple(gui) if gui else None
-        gui_bg = gui[1] if gui else _THEME_DEFAULTS[theme]["gui_bg"]
-        stats = merged["stats_colors"]
-        stats["file"], stats["folder"] = stats["folder"], stats["file"]
-        tags = [t for pair in _SELECT_KEY_TO_TAG_COLOR_KEYS.values() for t in pair]
-        tags += ["unhashed_file", "unhashed_dir", "changed_file", "changed_dir", "hashed_file", "hashed_dir"]
-        for tag in tags:
-            bg_fg = merged["tag_colors"].get(tag)
-            if bg_fg and bg_fg[0]:
-                merged["tag_colors"][tag] = [self._mix_hex(bg_fg[0], gui_bg, _GLOAMING_MUTE_SHARE), bg_fg[1]]
-        return merged, gui
-
-    @staticmethod
-    def _theme_default_button_colors(theme: str) -> tuple[str, str]:
-        """(bg, fg) the automatic default button color gives on the official
-        `theme`'s built-in window color (see _default_button_colors) -- Dark's
-        for any other theme, whatever its own tones."""
-        defaults = _THEME_DEFAULTS[theme if theme in _OFFICIAL_THEMES + _FILE_DEFAULT_THEMES else "dark"]
-        bg = QColor(defaults["gui_bg"])
-        if bg.lightness() < 128:
-            return bg.lighter(130).name(), "#F5F5F5"
-        return bg.darker(110).name(), "black"
-
-    def _overlay_theme_default_colors(self, new_set: dict):
-        """Lays the active theme's default COLORS over `new_set` (in place):
-        Dark/Light's built-in colors, Gloaming Grey's shipped ones
-        (<theme>_colors.json, with its Duplicate File Colors steps / reverse /
-        text-color mode) -- all button colors (Select, Clipboard, File Op,
-        FLV, Statistics, Cancel, default button), the file/folder row colors,
-        Statistics, scrollbar, indentation-line and every other color. The
-        opacities, line options and other widget values of `new_set` stay.
-        Returns the theme's custom GUI colors (None for the built-in ones),
-        or False when the theme has no such defaults (any other theme)."""
-        shipped = self._theme in _FILE_DEFAULT_THEMES
-        if self._theme not in _OFFICIAL_THEMES and not shipped:
-            return False
-        builtin, shipped_gui = self._shipped_theme_color_set(self._theme) if shipped else (None, None)
-        if builtin is None:
-            shipped = False
-            builtin = self._builtin_color_set(self._theme)
-        btn_bg, btn_fg = self._theme_default_button_colors(self._theme)
-        dup_keys = ("dup_steps", "dup_reverse", "dup_fg_mode") if shipped else ()
-        for key, value in builtin.items():
-            if key not in _NON_COLOR_SET_KEYS or key in dup_keys:
-                new_set[key] = value
-        # Every button gets the theme's one default button color: the Select
-        # group (its own table), Clipboard / File Op / Both Panes / FLV buttons
-        # (the ones with a fixed design color of their own get it explicitly)
-        # and the Statistics View buttons. Only the Statistics View mode
-        # switch pressed-in looks (Main tab and Statistics View) keep their blue, to tell the modes apart.
-        if not shipped:  # a shipped set brings all its own button colors
-            new_set["select_colors"] = {k: [btn_fg, btn_bg] for k in new_set["select_colors"]}
-            new_set["main_button_colors"] = {
-                k: (v if k in ("mode_pressed", "dup_list_pressed")
-                    else None if k in _THEME_DEFAULT_MAIN_BUTTON_KEYS else [btn_bg, btn_fg])
-                for k, v in builtin["main_button_colors"].items()
-            }
-            new_set["stats_button_colors"] = {k: None for k in new_set["stats_button_colors"]}
-        return shipped_gui if shipped else None
-
     def _reset_to_defaults(self):
         """"Reload Defaults": every setting of the ACTIVE theme (its
         whole set -- colors, opacities, indentation-line options and
         every other per-theme Settings-tab control -- plus its custom
-        GUI colors) back to the defaults: the colors of Dark, Light and
-        Gloaming Grey are that theme's own default colors (see
-        _overlay_theme_default_colors), everything else -- and every color
-        of any other theme -- the values in default_settings.json (the
-        built-in ones for anything that file lacks). Does not touch
+        GUI colors) back to the values in default_settings.json (the built-in
+        ones for anything that file lacks). Does not touch
         any other theme's set, the Global Options, or the theme itself,
         and does not save to disk on its own (Save Settings afterward
         if you want it to stick)."""
@@ -1561,19 +1456,10 @@ class ThemeOpsMixin:
         # theme itself isn't switched.
         shipped_set, shipped_gui = self._shipped_defaults_for_theme(self._theme)
         new_set = self._merged_color_set(self._theme, shipped_set) if shipped_set else self._builtin_color_set(self._theme)
-        new_custom = new_set.get("custom_default_button_colors")
-        old_gui = self._gui_colors.get(self._theme)
-        # The theme's own default colors (Dark/Light built-in, Gloaming Grey
-        # shipped) replace the file's colors; the file still supplies the
-        # non-color values (opacities, line options, widget values).
-        theme_gui = self._overlay_theme_default_colors(new_set)
-        if theme_gui is not False:
-            shipped_gui = theme_gui
-            new_custom = new_set.get("custom_default_button_colors")
-        needs_rebuild = (theme_gui is not False or
-            (tuple(new_custom) if new_custom else None) != self._custom_default_button_colors
-            or shipped_gui != (tuple(old_gui) if old_gui else None)
-        )
+        # Always a full rebuild: the defaults recolor every button (Select,
+        # Clipboard, File Op, FLV, Statistics, Cancel, the Settings tab's own)
+        # and may bring other GUI colors, so nothing is left on its old look.
+        needs_rebuild = True
         self._gui_colors[self._theme] = shipped_gui
         self._load_color_set_into_live(new_set)
         self._apply_theme_palette(self._theme)

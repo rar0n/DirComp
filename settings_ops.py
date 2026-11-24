@@ -58,7 +58,7 @@ _SHARED_WIDGET_KEYS = frozenset({
     "recursive_folder_contents", "expand_matching", "list_directories", "list_files",
     "sort_directories_first", "symmetrical_buttons", "synchronize_views",
     "dual_pane", "unnatural_scrolling", "hash_progress_in_list",
-    "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
+    "invert_statistics_zoom", "file_list_history_limit",
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
     "cache_hashed_folders",

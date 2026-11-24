@@ -11,7 +11,6 @@
   "hash_progress_in_list": true,
   "invert_statistics_zoom": false,
   "file_list_history_limit": 30,
-  "scrollbar_handle_style": 2,
   "comparison_type": 0,
   "hash_algorithm": 2,
   "fingerprint_start_kb": 64,
@@ -452,7 +451,8 @@
           "right_timeline_strip_units": false,
           "right_timeline_strip_names": false,
           "right_timeline_strip_abbreviate": false,
-          "right_timeline_strip_week_number": false
+          "right_timeline_strip_week_number": false,
+          "scrollbar_handle_style": 1
         }
       },
       "light": {
@@ -834,7 +834,8 @@
           "right_timeline_strip_units": false,
           "right_timeline_strip_names": false,
           "right_timeline_strip_abbreviate": false,
-          "right_timeline_strip_week_number": false
+          "right_timeline_strip_week_number": false,
+          "scrollbar_handle_style": 1
         }
       },
       "gloaming_grey": {
@@ -1064,20 +1065,6 @@
         "stats_colors": {
           "file": {
             "background_color": "#a0a0a0",
-            "selection_color": "#c4c4c4",
-            "hover_color": "#ffffff",
-            "hover_opacity": 35,
-            "partial_lerp": 50,
-            "bin_info_color": "#ffffff",
-            "stripped_info_color": "#ffffff",
-            "bin_color": "#808080",
-            "grid_color": "#e0e0e0",
-            "axis_label_color": "#ffffff",
-            "hover_label_color": "#ffffff",
-            "selection_info_color": "#ffffff"
-          },
-          "folder": {
-            "background_color": "#a0a0a0",
             "selection_color": "#404040",
             "hover_color": "#000000",
             "hover_opacity": 35,
@@ -1089,6 +1076,20 @@
             "axis_label_color": "#000000",
             "hover_label_color": "#000000",
             "selection_info_color": "#000000"
+          },
+          "folder": {
+            "background_color": "#a0a0a0",
+            "selection_color": "#c4c4c4",
+            "hover_color": "#ffffff",
+            "hover_opacity": 35,
+            "partial_lerp": 50,
+            "bin_info_color": "#ffffff",
+            "stripped_info_color": "#ffffff",
+            "bin_color": "#808080",
+            "grid_color": "#e0e0e0",
+            "axis_label_color": "#ffffff",
+            "hover_label_color": "#ffffff",
+            "selection_info_color": "#ffffff"
           }
         },
         "stats_button_colors": {
@@ -1173,9 +1174,9 @@
           "filter_apply": null
         },
         "selection_tint_opacity": 25,
-        "scrollbar_handle_opacity": 78,
-        "scrollbar_track_opacity": 100,
-        "scrollbar_marker_luma_threshold": 0,
+        "scrollbar_handle_opacity": 40,
+        "scrollbar_track_opacity": 50,
+        "scrollbar_marker_luma_threshold": 64,
         "stats_selection_opacity": {
           "file": 35,
           "folder": 35
@@ -1232,7 +1233,8 @@
           "right_timeline_strip_units": false,
           "right_timeline_strip_names": false,
           "right_timeline_strip_abbreviate": false,
-          "right_timeline_strip_week_number": false
+          "right_timeline_strip_week_number": false,
+          "scrollbar_handle_style": 2
         }
       }
     }

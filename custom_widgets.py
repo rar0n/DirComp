@@ -707,9 +707,8 @@ _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
 _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD = 0
 # How the FLV scrollbar handle shows the selection markers beneath it
 # (Settings tab -> File List View -> Scrollbar Tweaks -> "Scrollbar handle style"). Unlike
-# the two opacities above this is NOT per theme -- it's a Global Option,
-# saved once at the top level of the settings file (see
-# settings_ops._SHARED_WIDGET_KEYS). The index of a name here is also
+# the two opacities above this is a per-theme widget value (saved inside each
+# theme's set under "widgets"; see settings_ops._per_theme_widgets). The index of a name here is also
 # its radio button's id in that Settings-tab QButtonGroup, and what gets
 # persisted, so append rather than reorder.
 #   "plain"   -- no magnification: markers under the handle are drawn at

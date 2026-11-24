@@ -1211,8 +1211,8 @@ class SettingsTabMixin:
         # rebuild by itself (the radios are just re-checked from it
         # below). A QButtonGroup whose button ids index
         # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
-        # it as the checked id (see _widget_value), shared, not per
-        # theme, like the Global Options. No Main-tab primary -- this
+        # it as the checked id (see _widget_value), inside each theme's set
+        # (a per-theme widget, like the two opacities). No Main-tab primary -- this
         # control only exists here. ----
         scrollbar_style_row = QHBoxLayout()
         scrollbar_style_row.setContentsMargins(0, 0, 0, 0)

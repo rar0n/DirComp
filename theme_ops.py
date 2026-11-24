@@ -904,8 +904,8 @@ class ThemeOpsMixin:
         radio group (QButtonGroup.idToggled: fires for the button that
         just got checked AND the one that just got unchecked, so only
         the former is acted on). style_id indexes _SCROLLBAR_HANDLE_STYLES.
-        Not a per-theme setting, so it lives in _SCROLLBAR_STYLE but not
-        in a color set (see _capture_color_set)."""
+        It lives in _SCROLLBAR_STYLE; the radio group's checked id is a
+        per-theme widget value, saved in each theme's set."""
         if not checked or not 0 <= style_id < len(_SCROLLBAR_HANDLE_STYLES):
             return
         _SCROLLBAR_STYLE["handle_style"] = _SCROLLBAR_HANDLE_STYLES[style_id]

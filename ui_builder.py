@@ -707,7 +707,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.swap_pane_button.setFixedSize(uniform_w, uniform_h)
         self.swap_pane_button.clicked.connect(lambda checked=False: self._swap_panes())
-        self.sync_button = QPushButton("2-line\nSync")
+        self.sync_button = QPushButton("2-way\nSync")
         self.sync_button.setToolTip(self._SYNC_TOOLTIP)
         self.sync_button.setFixedSize(uniform_w, uniform_h * 2)
         self.sync_button.clicked.connect(lambda checked=False: self._sync_panes())

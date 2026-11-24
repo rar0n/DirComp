@@ -1133,16 +1133,16 @@ class ThemeOpsMixin:
             main_button_colors[key] = None
         stats_colors = {"file": dict(stats_palette), "folder": dict(stats_palette)}
         # Each Statistics View mode in its own "standard" color family -- grey
-        # for File mode, blue for Folder mode: grid the darkest shade, bins a
-        # mid shade, selection a very light one (hover stays the theme's own
-        # white/black tint). Light theme shades are kept dark/saturated
-        # enough to show on its white background.
+        # for File mode, blue for Folder mode: bins a mid shade, selection the
+        # extreme shade against the background (very light on Dark, black / very
+        # dark blue on Light), grid left as it looks good on both. Hover stays
+        # the theme's own white/black tint.
         light = theme == "light"
         families = {
             "file": {"grid_color": "#505050" if light else "#4A4A4A", "bin_color": "#808080" if light else "#8C8C8C",
-                     "selection_color": "#C8C8C8" if light else "#E8E8E8"},
+                     "selection_color": "#000000" if light else "#E8E8E8"},
             "folder": {"grid_color": "#2B5BA8" if light else "#1F3E6E", "bin_color": "#4682DC",
-                       "selection_color": "#BBD5F7" if light else "#CFE3FF"},
+                       "selection_color": "#0B2A5C" if light else "#CFE3FF"},
         }
         for mode, colors in families.items():
             stats_colors[mode].update(colors)

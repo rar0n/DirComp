@@ -2470,7 +2470,7 @@ class SettingsTabMixin:
                         self.reset_settings_button) = self._build_save_load_row(
             "Reload Defaults", self._reset_to_defaults,
             "Reset the current theme's colors (and the color-related options) back "
-            "to the program's own built-in defaults -- the other theme's colors are "
+            "to the program's shipped defaults (default_settings.json) -- the other themes' colors are "
             "left alone, and the saved settings file isn't touched; Save Settings "
             "afterward if you want the reset to stick.",
         )

@@ -36,6 +36,11 @@ from constants import CMP_FINGERPRINT, CMP_HASH, CMP_NAME_SIZE_DATE
 from theme_ops import _THEMES
 
 _SETTINGS_FILENAME = "dircomp_settings.json"
+# The shipped starting values "Reload Defaults" puts back (see
+# _shipped_defaults_for_theme): same format as a saved settings file, but
+# tracked in the repo, never written by the program, and without the
+# per-user bits (folder histories, window size).
+_DEFAULTS_FILENAME = "default_settings.json"
 
 # The only widget settings NOT kept per theme: Global Options (the Main
 # tab's checkboxes and their Settings-tab copies). Every other widget in _settings_widgets() is saved
@@ -390,6 +395,25 @@ class SettingsMixin:
         folder) rather than tucked away somewhere OS-specific."""
         program_dir = os.path.dirname(os.path.abspath(__file__))
         return os.path.join(program_dir, _SETTINGS_FILENAME)
+
+    def _shipped_defaults_for_theme(self, theme: str):
+        """(color set, custom GUI colors) that default_settings.json holds
+        for `theme`, each None when the file, the theme or that part is
+        missing or unreadable -- the caller then falls back to the
+        built-in values. The set is laid over the built-in one (see
+        _merged_color_set), so a default file from before some newer
+        setting existed still gives every key a value."""
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), _DEFAULTS_FILENAME)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                raw = json.load(f).get("_raw") or {}
+            color_set = (raw.get("color_sets") or {}).get(theme)
+            gui = (raw.get("gui_colors") or {}).get(theme)
+        except (OSError, ValueError, AttributeError):
+            return None, None
+        if not isinstance(color_set, dict):
+            color_set = None
+        return color_set, (tuple(gui) if gui else None)
 
     def save_settings(self, quiet: bool = False):
         """Write every widget in _settings_widgets() to disk, keyed by

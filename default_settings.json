@@ -1,0 +1,1292 @@
+{
+  "recursive_folder_contents": true,
+  "expand_matching": true,
+  "list_directories": true,
+  "list_files": true,
+  "sort_directories_first": true,
+  "symmetrical_buttons": true,
+  "synchronize_views": false,
+  "dual_pane": true,
+  "unnatural_scrolling": false,
+  "invert_statistics_zoom": false,
+  "file_list_history_limit": 30,
+  "scrollbar_handle_style": 2,
+  "comparison_type": 0,
+  "hash_algorithm": 2,
+  "fingerprint_start_kb": 64,
+  "fingerprint_end_kb": 64,
+  "ignore_file_extensions": false,
+  "first_name_only": false,
+  "cache_hashed_folders": true,
+  "ignore_empty_files": false,
+  "scan_expanded_folders": true,
+  "extra_copies_keep": 0,
+  "hash_same_size_files": true,
+  "ignore_hard_links": false,
+  "folder_counts_include_subfolders": true,
+  "binary_sizes": true,
+  "context_menu_separator": 1,
+  "context_menu_column_spaces": 2,
+  "context_menu_indent_spaces": 2,
+  "context_menu_nice_format": true,
+  "sync_warn_enabled": true,
+  "sync_warn_percent": 50,
+  "sync_min_enabled": true,
+  "sync_min_files": 10,
+  "left_folder_history": [],
+  "right_folder_history": [],
+  "file_filter_types": [
+    "*.ckpt",
+    "*.cpp",
+    "*.css",
+    "*.doc",
+    "*.docx",
+    "*.gif",
+    "*.h",
+    "*.html",
+    "*.java",
+    "*.jpeg",
+    "*.jpg",
+    "*.js",
+    "*.json",
+    "*.mp3",
+    "*.mp4",
+    "*.pdf",
+    "*.png",
+    "*.pt",
+    "*.py",
+    "*.safetensors",
+    "*.txt",
+    "*.xls",
+    "*.xlsx",
+    "*.zip"
+  ],
+  "_raw": {
+    "theme": "dark",
+    "gui_colors": {
+      "dark": [
+        "#cfcfcf",
+        "#3A3A3A"
+      ],
+      "light": null,
+      "gloaming_grey": null
+    },
+    "color_sets": {
+      "dark": {
+        "select_colors": {
+          "select_all": [
+            "black",
+            "#F5D400"
+          ],
+          "clear": [
+            "black",
+            "#e5e5e5"
+          ],
+          "missing": [
+            "#000000",
+            "#FFA0A0"
+          ],
+          "matching": [
+            "black",
+            "#90E0C0"
+          ],
+          "newer": [
+            "black",
+            "#DECFA3"
+          ],
+          "older": [
+            "black",
+            "#C9A96E"
+          ],
+          "smaller": [
+            "black",
+            "#D9BCF0"
+          ],
+          "larger": [
+            "black",
+            "#B98CE0"
+          ],
+          "diff_folders": [
+            "#55ffff",
+            "#5555ff"
+          ],
+          "dup_all": [
+            "black",
+            "#F0D080"
+          ],
+          "dup_extra": [
+            "black",
+            "#E58E8E"
+          ],
+          "dup_sel": [
+            "black",
+            "#E6C46A"
+          ],
+          "dup_sel_extra": [
+            "black",
+            "#D97C7C"
+          ],
+          "file_parent": [
+            "white",
+            "#3355DD"
+          ],
+          "all_parents": [
+            "white",
+            "#1A237E"
+          ],
+          "item_childs": [
+            "white",
+            "#2E8B57"
+          ],
+          "all_childs": [
+            "white",
+            "#145A32"
+          ]
+        },
+        "summary_colors": {
+          "missing": "#FFA0A0",
+          "matching": "#90E0C0",
+          "newer": "#DECFA3",
+          "older": "#C9A96E",
+          "smaller": "#D9BCF0",
+          "larger": "#B98CE0",
+          "diff_folders": "#ff55ff"
+        },
+        "folder_color": [
+          "#0088ff",
+          "#baba5d"
+        ],
+        "progress_bar_colors": {
+          "fg": "#2ec27e",
+          "bg": "#2A2A2A",
+          "busy": "#7e0000"
+        },
+        "scrollbar_colors": {
+          "groove": "#1A1A1A",
+          "handle": "#E8E8E8"
+        },
+        "invert_button_colors": {
+          "dark": "#000000",
+          "light": "#e5e5e5"
+        },
+        "custom_default_button_colors": null,
+        "tag_colors": {
+          "common_file": [
+            "#90E0C0",
+            "black"
+          ],
+          "common_dir": [
+            "#90E0C0",
+            "#0000ff"
+          ],
+          "missing_file": [
+            "#FFA0A0",
+            "#000000"
+          ],
+          "missing_dir": [
+            "#FFA0A0",
+            "#0000ff"
+          ],
+          "diff_size_smaller_file": [
+            "#D9BCF0",
+            "black"
+          ],
+          "diff_size_larger_file": [
+            "#B98CE0",
+            "black"
+          ],
+          "diff_date_newer_file": [
+            "#DECFA3",
+            "black"
+          ],
+          "diff_date_older_file": [
+            "#C9A96E",
+            "black"
+          ],
+          "diff_count_smaller_dir": [
+            "#D9BCF0",
+            "#0000ff"
+          ],
+          "diff_count_larger_dir": [
+            "#B98CE0",
+            "#0000ff"
+          ],
+          "diff_date_newer_dir": [
+            "#DECFA3",
+            "#0000ff"
+          ],
+          "diff_date_older_dir": [
+            "#C9A96E",
+            "#0000ff"
+          ],
+          "diff_content_dir": [
+            "#6d246d",
+            "#55ffff"
+          ],
+          "diff_content_file": [
+            "#7777DD",
+            "blue"
+          ],
+          "directory": [
+            "#baba5d",
+            "#0088ff"
+          ],
+          "file": [
+            "#000000",
+            "#dedede"
+          ],
+          "hardlink_file": [
+            "#D8C0E8",
+            "black"
+          ],
+          "empty_dir": [
+            "#1e1e20",
+            "#9569ff"
+          ],
+          "empty_dir_cmp": [
+            "#D4DCE8",
+            "#9569ff"
+          ],
+          "dupfolder": [
+            null,
+            "#0088ff"
+          ],
+          "error": [
+            "#FFB6C1",
+            "red"
+          ],
+          "unhashed_file": [
+            "#C8C8C8",
+            "black"
+          ],
+          "unhashed_dir": [
+            "#B0B0B0",
+            "blue"
+          ],
+          "changed_file": [
+            "#E8C888",
+            "black"
+          ],
+          "changed_dir": [
+            "#D4A85C",
+            "blue"
+          ],
+          "hashed_file": [
+            "#B8E0E8",
+            "black"
+          ],
+          "hashed_dir": [
+            "#9CCBD6",
+            "blue"
+          ]
+        },
+        "selection_tint_color": "#deddda",
+        "flv_bg_color": "#1e1e20",
+        "title_numeric_color": "#ffffff",
+        "status_selected_color": "#F5D400",
+        "status_unselected_color": null,
+        "status_warning_color": "#FF5050",
+        "group_border_color": "#8C8C8C",
+        "history_live_color": "#FFFFFF",
+        "history_snapshot_color": "#c4a6dc",
+        "indent_line_color1": "#ff0000",
+        "indent_line_color2": "#ff00ff",
+        "indent_hover_color": "#ffffff",
+        "stats_colors": {
+          "file": {
+            "background_color": "#1E1E20",
+            "selection_color": "#f8e45c",
+            "bin_info_color": "#D2D2D2",
+            "stripped_info_color": "#00ff7f",
+            "hover_color": "#FFFFFF",
+            "hover_opacity": 67,
+            "partial_lerp": 40,
+            "bin_color": "#9a9996",
+            "grid_color": "#004b07",
+            "axis_label_color": "#00a300",
+            "hover_label_color": "#b8f997",
+            "selection_info_color": "#E68C14"
+          },
+          "folder": {
+            "background_color": "#1e1e20",
+            "selection_color": "#99c1f1",
+            "bin_info_color": "#D2D2D2",
+            "stripped_info_color": "#00aaff",
+            "hover_color": "#FFFFFF",
+            "hover_opacity": 67,
+            "partial_lerp": 50,
+            "bin_color": "#3d39fc",
+            "grid_color": "#0028b5",
+            "axis_label_color": "#004fb6",
+            "hover_label_color": "#55ffff",
+            "selection_info_color": "#aaaaff"
+          }
+        },
+        "stats_button_colors": {
+          "mode_unpressed": [
+            "#565656",
+            "#c6c600"
+          ],
+          "mode_pressed": [
+            "#39007f",
+            "#ffff7f"
+          ],
+          "zoom_to": [
+            "#a9784b",
+            "#ffff7f"
+          ],
+          "reset": [
+            "#b4b4b4",
+            "#000000"
+          ],
+          "fit_range": null,
+          "zoom_in": [
+            "#2d2d2d",
+            "#f8e45c"
+          ],
+          "zoom_out": [
+            "#2d2d2d",
+            "#f8e45c"
+          ]
+        },
+        "main_button_colors": {
+          "copy": [
+            "#D0D0D0",
+            "black"
+          ],
+          "copy_flat": [
+            "#B5C7D3",
+            "black"
+          ],
+          "cut": [
+            "#9a9996",
+            "black"
+          ],
+          "paste": [
+            "#A9784B",
+            "#F5F5F5"
+          ],
+          "paste_folders": [
+            "#6E6694",
+            "#F5F5F5"
+          ],
+          "new_folder": [
+            "#3355DD",
+            "black"
+          ],
+          "delete": [
+            "#C0392B",
+            "#F5F5F5"
+          ],
+          "mode_pressed": [
+            "#00007f",
+            "#ffff7f"
+          ],
+          "dup_list_pressed": [
+            "#39007f",
+            "#ffff7f"
+          ],
+          "rename": [
+            "#55557f",
+            "#F5F5F5"
+          ],
+          "copy_across": [
+            "#ff7800",
+            "#F5F5F5"
+          ],
+          "move_across": [
+            "#63452c",
+            "#F5F5F5"
+          ],
+          "refresh": [
+            "#52fcd7",
+            "#00007f"
+          ],
+          "up": [
+            "#2d2d2d",
+            "#f8e45c"
+          ],
+          "select_dir": null,
+          "clear_view": [
+            "#e5e5e5",
+            "#000000"
+          ],
+          "expand_all": [
+            "#2d2d2d",
+            "#f8e45c"
+          ],
+          "collapse_all": [
+            "#2d2d2d",
+            "#f8e45c"
+          ],
+          "hash": [
+            "#ff5500",
+            "#ffff00"
+          ],
+          "pane_refresh": [
+            "#53ffda",
+            "#00007f"
+          ],
+          "save_snapshot": [
+            "#005500",
+            "#F5F5F5"
+          ],
+          "mode_unpressed": [
+            "#4b4b4b",
+            "#c6c6c6"
+          ],
+          "swap_pane": [
+            "#006d6d",
+            "#F5F5F5"
+          ],
+          "sync": [
+            "#990000",
+            "#ffff7f"
+          ],
+          "dup_list_unpressed": [
+            "#565656",
+            "#c6c600"
+          ],
+          "filter_clear": [
+            "#e5e5e5",
+            "#00007f"
+          ],
+          "filter_apply": null,
+          "rehash": [
+            "#ff5500",
+            "#F5F5F5"
+          ]
+        },
+        "selection_tint_opacity": 50,
+        "scrollbar_handle_opacity": 30,
+        "scrollbar_track_opacity": 50,
+        "scrollbar_marker_luma_threshold": 64,
+        "stats_selection_opacity": {
+          "file": 35,
+          "folder": 35
+        },
+        "indent_line_steps": 7,
+        "indent_line_reverse": false,
+        "dup_steps": 15,
+        "dup_color1": "#C07070",
+        "dup_color2": "#7070C0",
+        "dup_reverse": false,
+        "dup_fg_mode": 2,
+        "dup_fg_color": "#ffffff",
+        "indent_hover_opacity": 66,
+        "indent_lines_enabled": true,
+        "indent_line_thickness": 1,
+        "indent_line_style": 2,
+        "indent_tick_enabled": true,
+        "indent_tick_files": true,
+        "indent_tick_files_left": false,
+        "indent_tick_length": 3,
+        "indent_tick_folders": false,
+        "indent_tick_folders_left": true,
+        "indent_tick_folder_length": 6,
+        "indent_sel_enabled": true,
+        "indent_sel_increase": 1,
+        "indent_sel_ticks": true,
+        "widgets": {
+          "force_single_date_column": true,
+          "mirror_statistics_buttons": false,
+          "file_list_ratio": 0.63,
+          "title_numeric_bold": true,
+          "file_list_indentation": 16,
+          "flv_font_size": 12,
+          "left_timeline_bin_count": 30,
+          "left_timeline_nice_bins": true,
+          "left_timeline_log_scale": false,
+          "left_timeline_log_size_axis": false,
+          "left_timeline_auto_vrange": true,
+          "left_timeline_font_size": 12,
+          "left_timeline_tick_angle": 44,
+          "left_timeline_auto_tick_angle": true,
+          "left_timeline_strip_units": false,
+          "left_timeline_strip_names": false,
+          "left_timeline_strip_abbreviate": false,
+          "left_timeline_strip_week_number": false,
+          "right_timeline_bin_count": 30,
+          "right_timeline_nice_bins": true,
+          "right_timeline_log_scale": false,
+          "right_timeline_log_size_axis": false,
+          "right_timeline_auto_vrange": true,
+          "right_timeline_font_size": 12,
+          "right_timeline_tick_angle": 44,
+          "right_timeline_auto_tick_angle": true,
+          "right_timeline_strip_units": false,
+          "right_timeline_strip_names": false,
+          "right_timeline_strip_abbreviate": false,
+          "right_timeline_strip_week_number": false
+        }
+      },
+      "light": {
+        "select_colors": {
+          "select_all": [
+            "black",
+            "#F5D400"
+          ],
+          "clear": [
+            "black",
+            "#FFFFFF"
+          ],
+          "missing": [
+            "black",
+            "#FFA0A0"
+          ],
+          "matching": [
+            "black",
+            "#90E0C0"
+          ],
+          "newer": [
+            "black",
+            "#DECFA3"
+          ],
+          "older": [
+            "black",
+            "#C9A96E"
+          ],
+          "smaller": [
+            "black",
+            "#D9BCF0"
+          ],
+          "larger": [
+            "black",
+            "#B98CE0"
+          ],
+          "diff_folders": [
+            "blue",
+            "#7777DD"
+          ],
+          "dup_all": [
+            "black",
+            "#F0D080"
+          ],
+          "dup_extra": [
+            "black",
+            "#E58E8E"
+          ],
+          "dup_sel": [
+            "black",
+            "#E6C46A"
+          ],
+          "dup_sel_extra": [
+            "black",
+            "#D97C7C"
+          ],
+          "file_parent": [
+            "white",
+            "#3355DD"
+          ],
+          "all_parents": [
+            "white",
+            "#1A237E"
+          ],
+          "item_childs": [
+            "white",
+            "#2E8B57"
+          ],
+          "all_childs": [
+            "white",
+            "#145A32"
+          ]
+        },
+        "summary_colors": {
+          "missing": "#FFA0A0",
+          "matching": "#90E0C0",
+          "newer": "#DECFA3",
+          "older": "#C9A96E",
+          "smaller": "#D9BCF0",
+          "larger": "#B98CE0",
+          "diff_folders": "#7777DD"
+        },
+        "folder_color": [
+          "blue",
+          "#E0E090"
+        ],
+        "progress_bar_colors": {
+          "fg": "#4A90D9",
+          "bg": "#D0D0D0",
+          "busy": "#E0A030"
+        },
+        "scrollbar_colors": {
+          "groove": "#D8D8D8",
+          "handle": "#7A7A7A"
+        },
+        "invert_button_colors": {
+          "dark": "#000000",
+          "light": "#FFFFFF"
+        },
+        "custom_default_button_colors": null,
+        "tag_colors": {
+          "directory": [
+            "#E0E090",
+            "blue"
+          ],
+          "file": [
+            null,
+            null
+          ],
+          "error": [
+            "#FFB6C1",
+            "red"
+          ],
+          "hardlink_file": [
+            "#D8C0E8",
+            "black"
+          ],
+          "empty_dir": [
+            "#D4DCE8",
+            "blue"
+          ],
+          "empty_dir_cmp": [
+            "#D4DCE8",
+            "blue"
+          ],
+          "dupfolder": [
+            null,
+            "blue"
+          ],
+          "unhashed_file": [
+            "#C8C8C8",
+            "black"
+          ],
+          "unhashed_dir": [
+            "#B0B0B0",
+            "blue"
+          ],
+          "changed_file": [
+            "#E8C888",
+            "black"
+          ],
+          "changed_dir": [
+            "#D4A85C",
+            "blue"
+          ],
+          "hashed_file": [
+            "#B8E0E8",
+            "black"
+          ],
+          "hashed_dir": [
+            "#9CCBD6",
+            "blue"
+          ],
+          "missing_file": [
+            "#FFA0A0",
+            "black"
+          ],
+          "missing_dir": [
+            "#FFA0A0",
+            "#0000ff"
+          ],
+          "common_file": [
+            "#55aa7f",
+            "black"
+          ],
+          "common_dir": [
+            "#90E0C0",
+            "#0000ff"
+          ],
+          "diff_date_newer_file": [
+            "#DECFA3",
+            "black"
+          ],
+          "diff_date_newer_dir": [
+            "#DECFA3",
+            "#0000ff"
+          ],
+          "diff_date_older_file": [
+            "#C9A96E",
+            "black"
+          ],
+          "diff_date_older_dir": [
+            "#C9A96E",
+            "#0000ff"
+          ],
+          "diff_size_smaller_file": [
+            "#D9BCF0",
+            "black"
+          ],
+          "diff_count_smaller_dir": [
+            "#D9BCF0",
+            "#0000ff"
+          ],
+          "diff_size_larger_file": [
+            "#B98CE0",
+            "black"
+          ],
+          "diff_count_larger_dir": [
+            "#B98CE0",
+            "#0000ff"
+          ],
+          "diff_content_file": [
+            "#7777DD",
+            "blue"
+          ],
+          "diff_content_dir": [
+            "#7777DD",
+            "blue"
+          ]
+        },
+        "selection_tint_color": "#F5D400",
+        "flv_bg_color": null,
+        "title_numeric_color": "#C05A00",
+        "status_selected_color": "#ff7903",
+        "status_unselected_color": null,
+        "status_warning_color": "#C00000",
+        "group_border_color": "#5A5A5A",
+        "history_live_color": "#000000",
+        "history_snapshot_color": "#707070",
+        "indent_line_color1": "#ff0000",
+        "indent_line_color2": "#aa00ff",
+        "indent_hover_color": "#000000",
+        "stats_colors": {
+          "file": {
+            "background_color": "#FFFFFF",
+            "selection_color": "#E68C14",
+            "hover_color": "#000000",
+            "hover_opacity": 35,
+            "partial_lerp": 50,
+            "bin_info_color": "#303030",
+            "stripped_info_color": "#303030",
+            "bin_color": "#77767b",
+            "grid_color": "#D0D0D0",
+            "axis_label_color": "#303030",
+            "hover_label_color": "#303030",
+            "selection_info_color": "#B35C00"
+          },
+          "folder": {
+            "background_color": "#FFFFFF",
+            "selection_color": "#E68C14",
+            "hover_color": "#000000",
+            "hover_opacity": 35,
+            "partial_lerp": 50,
+            "bin_info_color": "#303030",
+            "stripped_info_color": "#303030",
+            "bin_color": "#4682DC",
+            "grid_color": "#D0D0D0",
+            "axis_label_color": "#303030",
+            "hover_label_color": "#303030",
+            "selection_info_color": "#B35C00"
+          }
+        },
+        "stats_button_colors": {
+          "mode_unpressed": null,
+          "mode_pressed": [
+            "#8e96ff",
+            "black"
+          ],
+          "zoom_to": null,
+          "reset": null,
+          "fit_range": null,
+          "zoom_in": null,
+          "zoom_out": null
+        },
+        "main_button_colors": {
+          "copy": [
+            "#D0D0D0",
+            "black"
+          ],
+          "copy_flat": [
+            "#B5C7D3",
+            "black"
+          ],
+          "cut": [
+            "#FFA0A0",
+            "black"
+          ],
+          "paste": [
+            "#A9784B",
+            "#F5F5F5"
+          ],
+          "paste_folders": [
+            "#6E6694",
+            "#F5F5F5"
+          ],
+          "new_folder": [
+            "#3355DD",
+            "black"
+          ],
+          "delete": [
+            "#C0392B",
+            "#F5F5F5"
+          ],
+          "mode_pressed": [
+            "#2F6DB5",
+            "#F5F5F5"
+          ],
+          "dup_list_pressed": [
+            "#2F6DB5",
+            "#F5F5F5"
+          ],
+          "rename": null,
+          "copy_across": [
+            "#ffaa00",
+            "black"
+          ],
+          "move_across": [
+            "#aaaa00",
+            "black"
+          ],
+          "refresh": null,
+          "up": null,
+          "select_dir": null,
+          "clear_view": null,
+          "expand_all": null,
+          "collapse_all": null,
+          "hash": null,
+          "pane_refresh": null,
+          "save_snapshot": null,
+          "mode_unpressed": null,
+          "swap_pane": null,
+          "sync": null,
+          "dup_list_unpressed": null,
+          "filter_clear": null,
+          "filter_apply": null,
+          "rehash": null
+        },
+        "selection_tint_opacity": 50,
+        "scrollbar_handle_opacity": 50,
+        "scrollbar_track_opacity": 100,
+        "scrollbar_marker_luma_threshold": 0,
+        "stats_selection_opacity": {
+          "file": 35,
+          "folder": 35
+        },
+        "indent_line_steps": 7,
+        "indent_line_reverse": false,
+        "dup_steps": 7,
+        "dup_color1": "#F0A0A0",
+        "dup_color2": "#A0A0F0",
+        "dup_reverse": false,
+        "dup_fg_mode": 2,
+        "dup_fg_color": "#000000",
+        "indent_hover_opacity": 35,
+        "indent_lines_enabled": true,
+        "indent_line_thickness": 2,
+        "indent_line_style": 3,
+        "indent_tick_enabled": false,
+        "indent_tick_files": true,
+        "indent_tick_files_left": false,
+        "indent_tick_length": 6,
+        "indent_tick_folders": false,
+        "indent_tick_folders_left": true,
+        "indent_tick_folder_length": 6,
+        "indent_sel_enabled": false,
+        "indent_sel_increase": 2,
+        "indent_sel_ticks": false,
+        "widgets": {
+          "force_single_date_column": true,
+          "mirror_statistics_buttons": false,
+          "file_list_ratio": 0.67,
+          "title_numeric_bold": true,
+          "file_list_indentation": 20,
+          "flv_font_size": 12,
+          "left_timeline_bin_count": 30,
+          "left_timeline_nice_bins": true,
+          "left_timeline_log_scale": false,
+          "left_timeline_log_size_axis": false,
+          "left_timeline_auto_vrange": true,
+          "left_timeline_font_size": 8,
+          "left_timeline_tick_angle": 45,
+          "left_timeline_auto_tick_angle": false,
+          "left_timeline_strip_units": false,
+          "left_timeline_strip_names": false,
+          "left_timeline_strip_abbreviate": false,
+          "left_timeline_strip_week_number": false,
+          "right_timeline_bin_count": 30,
+          "right_timeline_nice_bins": true,
+          "right_timeline_log_scale": false,
+          "right_timeline_log_size_axis": false,
+          "right_timeline_auto_vrange": true,
+          "right_timeline_font_size": 8,
+          "right_timeline_tick_angle": 45,
+          "right_timeline_auto_tick_angle": false,
+          "right_timeline_strip_units": false,
+          "right_timeline_strip_names": false,
+          "right_timeline_strip_abbreviate": false,
+          "right_timeline_strip_week_number": false
+        }
+      },
+      "gloaming_grey": {
+        "select_colors": {
+          "select_all": [
+            "black",
+            "#F5D400"
+          ],
+          "clear": [
+            "black",
+            "#FFFFFF"
+          ],
+          "missing": [
+            "black",
+            "#9f6d6d"
+          ],
+          "matching": [
+            "black",
+            "#828f82"
+          ],
+          "newer": [
+            "black",
+            "#ac9d84"
+          ],
+          "older": [
+            "black",
+            "#a78b6c"
+          ],
+          "smaller": [
+            "black",
+            "#a797af"
+          ],
+          "larger": [
+            "black",
+            "#917ba3"
+          ],
+          "diff_folders": [
+            "#b4afff",
+            "#625ca7"
+          ],
+          "dup_all": [
+            "black",
+            "#F0D080"
+          ],
+          "dup_extra": [
+            "black",
+            "#E58E8E"
+          ],
+          "dup_sel": [
+            "black",
+            "#E6C46A"
+          ],
+          "dup_sel_extra": [
+            "black",
+            "#D97C7C"
+          ],
+          "file_parent": [
+            "white",
+            "#3355DD"
+          ],
+          "all_parents": [
+            "white",
+            "#1A237E"
+          ],
+          "item_childs": [
+            "white",
+            "#2E8B57"
+          ],
+          "all_childs": [
+            "white",
+            "#145A32"
+          ]
+        },
+        "summary_colors": {
+          "missing": "#FFA0A0",
+          "matching": "#90E0C0",
+          "newer": "#DECFA3",
+          "older": "#C9A96E",
+          "smaller": "#D9BCF0",
+          "larger": "#B98CE0",
+          "diff_folders": "#7777DD"
+        },
+        "folder_color": [
+          "blue",
+          "#E0E090"
+        ],
+        "progress_bar_colors": {
+          "fg": "#4A90D9",
+          "bg": "#4A4A4E",
+          "busy": "#E0A030"
+        },
+        "scrollbar_colors": {
+          "groove": "#4A4A4E",
+          "handle": "#E8E8E8"
+        },
+        "invert_button_colors": {
+          "dark": "#505050",
+          "light": "#acacac"
+        },
+        "custom_default_button_colors": null,
+        "tag_colors": {
+          "directory": [
+            "#E0E090",
+            "blue"
+          ],
+          "file": [
+            null,
+            null
+          ],
+          "error": [
+            "#FFB6C1",
+            "red"
+          ],
+          "hardlink_file": [
+            "#D8C0E8",
+            "black"
+          ],
+          "empty_dir": [
+            "#D4DCE8",
+            "blue"
+          ],
+          "empty_dir_cmp": [
+            "#D4DCE8",
+            "blue"
+          ],
+          "dupfolder": [
+            null,
+            "blue"
+          ],
+          "unhashed_file": [
+            "#C8C8C8",
+            "black"
+          ],
+          "unhashed_dir": [
+            "#B0B0B0",
+            "blue"
+          ],
+          "changed_file": [
+            "#E8C888",
+            "black"
+          ],
+          "changed_dir": [
+            "#D4A85C",
+            "blue"
+          ],
+          "hashed_file": [
+            "#B8E0E8",
+            "black"
+          ],
+          "hashed_dir": [
+            "#9CCBD6",
+            "blue"
+          ],
+          "missing_file": [
+            "#9f6d6d",
+            "black"
+          ],
+          "missing_dir": [
+            "#9f6d6d",
+            "black"
+          ],
+          "common_file": [
+            "#828f82",
+            "black"
+          ],
+          "common_dir": [
+            "#828f82",
+            "black"
+          ],
+          "diff_date_newer_file": [
+            "#ac9d84",
+            "black"
+          ],
+          "diff_date_newer_dir": [
+            "#ac9d84",
+            "black"
+          ],
+          "diff_date_older_file": [
+            "#a78b6c",
+            "black"
+          ],
+          "diff_date_older_dir": [
+            "#a78b6c",
+            "black"
+          ],
+          "diff_size_smaller_file": [
+            "#a797af",
+            "black"
+          ],
+          "diff_count_smaller_dir": [
+            "#a797af",
+            "black"
+          ],
+          "diff_size_larger_file": [
+            "#917ba3",
+            "black"
+          ],
+          "diff_count_larger_dir": [
+            "#917ba3",
+            "black"
+          ],
+          "diff_content_file": [
+            "#7777DD",
+            "blue"
+          ],
+          "diff_content_dir": [
+            "#625ca7",
+            "#b4afff"
+          ]
+        },
+        "selection_tint_color": "#b0b0b0",
+        "flv_bg_color": "#7f7f7f",
+        "title_numeric_color": "#E68C14",
+        "status_selected_color": "#ffffff",
+        "status_unselected_color": "#000000",
+        "status_warning_color": "#FF5050",
+        "group_border_color": "#8C8C8C",
+        "history_live_color": "#FFFFFF",
+        "history_snapshot_color": "#C8C8C8",
+        "indent_line_color1": "#b5b5b5",
+        "indent_line_color2": "#323232",
+        "indent_hover_color": "#ffffff",
+        "stats_colors": {
+          "file": {
+            "background_color": "#3A3A3E",
+            "selection_color": "#E68C14",
+            "hover_color": "#F2F2F2",
+            "hover_opacity": 35,
+            "partial_lerp": 50,
+            "bin_info_color": "#E4E4E6",
+            "stripped_info_color": "#E4E4E6",
+            "bin_color": "#4682DC",
+            "grid_color": "#57575C",
+            "axis_label_color": "#E4E4E6",
+            "hover_label_color": "#E4E4E6",
+            "selection_info_color": "#E68C14"
+          },
+          "folder": {
+            "background_color": "#3A3A3E",
+            "selection_color": "#E68C14",
+            "hover_color": "#F2F2F2",
+            "hover_opacity": 35,
+            "partial_lerp": 50,
+            "bin_info_color": "#E4E4E6",
+            "stripped_info_color": "#E4E4E6",
+            "bin_color": "#4682DC",
+            "grid_color": "#57575C",
+            "axis_label_color": "#E4E4E6",
+            "hover_label_color": "#E4E4E6",
+            "selection_info_color": "#E68C14"
+          }
+        },
+        "stats_button_colors": {
+          "mode_unpressed": null,
+          "mode_pressed": null,
+          "zoom_to": null,
+          "reset": null,
+          "fit_range": null,
+          "zoom_in": null,
+          "zoom_out": null
+        },
+        "main_button_colors": {
+          "copy": [
+            "#D0D0D0",
+            "black"
+          ],
+          "copy_flat": [
+            "#B5C7D3",
+            "black"
+          ],
+          "cut": [
+            "#FFA0A0",
+            "black"
+          ],
+          "paste": [
+            "#A9784B",
+            "#F5F5F5"
+          ],
+          "paste_folders": [
+            "#6E6694",
+            "#F5F5F5"
+          ],
+          "new_folder": [
+            "#3355DD",
+            "black"
+          ],
+          "delete": [
+            "#C0392B",
+            "#F5F5F5"
+          ],
+          "mode_pressed": [
+            "#2F6DB5",
+            "#F5F5F5"
+          ],
+          "dup_list_pressed": [
+            "#2F6DB5",
+            "#F5F5F5"
+          ],
+          "rename": null,
+          "copy_across": null,
+          "move_across": null,
+          "refresh": null,
+          "up": null,
+          "select_dir": null,
+          "clear_view": null,
+          "expand_all": null,
+          "collapse_all": null,
+          "hash": null,
+          "pane_refresh": null,
+          "save_snapshot": null,
+          "mode_unpressed": null,
+          "swap_pane": null,
+          "sync": null,
+          "dup_list_unpressed": null,
+          "filter_clear": null,
+          "filter_apply": null,
+          "rehash": null
+        },
+        "selection_tint_opacity": 25,
+        "scrollbar_handle_opacity": 78,
+        "scrollbar_track_opacity": 100,
+        "scrollbar_marker_luma_threshold": 0,
+        "stats_selection_opacity": {
+          "file": 35,
+          "folder": 35
+        },
+        "indent_line_steps": 2,
+        "indent_line_reverse": false,
+        "dup_steps": 7,
+        "dup_color1": "#C07070",
+        "dup_color2": "#7070C0",
+        "dup_reverse": false,
+        "dup_fg_mode": 2,
+        "dup_fg_color": "#000000",
+        "indent_hover_opacity": 50,
+        "indent_lines_enabled": true,
+        "indent_line_thickness": 1,
+        "indent_line_style": 0,
+        "indent_tick_enabled": true,
+        "indent_tick_files": false,
+        "indent_tick_files_left": false,
+        "indent_tick_length": 6,
+        "indent_tick_folders": true,
+        "indent_tick_folders_left": true,
+        "indent_tick_folder_length": 3,
+        "indent_sel_enabled": false,
+        "indent_sel_increase": 2,
+        "indent_sel_ticks": false,
+        "widgets": {
+          "force_single_date_column": false,
+          "mirror_statistics_buttons": false,
+          "file_list_ratio": 0.75,
+          "title_numeric_bold": true,
+          "file_list_indentation": 20,
+          "flv_font_size": 10,
+          "left_timeline_bin_count": 30,
+          "left_timeline_nice_bins": true,
+          "left_timeline_log_scale": false,
+          "left_timeline_log_size_axis": false,
+          "left_timeline_auto_vrange": true,
+          "left_timeline_font_size": 8,
+          "left_timeline_tick_angle": 45,
+          "left_timeline_auto_tick_angle": false,
+          "left_timeline_strip_units": false,
+          "left_timeline_strip_names": false,
+          "left_timeline_strip_abbreviate": false,
+          "left_timeline_strip_week_number": false,
+          "right_timeline_bin_count": 30,
+          "right_timeline_nice_bins": true,
+          "right_timeline_log_scale": false,
+          "right_timeline_log_size_axis": false,
+          "right_timeline_auto_vrange": true,
+          "right_timeline_font_size": 8,
+          "right_timeline_tick_angle": 45,
+          "right_timeline_auto_tick_angle": false,
+          "right_timeline_strip_units": false,
+          "right_timeline_strip_names": false,
+          "right_timeline_strip_abbreviate": false,
+          "right_timeline_strip_week_number": false
+        }
+      }
+    }
+  }
+}

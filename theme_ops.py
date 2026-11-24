@@ -1507,31 +1507,28 @@ class ThemeOpsMixin:
             return bg.lighter(130).name(), "#F5F5F5"
         return bg.darker(110).name(), "black"
 
-    def _reset_to_theme_default_colors(self):
-        """"Default theme colors": every COLOR of the active official theme
-        (Dark/Light; Gloaming Grey: its shipped colors) back to its built-in value -- all button colors (Panel/
-        Select, Clipboard, File Op, FLV, Statistics, default button), the
-        file/folder row colors, Statistics, scrollbar, indentation-line and
-        every other color -- plus its custom GUI colors
-        -- not the opacities, line options or other widget values, not the
-        Global Options, not the other themes. Nothing is saved to disk
-        (Save Settings afterward to keep it)."""
+    def _overlay_theme_default_colors(self, new_set: dict):
+        """Lays the active theme's default COLORS over `new_set` (in place):
+        Dark/Light's built-in colors, Gloaming Grey's shipped ones
+        (<theme>_colors.json, with its Duplicate File Colors steps / reverse /
+        text-color mode) -- all button colors (Select, Clipboard, File Op,
+        FLV, Statistics, Cancel, default button), the file/folder row colors,
+        Statistics, scrollbar, indentation-line and every other color. The
+        opacities, line options and other widget values of `new_set` stay.
+        Returns the theme's custom GUI colors (None for the built-in ones),
+        or False when the theme has no such defaults (any other theme)."""
         shipped = self._theme in _FILE_DEFAULT_THEMES
         if self._theme not in _OFFICIAL_THEMES and not shipped:
-            return
+            return False
         builtin, shipped_gui = self._shipped_theme_color_set(self._theme) if shipped else (None, None)
         if builtin is None:
             shipped = False
             builtin = self._builtin_color_set(self._theme)
         btn_bg, btn_fg = self._theme_default_button_colors(self._theme)
-        new_set = self._capture_color_set()
-        # A shipped set also brings its Duplicate File Colors' steps / reverse /
-        # text-color mode, which belong to that color table.
         dup_keys = ("dup_steps", "dup_reverse", "dup_fg_mode") if shipped else ()
         for key, value in builtin.items():
             if key not in _NON_COLOR_SET_KEYS or key in dup_keys:
                 new_set[key] = value
-        # The captured set's non-color values (opacities, widget values) stay.
         # Every button gets the theme's one default button color: the Select
         # group (its own table), Clipboard / File Op / Both Panes / FLV buttons
         # (the ones with a fixed design color of their own get it explicitly)
@@ -1545,25 +1542,17 @@ class ThemeOpsMixin:
                 for k, v in builtin["main_button_colors"].items()
             }
             new_set["stats_button_colors"] = {k: None for k in new_set["stats_button_colors"]}
-        widget_values = new_set.get("widgets") or {}
-        self._gui_colors[self._theme] = shipped_gui if shipped else None
-        self._load_color_set_into_live(new_set)
-        self._apply_theme_palette(self._theme)
-        # Always a full rebuild: every button (Panel/Select, Clipboard, File
-        # Op, FLV, Statistics, the Settings tab's own) and any other themed
-        # widget is rebuilt from the reset colors, none left on its old look.
-        self._rebuild_ui()
-        self._apply_theme_widget_values(widget_values)
-        self._set_settings_status(
-            f"{self._theme.replace('_', ' ').title()} theme colors reset to the theme defaults "
-            "(not saved -- press Save Settings to keep).")
+        return shipped_gui if shipped else None
 
     def _reset_to_defaults(self):
         """"Reload Defaults": every setting of the ACTIVE theme (its
         whole set -- colors, opacities, indentation-line options and
         every other per-theme Settings-tab control -- plus its custom
-        GUI colors) back to the values in default_settings.json (the built-in
-        ones for anything that file lacks). Does not touch
+        GUI colors) back to the defaults: the colors of Dark, Light and
+        Gloaming Grey are that theme's own default colors (see
+        _overlay_theme_default_colors), everything else -- and every color
+        of any other theme -- the values in default_settings.json (the
+        built-in ones for anything that file lacks). Does not touch
         any other theme's set, the Global Options, or the theme itself,
         and does not save to disk on its own (Save Settings afterward
         if you want it to stick)."""
@@ -1574,7 +1563,14 @@ class ThemeOpsMixin:
         new_set = self._merged_color_set(self._theme, shipped_set) if shipped_set else self._builtin_color_set(self._theme)
         new_custom = new_set.get("custom_default_button_colors")
         old_gui = self._gui_colors.get(self._theme)
-        needs_rebuild = (
+        # The theme's own default colors (Dark/Light built-in, Gloaming Grey
+        # shipped) replace the file's colors; the file still supplies the
+        # non-color values (opacities, line options, widget values).
+        theme_gui = self._overlay_theme_default_colors(new_set)
+        if theme_gui is not False:
+            shipped_gui = theme_gui
+            new_custom = new_set.get("custom_default_button_colors")
+        needs_rebuild = (theme_gui is not False or
             (tuple(new_custom) if new_custom else None) != self._custom_default_button_colors
             or shipped_gui != (tuple(old_gui) if old_gui else None)
         )

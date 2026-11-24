@@ -498,47 +498,6 @@ class SettingsTabMixin:
         self._aligned_option_rows.append((history_label, self.file_list_history_limit_spin))
         global_grid.addLayout(history_row, 8, 0, 1, 7)
 
-        # Row 9-10: how the File List View scrollbar handle shows the
-        # selection markers beneath it -- custom_widgets._SCROLLBAR_STYLE
-        # ["handle_style"], not an attribute of self, so it survives a UI
-        # rebuild by itself (the radios are just re-checked from it
-        # below). A QButtonGroup whose button ids index
-        # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
-        # it as the checked id (see _widget_value), shared, not per
-        # theme, same as the rest of Global Options. Like the history
-        # row, no Main-tab primary -- this control only exists here.
-        scrollbar_gap = QWidget()
-        scrollbar_gap.setFixedHeight(6)
-        global_grid.addWidget(scrollbar_gap, 9, 0, 1, 7)
-
-        scrollbar_style_row = QHBoxLayout()
-        scrollbar_style_row.setContentsMargins(0, 0, 0, 0)
-        scrollbar_style_row.addWidget(QLabel("Scrollbar handle style:"))
-        # Parented to the Global Options box so it goes away with it on
-        # a UI rebuild instead of piling up on the main window.
-        self.scrollbar_handle_style_group = QButtonGroup(global_group)
-        for style_id, text, tip in (
-            (0, "Plain",
-             "No magnification: the selection markers under the scrollbar handle stay "
-             "at their ordinary position on the track."),
-            (1, "Fisheye",
-             "Magnifies the selection markers around the middle of what the File List View "
-             "currently shows, spreading them over the whole handle and easing back to "
-             "normal towards its top and bottom edges."),
-            (2, "Mirrored quarter circle (experimental)",
-             "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
-             "of the view, while markers near the handle's edges bunch together."),
-        ):
-            radio = QRadioButton(text)
-            radio.setToolTip(tip)
-            self.scrollbar_handle_style_group.addButton(radio, style_id)
-            scrollbar_style_row.addWidget(radio)
-            if _SCROLLBAR_HANDLE_STYLES[style_id] == _SCROLLBAR_STYLE["handle_style"]:
-                radio.setChecked(True)
-        scrollbar_style_row.addStretch(1)
-        self.scrollbar_handle_style_group.idToggled.connect(self._on_scrollbar_handle_style_toggled)
-        global_grid.addLayout(scrollbar_style_row, 10, 0, 1, 7)
-
         # Rows 11-14: how two files are judged "the same" (see
         # DiffEngineMixin._comparison_key). Shared by both panes, no
         # Main-tab primary. The state lives in self._cmp_* (so it
@@ -777,11 +736,6 @@ class SettingsTabMixin:
              lambda: self._effective_gui_colors(self._theme)[1],
              lambda hexc: self._on_gui_color_changed(True, hexc),
              lambda hexc: self._on_gui_color_changed(False, hexc)),
-            ("Default Button",
-             lambda: (self._custom_default_button_colors or self._default_button_colors())[1],
-             lambda: (self._custom_default_button_colors or self._default_button_colors())[0],
-             lambda hexc: self._on_default_button_color_changed(True, hexc),
-             lambda hexc: self._on_default_button_color_changed(False, hexc)),
             ("Progress Bar",
              lambda: self._progress_bar_colors["fg"], lambda: self._progress_bar_colors["bg"],
              lambda hexc: self._on_progress_bar_color_changed("fg", hexc),
@@ -804,13 +758,6 @@ class SettingsTabMixin:
             ("Status line Unselected",
              lambda: self._status_unselected_color or self._effective_gui_colors(self._theme)[0], None,
              self._on_status_unselected_color_changed, None),
-            # Main tab -> Global Options' Refresh button. The theme's
-            # default button colors until one is picked.
-            ("Refresh (global)",
-             lambda: self._main_button_color_for("refresh")[1],
-             lambda: self._main_button_color_for("refresh")[0],
-             lambda hexc: self._on_main_button_color_changed("refresh", False, hexc),
-             lambda hexc: self._on_main_button_color_changed("refresh", True, hexc)),
             ("Status line warning",
              lambda: self._status_warning_color, None,
              self._on_status_warning_color_changed, None),
@@ -860,34 +807,30 @@ class SettingsTabMixin:
             "Text and background color of the whole GUI, for the current theme "
             "(the file lists' and text fields' background follows the Bg)."
         )
-        default_colors_table.item(4, 0).setToolTip(
+        default_colors_table.item(3, 0).setToolTip(
             "Color of the numbers in the titles (item counts, sizes, file and "
             "folder totals, free space). The Bold option is in the Bg column."
         )
-        default_colors_table.item(5, 0).setToolTip(
+        default_colors_table.item(4, 0).setToolTip(
             "Text color of each pane's status line at the bottom of the window "
             "while something is selected (\"N selected, X files, Y folders, size\")."
         )
-        default_colors_table.item(6, 0).setToolTip(
+        default_colors_table.item(5, 0).setToolTip(
             "Text color of that status line while nothing is selected, and of "
             "the operation messages shown there. Follows the GUI text color "
             "until you pick one."
         )
-        default_colors_table.item(7, 0).setToolTip(
-            "The Refresh button under Quick Options on the Main tab. Uses the "
-            "theme's default button colors until you pick one."
-        )
-        default_colors_table.item(8, 0).setToolTip(
+        default_colors_table.item(6, 0).setToolTip(
             "Text color of a warning in a pane's status line, e.g. when a loaded snapshot "
             "cannot be compared by hash and the comparison falls back to name, size and date."
         )
-        default_colors_table.item(9, 0).setToolTip(
+        default_colors_table.item(7, 0).setToolTip(
             "Text color of live-folder entries in each pane's folder-history drop-down."
         )
-        default_colors_table.item(10, 0).setToolTip(
+        default_colors_table.item(8, 0).setToolTip(
             "Text color of folder-snapshot (.fss) entries in each pane's folder-history drop-down."
         )
-        default_colors_table.item(11, 0).setToolTip(
+        default_colors_table.item(9, 0).setToolTip(
             "Color of the edge around the Main tab's button groups (Select, File Op, "
             "Clipboard, Both Panes, Quick Options, Global File Filter)."
         )
@@ -931,12 +874,29 @@ class SettingsTabMixin:
         # Swap pane button. Same Item | Fg | Bg swatch table as the other
         # button tables; kept per theme in self._main_button_colors. The
         # released/Swap rows start at the theme's default button colors. ----
+        # "Default Button" (the theme's default button colors, which every
+        # button without a color of its own falls back to) is the top row;
+        # it is stored per theme in self._custom_default_button_colors, not
+        # in self._main_button_colors, hence the custom getter/setter.
+        # "Refresh (global)" is the Main tab's Global Options Refresh button.
         misc_buttons_group = self._main_button_color_table([
+            ("default_button", "Default Button"),
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
             ("filter_clear", "File Filter: Clear"),
             ("filter_apply", "File Filter: Apply"),
-        ])
+            ("refresh", "Refresh (global)"),
+        ], custom={
+            "default_button": (
+                lambda: self._custom_default_button_colors or self._default_button_colors(),
+                lambda is_bg, hexc: self._on_default_button_color_changed(not is_bg, hexc),
+            ),
+        }, tooltips={
+            "default_button": "The color every button without a color of its own uses, for the "
+                              "current theme. Changing it rebuilds the GUI.",
+            "refresh": "The Refresh button under Quick Options on the Main tab. Uses the "
+                       "theme's default button colors until you pick one.",
+        })
         global_settings_flow.addWidget(self._l2_block("Misc Buttons", misc_buttons_group, "third"))
 
         # ---- File List View (Settings-tab only -- no Main-tab copy,
@@ -1227,6 +1187,43 @@ class SettingsTabMixin:
         flv_general_outer.addLayout(tint_row)
         self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
 
+        # ---- Scrollbar handle style: how the File List View scrollbar handle shows the
+        # selection markers beneath it -- custom_widgets._SCROLLBAR_STYLE
+        # ["handle_style"], not an attribute of self, so it survives a UI
+        # rebuild by itself (the radios are just re-checked from it
+        # below). A QButtonGroup whose button ids index
+        # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
+        # it as the checked id (see _widget_value), shared, not per
+        # theme, like the Global Options. No Main-tab primary -- this
+        # control only exists here. ----
+        scrollbar_style_row = QHBoxLayout()
+        scrollbar_style_row.setContentsMargins(0, 0, 0, 0)
+        scrollbar_style_row.addWidget(QLabel("Scrollbar handle style:"))
+        # Parented to the Scrollbar Tweaks box so it goes away with it on
+        # a UI rebuild instead of piling up on the main window.
+        self.scrollbar_handle_style_group = QButtonGroup(flv_scrollbar_group)
+        for style_id, text, tip in (
+            (0, "Plain",
+             "No magnification: the selection markers under the scrollbar handle stay "
+             "at their ordinary position on the track."),
+            (1, "Fisheye",
+             "Magnifies the selection markers around the middle of what the File List View "
+             "currently shows, spreading them over the whole handle and easing back to "
+             "normal towards its top and bottom edges."),
+            (2, "Quarter circle (test)",
+             "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
+             "of the view, while markers near the handle's edges bunch together."),
+        ):
+            radio = QRadioButton(text)
+            radio.setToolTip(tip)
+            self.scrollbar_handle_style_group.addButton(radio, style_id)
+            scrollbar_style_row.addWidget(radio)
+            if _SCROLLBAR_HANDLE_STYLES[style_id] == _SCROLLBAR_STYLE["handle_style"]:
+                radio.setChecked(True)
+        scrollbar_style_row.addStretch(1)
+        self.scrollbar_handle_style_group.idToggled.connect(self._on_scrollbar_handle_style_toggled)
+        flv_scrollbar_outer.addLayout(scrollbar_style_row)
+
         # ---- Scrollbar handle opacity: how much of the handle's own
         # color covers whatever sits under it in the scrollbar track
         # (the selection markers, on the file lists) -- 100% hides them
@@ -1288,7 +1285,7 @@ class SettingsTabMixin:
         # inverted, so e.g. a black row on a dark track stays visible
         # (custom_widgets._contrasting_marker_color). 0 = off. Per theme. ----
         marker_luma_row = QHBoxLayout()
-        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference:")
+        self.scrollbar_marker_luma_label = QLabel("Marker Δ luminance threshold:")
         self.scrollbar_marker_luma_spin = SliderSpinBox()
         self.scrollbar_marker_luma_spin.setRange(0, 255)
         self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])
@@ -2317,8 +2314,8 @@ class SettingsTabMixin:
         QVBoxLayout(info_colors_group).addWidget(info_colors_table)
         info_colors_block = self._l2_block("Info text colors", info_colors_group, "half")
 
-        # ---- Buttons -- every button in the Statistics view: Files/
-        # Folders and Zoom to/Reset in its title line, Fit Range and the
+        # ---- Buttons -- every button in the Statistics view: the Files/
+        # Folders mode switch and Zoom to/Reset view in its title line, Fit Range and the
         # +/- zoom buttons in its footer. A third Level 3 table next to
         # Graph colors/Info text colors. None of them has a color set
         # here until the user actually picks one -- see
@@ -2327,8 +2324,8 @@ class SettingsTabMixin:
         # here; they moved to Panel Button Colors -> Clipboard Buttons,
         # along with the buttons themselves.) ----
         _STATS_BUTTON_ROWS = [
-            ("files", "Files"), ("folders", "Folders"),
-            ("zoom_to", "Zoom to"), ("reset", "Reset"), ("fit_range", "Fit Range"),
+            ("mode_unpressed", "Mode switch (released)"), ("mode_pressed", "Mode switch (pressed)"),
+            ("zoom_to", "Zoom to"), ("reset", "Reset view"), ("fit_range", "Fit Range"),
             ("zoom_in", "Zoom in (+)"), ("zoom_out", "Zoom out (-)"),
         ]
         stats_buttons_table = QTableWidget(len(_STATS_BUTTON_ROWS), 3)
@@ -2473,7 +2470,7 @@ class SettingsTabMixin:
                         self.reset_settings_button) = self._build_save_load_row(
             "Reload Defaults", self._reset_to_defaults,
             "Reset the current theme's colors (and the color-related options) back "
-            "to the program's own built-in defaults -- the other theme's colors are "
+            "to the program's shipped defaults (default_settings.json) -- the other themes' colors are "
             "left alone, and the saved settings file isn't touched; Save Settings "
             "afterward if you want the reset to stick.",
         )
@@ -2971,27 +2968,41 @@ class SettingsTabMixin:
         table.horizontalHeader().setSectionsClickable(False)
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
-    def _main_button_color_table(self, rows: list) -> QGroupBox:
+    def _main_button_color_table(self, rows: list, custom: dict | None = None,
+                                 tooltips: dict | None = None) -> QGroupBox:
         """A framed "Item | Fg | Bg" swatch table for buttons whose colors
         live in self._main_button_colors -- `rows` is (key, label) pairs.
         Shared by Panel Button Colors' Clipboard/File Op Buttons tables and
         File List View Colors' Button Colors table. A button without a
         color of its own shows (and starts from) the theme's default
-        button colors -- see _main_button_color_for."""
+        button colors -- see _main_button_color_for. `custom` maps a row's
+        key to (get_pair, set_color) for a row whose colors live somewhere
+        other than self._main_button_colors: get_pair() -> (bg, fg),
+        set_color(is_bg, hex); `tooltips` maps a key to a label tooltip."""
+        custom = custom or {}
+        tooltips = tooltips or {}
         group = QGroupBox("")
         group_outer = QVBoxLayout(group)
         table = QTableWidget(len(rows), 3)
         self._style_table_widget(table, ["Item", "Fg", "Bg"])
         for i, (key, label) in enumerate(rows):
-            table.setItem(i, 0, self._table_item(label))
-            table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
-                lambda k=key: self._main_button_color_for(k)[1],
-                lambda hexc, k=key: self._on_main_button_color_changed(k, False, hexc),
-            )))
-            table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(
-                lambda k=key: self._main_button_color_for(k)[0],
-                lambda hexc, k=key: self._on_main_button_color_changed(k, True, hexc),
-            )))
+            item = self._table_item(label)
+            if key in tooltips:
+                item.setToolTip(tooltips[key])
+            table.setItem(i, 0, item)
+            if key in custom:
+                get_pair, set_color = custom[key]
+                get_fg = lambda g=get_pair: g()[1]
+                get_bg = lambda g=get_pair: g()[0]
+                set_fg = lambda hexc, f=set_color: f(False, hexc)
+                set_bg = lambda hexc, f=set_color: f(True, hexc)
+            else:
+                get_fg = lambda k=key: self._main_button_color_for(k)[1]
+                get_bg = lambda k=key: self._main_button_color_for(k)[0]
+                set_fg = lambda hexc, k=key: self._on_main_button_color_changed(k, False, hexc)
+                set_bg = lambda hexc, k=key: self._on_main_button_color_changed(k, True, hexc)
+            table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(get_fg, set_fg)))
+            table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(get_bg, set_bg)))
         self._size_table_to_contents(table)
         group_outer.addWidget(table)
         return group

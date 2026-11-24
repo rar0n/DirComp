@@ -897,7 +897,7 @@ class ThemeOpsMixin:
         self._repaint_all_scrollbars()
 
     def _on_scrollbar_handle_style_toggled(self, style_id: int, checked: bool):
-        """Settings tab -> Global Options -> "Scrollbar handle style"
+        """Settings tab -> File List View -> Scrollbar Tweaks -> "Scrollbar handle style"
         radio group (QButtonGroup.idToggled: fires for the button that
         just got checked AND the one that just got unchecked, so only
         the former is acted on). style_id indexes _SCROLLBAR_HANDLE_STYLES.
@@ -1284,6 +1284,14 @@ class ThemeOpsMixin:
             moved = merged["stats_button_colors"].pop(key, None)
             if moved and not saved_main.get(key):
                 merged["main_button_colors"][key] = moved
+        # The Statistics View's Files/Folders buttons got a mode-switch
+        # pair (released/pressed) instead of one color each: carry a picked
+        # Files color over as "released" and a Folders one as "pressed".
+        saved_stats = (saved or {}).get("stats_button_colors") or {}
+        for old, new in (("files", "mode_unpressed"), ("folders", "mode_pressed")):
+            moved = merged["stats_button_colors"].pop(old, None)
+            if moved and not saved_stats.get(new):
+                merged["stats_button_colors"][new] = moved
         return merged
 
     def _load_color_set_into_live(self, cs: dict):
@@ -1424,20 +1432,26 @@ class ThemeOpsMixin:
         """"Reload Defaults": every setting of the ACTIVE theme (its
         whole set -- colors, opacities, indentation-line options and
         every other per-theme Settings-tab control -- plus its custom
-        GUI colors) back to its built-in starting value. Does not touch
+        GUI colors) back to the values in default_settings.json (the built-in
+        ones for anything that file lacks). Does not touch
         any other theme's set, the Global Options, or the theme itself,
         and does not save to disk on its own (Save Settings afterward
         if you want it to stick)."""
         # Only the active theme's colors -- every other theme's set
         # (and its custom GUI colors) is left exactly as it is, and the
         # theme itself isn't switched.
+        shipped_set, shipped_gui = self._shipped_defaults_for_theme(self._theme)
+        new_set = self._merged_color_set(self._theme, shipped_set) if shipped_set else self._builtin_color_set(self._theme)
+        new_custom = new_set.get("custom_default_button_colors")
+        old_gui = self._gui_colors.get(self._theme)
         needs_rebuild = (
-            self._custom_default_button_colors is not None
-            or self._gui_colors.get(self._theme) is not None
+            (tuple(new_custom) if new_custom else None) != self._custom_default_button_colors
+            or shipped_gui != (tuple(old_gui) if old_gui else None)
         )
-        self._gui_colors[self._theme] = None
-        self._load_color_set_into_live(self._builtin_color_set(self._theme))
+        self._gui_colors[self._theme] = shipped_gui
+        self._load_color_set_into_live(new_set)
         self._apply_theme_palette(self._theme)
+        widget_values = new_set.get("widgets") or self._widget_defaults
         # Only rebuild the whole window if the custom GUI/default-button
         # colors actually changed (same cases settings_ops.
         # _apply_raw_settings_state rebuilds for, and for the same
@@ -1454,8 +1468,8 @@ class ThemeOpsMixin:
         # before the bulk refresh so it sees what their handlers set.
         if needs_rebuild:
             self._rebuild_ui()
-            self._apply_theme_widget_values(self._widget_defaults)
+            self._apply_theme_widget_values(widget_values)
         else:
-            self._apply_theme_widget_values(self._widget_defaults)
+            self._apply_theme_widget_values(widget_values)
             self._refresh_color_dependent_widgets()
         self._set_settings_status(f"{self._theme.replace('_', ' ').title()} theme reset to defaults.")

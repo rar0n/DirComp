@@ -207,8 +207,10 @@ _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
 # Statistics View -> Colors (both panes) -> Buttons) -- all start as None,
 # the theme's default button colors. Copy -->/Move --> used to be here;
 # they moved to _THEME_DEFAULT_MAIN_BUTTON_KEYS along with the buttons
-# themselves (into the Clipboard group).
-_STATS_BUTTON_KEYS = ("files", "folders", "zoom_to", "reset", "fit_range", "zoom_in", "zoom_out")
+# themselves (into the Clipboard group). "mode_unpressed"/"mode_pressed"
+# are the Files/Folders mode switch's released and pressed-in looks (they
+# replaced separate "files"/"folders" entries).
+_STATS_BUTTON_KEYS = ("mode_unpressed", "mode_pressed", "zoom_to", "reset", "fit_range", "zoom_in", "zoom_out")
 
 class ElidedLabel(QLabel):
     """A one-line QLabel that never forces its parent wider: text that does
@@ -642,14 +644,14 @@ _SCROLLBAR_HANDLE_OPACITY = _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT / 100.0
 # _SCROLLBAR_STYLE.
 _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
 # Marker luminance difference threshold (Settings tab -> File List View ->
-# "Marker luminance difference threshold"; per theme, like the two
+# "Marker Δ luminance threshold"; per theme, like the two
 # opacities): a selection marker that, as it is actually seen (faded by the
 # track opacity, or by the handle's), differs in luminance (0..255) from
 # the track by less than this gets its luminance inverted (see _contrasting_marker_color), so e.g. a black row
 # on a dark track stays visible. 0 = off.
 _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD = 0
 # How the FLV scrollbar handle shows the selection markers beneath it
-# (Settings tab -> Global Options -> "Scrollbar handle style"). Unlike
+# (Settings tab -> File List View -> Scrollbar Tweaks -> "Scrollbar handle style"). Unlike
 # the two opacities above this is NOT per theme -- it's a Global Option,
 # saved once at the top level of the settings file (see
 # settings_ops._SHARED_WIDGET_KEYS). The index of a name here is also

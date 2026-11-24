@@ -237,18 +237,16 @@ class FolderSyncMixin:
         fmt = self.format_size
         esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         no_ops = not plan["ops"] and not plan["mkdirs"]
-        lines = []
         problems = []
-        for direction, title, src_dir, dest_dir in (
-                (_LR, "Left &rarr; Right", left_dir, right_dir), (_RL, "Right &rarr; Left", right_dir, left_dir)):
+        left_share, right_share, mismatch = self._sync_mismatch(plan)
+        rows = []
+        for direction, title, src_dir, dest_dir, share, only, total in (
+                (_LR, "Left &rarr; Right", left_dir, right_dir, left_share, plan["left_only"], plan["left_total"]),
+                (_RL, "Right &larr; Left", right_dir, left_dir, right_share, plan["right_only"], plan["right_total"])):
             new, upd = self._sync_totals(plan, direction)
             folders = _plan_new_dirs(plan, direction)
             need = sum(op["size"] for op in new + upd)
-            parts = [f"{len(new)} new file{'' if len(new) == 1 else 's'} ({fmt(sum(o['size'] for o in new))})",
-                     f"{len(upd)} newer file{'' if len(upd) == 1 else 's'} replacing older ({fmt(sum(o['size'] for o in upd))})"]
-            if folders:
-                parts.append(f"{folders} folder{'' if folders == 1 else 's'} created")
-            lines.append(f"<b>{title}</b>: " + ", ".join(parts))
+            rows.append((title, f"{share:.0%} ({only} of {total})", len(new), len(upd), folders, fmt(need)))
             try:
                 free = shutil.disk_usage(dest_dir).free
             except OSError:
@@ -260,7 +258,6 @@ class FolderSyncMixin:
         html = [self._sync_banner("WARNING: this changes files in BOTH folders.<br>"
                                   "Check that these are the right two folders:"),
                 f"<p><b>Left:</b> {esc(left_dir)}<br><b>Right:</b> {esc(right_dir)}</p>"]
-        left_share, right_share, mismatch = self._sync_mismatch(plan)
         if mismatch:
             html.append(self._sync_banner(
                 f"These folders look unrelated: {left_share:.0%} of the files in the left folder and "
@@ -268,17 +265,15 @@ class FolderSyncMixin:
                 f"(warning threshold {getattr(self, '_sync_warn_percent', 50)}%).<br>"
                 "Make sure these are the folders you mean to merge -- this is expected only "
                 "for a first sync."))
-        html.append("<p>" + "<br>".join(lines) + "</p>")
-        if plan["left_total"] or plan["right_total"]:
-            html.append(f"<p>Files without a counterpart: left {left_share:.0%} "
-                        f"({plan['left_only']} of {plan['left_total']}), right {right_share:.0%} "
-                        f"({plan['right_only']} of {plan['right_total']}).</p>")
+        html.append(self._sync_table(rows))
         if trashed:
             html.append(f"<p>{trashed} older file{'' if trashed == 1 else 's'} will be moved to the trash "
                         "before being replaced. Nothing is deleted otherwise.</p>")
+        conflicts_html = ""
         if plan["conflicts"]:
-            html.append(f"<p>{len(plan['conflicts'])} conflict{'' if len(plan['conflicts']) == 1 else 's'} "
-                        "will be skipped (see Show Details).</p>")
+            conflicts_html = (f"<p>{len(plan['conflicts'])} conflict{'' if len(plan['conflicts']) == 1 else 's'} "
+                              "will be skipped (see Show Details).</p>")
+            html.append(conflicts_html)
         if name_filter.active:
             html.append("<p style='color:#E68C14'><b>The File Filter is ACTIVE</b> (" + esc(", ".join(name_filter.terms))
                         + (", inverted" if name_filter.invert else "")
@@ -301,7 +296,7 @@ class FolderSyncMixin:
                 "<p><b>Nothing to sync</b> -- every file that exists on both sides has the same Modified "
                 "date, and neither side lacks anything"
                 + (" (within the File Filter)" if name_filter.active else "") + ".</p>"
-                + ("".join(html[-2:]) if plan["conflicts"] else ""),
+                + conflicts_html,
                 "\n".join(detail), proceed=False, warning=False)
         return self._sync_dialog("".join(html), "\n".join(detail), proceed=not problems, warning=True)
 
@@ -356,6 +351,22 @@ class FolderSyncMixin:
         outer.addLayout(buttons)
         dialog.adjustSize()
         return dialog.exec() == QDialog.Accepted and proceed
+
+    @staticmethod
+    def _sync_table(rows) -> str:
+        """The per-direction summary: a header row, a header column, left-aligned,
+        with a blank line (the dialog's own font size) above it. rows: (title, missing ratio, new files, newer files,
+        new folders, extra size)."""
+        heads = ("Missing ratio", "New Files", "Newer files overwriting older", "New Folders",
+                 "Total extra size needed")
+        pad = "cellpadding='6' cellspacing='0'"
+        out = ["<p style='margin-top:0; margin-bottom:0'>&nbsp;</p>", f"<table border='1' {pad} style='border-color:#808080'>",
+               "<tr><td></td>" + "".join(f"<td align='center'><b>{h}</b></td>" for h in heads) + "</tr>"]
+        for title, *cells in rows:
+            out.append(f"<tr><td><b>{title}</b></td>"
+                       + "".join(f"<td align='center'>{c}</td>" for c in cells) + "</tr>")
+        out.append("</table><br>")
+        return "".join(out)
 
     @staticmethod
     def _sync_banner(text: str) -> str:

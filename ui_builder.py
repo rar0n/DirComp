@@ -1112,7 +1112,20 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         custom = self._stats_button_colors.get(key)
         if custom is not None:
             return tuple(custom)
+        if key == "mode_pressed":
+            # The Files/Folders switch's pressed-in look starts as the Main
+            # tab mode switch's fixed blue, not the theme's button default.
+            return tuple(_DEFAULT_MAIN_BUTTON_COLORS["mode_pressed"])
         return self._default_button_colors()
+
+    def _stats_mode_button_sheet(self) -> str:
+        """Stylesheet of a Statistics View's Files/Folders mode switch:
+        Settings tab -> Statistics View -> Buttons -> "Mode switch
+        (released)" / "(pressed)" -- same kind of sheet as the Main tab's
+        mode switch (_mode_button_sheet)."""
+        bg, fg = self._stats_button_color_for("mode_unpressed")
+        pressed_bg, pressed_fg = self._stats_button_color_for("mode_pressed")
+        return _mode_button_stylesheet(bg, fg, pressed_bg, pressed_fg)
 
     def _fit_range_stylesheet(self, enabled: bool) -> str:
         """Stylesheet for a Statistics view's Fit Range button, in its
@@ -1126,15 +1139,18 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
 
     def _apply_stats_button_colors(self):
         """Re-applies self._stats_button_colors to the live Statistics-
-        view buttons on both panes (Files/Folders, Zoom to, Reset, Fit
+        view buttons on both panes (Files/Folders mode switch, Zoom to, Reset, Fit
         Range, Zoom in/out), without a full rebuild -- called by each
         color swatch's own change handler (see
         _on_stats_button_color_changed) and once after Load Settings.
         One shared color per button regardless of which pane -- same
         convention the rest of this app's button colors use."""
         for pane in (self.left, self.right):
+            for attr in ("tl_files_mode_button", "tl_folders_mode_button"):
+                button = getattr(pane, attr, None)
+                if button is not None:
+                    button.setStyleSheet(self._stats_mode_button_sheet())
             for key, attr in (
-                ("files", "tl_files_mode_button"), ("folders", "tl_folders_mode_button"),
                 ("zoom_to", "tl_zoom_sel_button"), ("reset", "tl_reset_button"),
                 ("zoom_in", "tl_zoom_in_button"), ("zoom_out", "tl_zoom_out_button"),
             ):
@@ -1235,6 +1251,19 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             height = fm.height() + 10
             self._uniform_button_dims = (width, height)
         return self._uniform_button_dims
+
+    def _view_button_width(self) -> int:
+        """Shared width of the File List View's "Clear view" and the
+        Statistics View's "Reset view" buttons, which sit one above the
+        other at the pane's outer edge: the wider of the two labels plus
+        the usual bevel and one-average-character padding. Cached --
+        depends only on the app's font."""
+        if not hasattr(self, "_view_button_w"):
+            fm = QFontMetrics(self.font())
+            self._view_button_w = max(
+                fm.horizontalAdvance("Clear view"), fm.horizontalAdvance("Reset view")
+            ) + 14 + fm.averageCharWidth()
+        return self._view_button_w
 
     def _stats_across_button_size(self, kind: str = "copy") -> tuple[int, int]:
         """Fixed size for the Statistics view's Copy--> / Move--> buttons

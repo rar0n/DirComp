@@ -642,7 +642,7 @@ class ListingMixin:
         # all, so its empty-state message follows *this pane's* own state
         # ("Drag a folder ... to begin" until a folder's open here,
         # "No files in view" only once one is, and back again after
-        # "Empty view") rather than whether set_records() has ever been
+        # "Clear view") rather than whether set_records() has ever been
         # called -- see TimelineWidget.set_folder_open. Set before
         # _refresh_pane_timeline so its own repaint already sees it.
         timeline = getattr(pane, "timeline", None)
@@ -1224,7 +1224,7 @@ class ListingMixin:
             # Restore whatever was selected before this rebuild threw the
             # old items away -- a full repopulate (this always does one)
             # would otherwise silently drop the selection on every
-            # Refresh/Empty view/transfer/new-folder-open, even for a
+            # Refresh/Clear view/transfer/new-folder-open, even for a
             # pane whose own directory didn't change and was only
             # rebuilt to re-diff against the other side. select_subtree
             # off restores exactly the same set that was selected before

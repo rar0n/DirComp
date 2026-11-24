@@ -861,10 +861,10 @@ class SettingsTabMixin:
         sync_settings_block = self._l2_block("Sync Settings", self._build_sync_settings_group(), "two_thirds")
         global_settings_flow.addWidget(context_menu_block)
         global_settings_flow.addWidget(sync_settings_block)
-        # File type list: the entries of the Main tab's Global File Filter
+        # File Filter List: the entries of the Main tab's Global File Filter
         # drop-down (this used to be the File Filter tab).
         global_settings_flow.addWidget(
-            self._l2_block("File type list", self._build_file_filter_group(), "third")
+            self._l2_block("File Filter List", self._build_file_filter_group(), "third")
         )
         global_settings_flow.addWidget(self._l2_block("Misc Colors", default_colors_group, "third"))
 
@@ -2747,7 +2747,7 @@ class SettingsTabMixin:
     def _build_save_load_row(self, reset_text: str, reset_handler, reset_tooltip: str):
         """The Save Settings / Load Settings / <reset> button row centered
         under the Settings tab's scroll area. Save and Load act on the one
-        settings file for the whole program (the file type list included);
+        settings file for the whole program (the File Filter List included);
         the reset button is set by `reset_text`/`reset_handler`/`reset_tooltip`.
         Returns (the row layout, (save, load, reset buttons))."""
         uniform_w, uniform_h = self._uniform_button_size()
@@ -2758,7 +2758,7 @@ class SettingsTabMixin:
 
         # Fixed (bg, fg) copies of the Select group's current Matching/
         # Missing/File Parent colors at the moment the tab is built
-        # (Save Settings gets Missing's, Load Settings Matching's) --
+        # (Save Settings gets Matching's, Load Settings Missing's) --
         # a literal snapshot, not a live reference: these buttons keep
         # this look even if Matching/Missing/File Parent get recolored
         # afterward in Panel Button Colors.
@@ -2768,14 +2768,14 @@ class SettingsTabMixin:
 
         save_button = QPushButton("Save Settings")
         save_button.setFixedSize(status_btn_w, uniform_h)
-        save_button.setStyleSheet(_bevel_button_stylesheet(missing_bg, missing_fg))
+        save_button.setStyleSheet(_bevel_button_stylesheet(matching_bg, matching_fg))
         save_button.setToolTip("Save every option and spinbox on this GUI to disk.")
         save_button.clicked.connect(self.save_settings)
         row.addWidget(save_button)
 
         load_button = QPushButton("Load Settings")
         load_button.setFixedSize(status_btn_w, uniform_h)
-        load_button.setStyleSheet(_bevel_button_stylesheet(matching_bg, matching_fg))
+        load_button.setStyleSheet(_bevel_button_stylesheet(missing_bg, missing_fg))
         load_button.setToolTip("Reload every option and spinbox on this GUI from disk.")
         load_button.clicked.connect(lambda checked=False: self.load_settings())
         row.addWidget(load_button)

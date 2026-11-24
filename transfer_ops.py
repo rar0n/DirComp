@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 
-from PySide6.QtCore import Qt, QUrl, QMimeData
+from PySide6.QtCore import Qt, QTimer, QUrl, QMimeData
 from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
 
 from constants import PATH_ROLE, GNOME_COPIED_FILES_MIME
@@ -1188,13 +1188,45 @@ class TransferMixin:
             return
 
         rel_root = self._safe_rel_root(paths, self._clipboard_source_base_dir)
+        self._paste_paths(pane, paths, base_dir, cut, rel_root, from_clipboard=True)
+
+    def _on_paths_dropped(self, pane: DirectoryPane, paths, target_dir: str, move: bool, source_tree):
+        """Items dragged from one of the file lists and dropped (with Ctrl =
+        copy, Shift = move -- see DirDropTreeWidget._internal_drop_plan) on
+        `pane`: into `target_dir`, or the pane's own folder when that is
+        "". Runs the same way Paste does, and selects what arrived. Deferred
+        to the next event-loop turn so the drag itself finishes first (the
+        drag's own after-drag refresh then finds the transfer running and
+        stays out of the way)."""
+        def run():
+            if getattr(self, "active_transfer_progress", None) is not None:
+                return
+            source_pane = self._pane_for_tree(source_tree)
+            if source_pane is None or self._snapshot_blocks(source_pane, pane, what="Copy/Move"):
+                return
+            base_dir = target_dir or pane.entry.text()
+            if not base_dir or not os.path.isdir(base_dir):
+                QMessageBox.warning(self, "Copy/Move", "Select a valid destination directory first.")
+                return
+            rel_root = self._safe_rel_root(paths, source_pane.entry.text())
+            self._paste_paths(pane, list(paths), base_dir, move, rel_root, source_pane=source_pane)
+        QTimer.singleShot(0, run)
+
+    def _paste_paths(self, pane: DirectoryPane, paths, base_dir: str, cut: bool, rel_root,
+                     from_clipboard: bool = False, source_pane: "DirectoryPane | None" = None):
+        """Copies (or, `cut`, moves) `paths` into `base_dir` and selects the
+        results in `pane` -- the second half of Paste, also used for drops.
+        `from_clipboard` clears the clipboard/cut marks after a move; a drop
+        passes `source_pane` instead, whose selection is put back after a
+        copy (when it is another pane)."""
+        rel_root = self._safe_rel_root(paths, self._clipboard_source_base_dir)
 
         progress = self._start_transfer_progress(label="Enumerating...", pane=pane)
         errors, dest_paths = [], []
         try:
             errors, dest_paths = self._transfer_paths(paths, base_dir, move=cut, rel_root=rel_root, progress=progress)
 
-            if cut:
+            if cut and from_clipboard:
                 QApplication.clipboard().clear()
                 self._clear_cut_marks()
 
@@ -1213,6 +1245,15 @@ class TransferMixin:
                     auto_expand=self._expand_folders_matching_selection_enabled(),
                 )
                 self._scroll_tree_to_first_selected(pane.tree)
+            # A copy leaves the source items where they are, but the
+            # refresh above dropped their selection: put it back (a
+            # drop from the other pane only, and not while Synchronize
+            # Views governs the selections itself).
+            if (source_pane is not None and not cut and source_pane.tree is not pane.tree
+                    and not self._synchronize_views_enabled() and not progress.cancelled):
+                self._set_transfer_label("Reselecting source...")
+                progress.start_phase(sum(1 for _ in self._iter_items(source_pane.tree)) or None)
+                self._select_paths_in_tree(source_pane.tree, paths, progress=progress)
         finally:
             # Same "keep the breakdown, add the timing" treatment as
             # transfer_between_panes above, rather than the old

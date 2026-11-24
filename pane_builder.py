@@ -222,6 +222,9 @@ class PaneBuilderMixin:
             lambda path, p=pane: self._navigate_pane(p, path)
             if getattr(self, "active_transfer_progress", None) is None else None
         )
+        tree.pathsDropped.connect(
+            lambda paths, target, move, source, p=pane: self._on_paths_dropped(p, paths, target, move, source)
+        )
         tree.itemDoubleClicked.connect(lambda item, col, p=pane: self._on_item_double_clicked(item, p))
         # Right-click menu (see context_menu_ops.ContextMenuMixin).
         tree.setContextMenuPolicy(Qt.CustomContextMenu)

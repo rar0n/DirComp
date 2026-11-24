@@ -1,5 +1,5 @@
 """
-FileFilterTabMixin: the editable file type list behind the Main tab's
+FileFilterTabMixin: the editable File Filter List behind the Main tab's
 Global File Filter drop-down (Settings tab -> Global Settings -> File
 type list), and the program-wide (not per theme) File Filter settings.
 
@@ -55,8 +55,8 @@ class FileFilterTabMixin:
     # ----------------------------------------------------------- Building
 
     def _build_file_filter_group(self) -> QGroupBox:
-        """The File type list's frame for the Settings tab (Global Settings
-        -> "File type list"; the caller wraps it in a titled block): the
+        """The File Filter List's frame for the Settings tab (Global Settings
+        -> "File Filter List"; the caller wraps it in a titled block): the
         list itself and its Add/Remove/Move/Sort/Defaults buttons.
         Save Settings / Load Settings on the Settings tab commit / reload
         the list along with everything else."""
@@ -205,7 +205,7 @@ class FileFilterTabMixin:
         self._refresh_filter_metric_panes()
 
     def _reset_file_filter_defaults(self):
-        """"Defaults" button under the file type list. Not saved until Save Settings."""
+        """"Defaults" button under the File Filter List. Not saved until Save Settings."""
         self._file_filter_set(DEFAULT_FILE_FILTER_TYPES)
         self._set_settings_status("File Filter settings reset to defaults.")
 

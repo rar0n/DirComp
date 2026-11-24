@@ -13,14 +13,14 @@ I take no responsibility if you delete any files or folders you didn't want to, 
 Back up your files! And also your folders!
 
 
-### Compare Folders:
+### Compare Folders (Gloaming Grey theme)
 
-<img width="1675" height="1181" alt="image" src="https://github.com/user-attachments/assets/584abe04-8bea-49bf-8fcd-4bac5a41b922" />
+<img width="1628" height="1181" alt="image" src="https://github.com/user-attachments/assets/c86866ca-8108-453c-92b5-3b122d1012d5" />
 
 
-### Duplicate Finder:
+### Duplicate Finder (My Dark based colorful theme)
 
-<img width="1675" height="1181" alt="image" src="https://github.com/user-attachments/assets/af58b448-17be-401c-865f-9d4f0a1afe96" />
+<img width="1628" height="1181" alt="image" src="https://github.com/user-attachments/assets/5ce64893-dfc6-4aba-8fde-6ca67c94ff42" />
 
 
 ## Features (WIP)

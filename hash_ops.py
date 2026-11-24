@@ -25,9 +25,10 @@ import hashlib
 import os
 import time
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtCore import QEvent, QObject
+from PySide6.QtWidgets import QAbstractItemView, QScrollBar, QApplication, QMessageBox
 
-from constants import CMP_FINGERPRINT, CMP_HASH, HASH_ALGORITHMS
+from constants import CMP_FINGERPRINT, CMP_HASH, HASH_ALGORITHMS, PATH_ROLE
 from hash_cache_store import HashCacheStore
 
 _CHUNK = 1024 * 1024
@@ -38,6 +39,175 @@ _ALGORITHM_FACTORIES = {
     "MD5": hashlib.md5, "SHA-1": hashlib.sha1, "SHA-256": hashlib.sha256,
     "BLAKE2b": hashlib.blake2b,
 }
+
+
+class _UserScrollWatcher(QObject):
+    """Calls `on_scroll` when the user scrolls by hand: mouse wheel over the
+    list or its scrollbar, a click/drag on the scrollbar, or a navigation key."""
+    _KEYS = None
+
+    def __init__(self, on_scroll):
+        super().__init__()
+        self._on_scroll = on_scroll
+
+    def eventFilter(self, obj, event):
+        kind = event.type()
+        if kind in (QEvent.Wheel, QEvent.KeyPress) or (
+                kind == QEvent.MouseButtonPress and isinstance(obj, QScrollBar)):
+            self._on_scroll()
+        return False
+
+
+class _HashLive:
+    """File List View rows as hash progress bars (Settings -> File List View
+    -> "File List names as hash progress bars"). Owns, for one _hash_pane run,
+    the tree's `_hash_fill` dict (normalized path -> 0..1, read by the row
+    painting in custom_widgets/dnd_widgets): a file's own fraction of the
+    bytes read, and each ancestor folder's share of all bytes its contents
+    need. Also follows the hashing with the scrollbar (until the user scrolls
+    by hand), and with Expand To Selection on opens the folders being hashed,
+    closing them again in finish()."""
+
+    _REPAINT_SECONDS = 0.04
+
+    def __init__(self, owner, pane, todo, cost):
+        self.owner, self.pane, self.tree = owner, pane, pane.tree
+        self.expand = owner.expand_matching_cb.isChecked()
+        root = pane.snapshot_root.get("full_path") or ""
+        self.root = os.path.normpath(root) if root else None
+        self.fill = {}
+        self.total = {}   # normalized path -> bytes its contents need (files: own cost)
+        self.done = {}
+        self.ancestors = {}  # file path -> [outermost ... innermost folder paths]
+        for node in todo:
+            path = os.path.normpath(node["full_path"])
+            chain, parent = [], os.path.dirname(path)
+            while self.root and parent != self.root and len(parent) > len(self.root) and parent != os.path.dirname(parent):
+                chain.append(parent)
+                parent = os.path.dirname(parent)
+            chain.reverse()
+            self.ancestors[path] = chain
+            c = max(0, cost(node["size"]))
+            for key in [path] + chain:
+                self.total[key] = self.total.get(key, 0) + c
+                self.done.setdefault(key, 0)
+        self.scrollbar = self.tree.verticalScrollBar()
+        self.orig_scroll = self.scrollbar.value()
+        self.last_user_scroll = None  # monotonic time of the user's last manual scroll
+        self._watcher = _UserScrollWatcher(self._user_scrolled)
+        for target in (self.tree.viewport(), self.scrollbar, self.tree):
+            target.installEventFilter(self._watcher)
+        self.expanded = []
+        self.items = {}
+        for item in owner._iter_items(self.tree):
+            p = item.data(0, PATH_ROLE)
+            if p:
+                self.items[os.path.normpath(p)] = item
+        self.pre_selected = bool(self.tree.selectedItems())
+        self.current = None
+        self._last_paint = 0.0
+        self.tree._hash_fill = self.fill
+
+    def begin_file(self, node):
+        self.current = os.path.normpath(node["full_path"])
+        self._publish(self.current)
+        self._reveal(self.current)
+        self.tree.viewport().update()
+
+    def add_bytes(self, n):
+        if self.current is None:
+            return
+        for key in [self.current] + self.ancestors.get(self.current, []):
+            self.done[key] += n
+            self._publish(key)
+        now = time.monotonic()
+        if now - self._last_paint >= self._REPAINT_SECONDS:
+            self._last_paint = now
+            self.tree.viewport().update()
+
+    def end_file(self):
+        if self.current is not None:
+            path = self.current
+            for key in [path] + self.ancestors.get(path, []):
+                self.done[key] = max(self.done[key], 0)
+            self.fill[path] = 1.0
+            self.current = None
+
+    def _publish(self, key):
+        total = self.total.get(key, 0)
+        self.fill[key] = (self.done[key] / total) if total else 1.0
+
+    def _reveal(self, path):
+        """Expand (Expand To Selection on) and/or scroll to the file being
+        hashed, or to the nearest visible folder row above it."""
+        tree = self.tree
+        target = None
+        reachable = True
+        for folder in self.ancestors.get(path, []):
+            item = self.items.get(folder)
+            if item is None:
+                reachable = False
+                break
+            if not item.isExpanded():
+                if self.expand:
+                    item.setExpanded(True)
+                    self.expanded.append(item)
+                    self._register(item)
+                else:
+                    target = item
+                    reachable = False
+                    break
+        if reachable:
+            target = self.items.get(path)
+        if target is None or self._user_is_scrolling():
+            return
+        tree.scrollToItem(target, QAbstractItemView.PositionAtCenter)
+
+    # Following pauses while the user scrolls by hand and takes over again
+    # this long after their last scroll input.
+    _RESUME_SECONDS = 1.5
+
+    def _user_scrolled(self):
+        self.last_user_scroll = time.monotonic()
+
+    def _user_is_scrolling(self):
+        if self.scrollbar.isSliderDown():
+            return True
+        return (self.last_user_scroll is not None
+                and time.monotonic() - self.last_user_scroll < self._RESUME_SECONDS)
+
+    def _register(self, item):
+        def walk(it):
+            for i in range(it.childCount()):
+                child = it.child(i)
+                p = child.data(0, PATH_ROLE)
+                if p:
+                    self.items[os.path.normpath(p)] = child
+                walk(child)
+        walk(item)
+
+    def finish(self):
+        """Stop painting; close what was opened. Call before the listing is
+        rebuilt (which keeps the expand state it finds)."""
+        self.tree._hash_fill = None
+        for target in (self.tree.viewport(), self.scrollbar, self.tree):
+            target.removeEventFilter(self._watcher)
+        for item in reversed(self.expanded):
+            try:
+                item.setExpanded(False)
+            except RuntimeError:
+                pass
+        self.tree.viewport().update()
+
+    def restore_scroll(self):
+        """After the rebuild: to the first selection made before hashing, or
+        back where the list was -- unless the user is scrolling right now."""
+        if self._user_is_scrolling():
+            return
+        if self.pre_selected:
+            self.owner._scroll_tree_to_first_selected(self.tree)
+        else:
+            self.scrollbar.setValue(self.orig_scroll)
 
 
 class HashOpsMixin:
@@ -85,6 +255,19 @@ class HashOpsMixin:
         except OSError:
             return None
         return digest.hexdigest() if ok else None
+
+    def _display_order_key(self, pane):
+        """Sort key putting file nodes in (approximately) the order the File
+        List View shows them -- by name, folders first when that option is on
+        -- so the list can follow the hashing top to bottom."""
+        root = os.path.normpath(pane.snapshot_root.get("full_path") or "")
+        dirs_first = self.sort_directories_first_cb.isChecked()
+
+        def key(node):
+            parts = os.path.relpath(os.path.normpath(node["full_path"]), root).split(os.sep)
+            last = len(parts) - 1
+            return [(1 if (dirs_first and i == last) else 0, name.lower()) for i, name in enumerate(parts)]
+        return key
 
     def _files_to_hash(self, pane, progress):
         """Snapshot file nodes the Hash button should look at: every file
@@ -141,6 +324,7 @@ class HashOpsMixin:
         pending = []  # rows not yet written to the persistent cache
         cache_failed = False
         saved = compared = differed = 0
+        live = None
 
         def flush():
             nonlocal saved, cache_failed
@@ -156,6 +340,10 @@ class HashOpsMixin:
             nodes = self._files_to_hash(pane, progress)
             todo = list(nodes) if rehash else [n for n in nodes if self._node_hash(n) is None]
             if not progress.cancelled and todo:
+                if getattr(self, "hash_progress_in_list_cb", None) is not None \
+                        and self.hash_progress_in_list_cb.isChecked():
+                    todo.sort(key=self._display_order_key(pane))
+                    live = _HashLive(self, pane, todo, self._hash_cost)
                 total_units = sum(self._hash_cost(n["size"]) for n in todo) // _UNIT + 1
                 progress.start_phase(total_units)
                 progress._on_tick = None
@@ -165,6 +353,8 @@ class HashOpsMixin:
 
                 def on_bytes(n):
                     nonlocal carry
+                    if live is not None:
+                        live.add_bytes(n)
                     carry += n
                     units, carry = divmod(carry, _UNIT)
                     return progress.advance(units) if units else progress.pump()
@@ -176,7 +366,11 @@ class HashOpsMixin:
                         label.setText(f"{'Rehashing' if rehash else 'Hashing'} {i}/{len(todo)}")
                         QApplication.processEvents()
                     previous = self._node_hash(node)
+                    if live is not None:
+                        live.begin_file(node)
                     digest = self._compute_file_hash(node["full_path"], node["size"], on_bytes)
+                    if live is not None:
+                        live.end_file()
                     if progress.cancelled:
                         break
                     if digest is None:
@@ -193,6 +387,8 @@ class HashOpsMixin:
                         last_flush = time.monotonic()
                         flush()
         finally:
+            if live is not None:
+                live.finish()
             flush()
             removed = self._prune_hash_cache(pane) if hashed else 0
             self._finish_transfer_progress(result_count=hashed)
@@ -201,6 +397,8 @@ class HashOpsMixin:
         self._reattach_cached_hashes()
         self._invalidate_dir_rank_cache()
         self.update_listings(rescan_disk=False)
+        if live is not None:
+            live.restore_scroll()
         # Said after the re-tag (which overwrites the status text): files
         # only compare once BOTH panes' files are hashed, so when the other
         # pane still has unhashed files nothing changes color yet -- say so.

@@ -951,6 +951,21 @@ class SettingsTabMixin:
         date_col_row.addStretch(1)
         flv_general_outer.addLayout(date_col_row)
 
+        # Row 3: names as hash progress bars (global option).
+        hash_bar_row = QHBoxLayout()
+        self.hash_progress_in_list_cb = QCheckBox("File List names as hash progress bars")
+        self.hash_progress_in_list_cb.setToolTip(
+            "While hashing/fingerprinting, paint each file's row from left to right in the "
+            "\"Hashed, not compared\" color as it is read (folders fill by the share of their "
+            "contents' bytes that is done), and scroll the list along. With Expand To Selection on, "
+            "folders being hashed open up meanwhile and collapse again afterwards. In addition to "
+            "the normal progress bar."
+        )
+        self.hash_progress_in_list_cb.setChecked(True)
+        hash_bar_row.addWidget(self.hash_progress_in_list_cb)
+        hash_bar_row.addStretch(1)
+        flv_general_outer.addLayout(hash_bar_row)
+
         # The section's Level 2 blocks (Indentation Line, File List View
         # Colors, Comparison Type Colors, in that order), side by side
         # while they fit and wrapping below each other when they don't
@@ -1184,7 +1199,7 @@ class SettingsTabMixin:
             SpinSlider(self.selection_tint_opacity_spin),
         ), 0, Qt.AlignVCenter)
         tint_row.addStretch(1)
-        flv_general_outer.addLayout(tint_row)
+        flv_general_outer.insertLayout(1, tint_row)  # right below Font size
         self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
 
         # ---- Scrollbar handle style: how the File List View scrollbar handle shows the

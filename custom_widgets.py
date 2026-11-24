@@ -22,6 +22,7 @@ import textwrap
 from PySide6.QtCore import Qt, QPoint, QPointF, QObject, QEvent, QRect, QSize
 from PySide6.QtGui import (
     QColor, QPainter, QPen, QPolygonF, QPainterPath, QPalette, QBrush, QRegion, QWheelEvent,
+    QLinearGradient,
 )
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QAbstractItemView, QPushButton, QScrollBar, QStyle, QProxyStyle,
@@ -29,7 +30,9 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox, QHBoxLayout, QLabel, QLayout, QSizePolicy, QSlider, QSpinBox, QToolButton, QVBoxLayout,
 )
 
-from constants import IS_DIR_ROLE
+import os
+
+from constants import IS_DIR_ROLE, PATH_ROLE, TAG_COLORS
 
 # The tree's own selection-highlight yellow (see the palette setup in
 # ui_builder._build_directory_widgets) and Select All's matching button
@@ -546,6 +549,35 @@ class InvertButton(QPushButton):
         painter.drawLine(rect.topRight(), rect.bottomRight())
 
 
+def hash_fill_for(widget, index):
+    """(fraction, fill_hex) if this row is being painted as a hash progress
+    bar (see HashOpsMixin: the tree's `_hash_fill` dict, path -> 0..1), else
+    None. Fill color: the "Hashed, not compared" file/folder color."""
+    fills = getattr(widget, "_hash_fill", None)
+    if not fills:
+        return None
+    first = index.sibling(index.row(), 0)
+    path = first.data(PATH_ROLE)
+    if not path:
+        return None
+    fraction = fills.get(os.path.normpath(path))
+    if fraction is None:
+        return None
+    tag = "hashed_dir" if first.data(IS_DIR_ROLE) else "hashed_file"
+    return fraction, (TAG_COLORS.get(tag) or ("#B8E0E8",))[0] or "#B8E0E8"
+
+
+def paint_hash_fill(painter, widget, rect, fraction, base_color, fill_color):
+    """One cell's (or the indent area's) share of a row's hash progress bar:
+    the row is one continuous bar over the whole viewport width, so each
+    piece paints only the part of itself left of the row's fill edge."""
+    painter.fillRect(rect, QColor(base_color))
+    edge = int(round(max(0.0, min(1.0, fraction)) * widget.viewport().width()))
+    part = rect.intersected(QRect(0, rect.top(), edge, rect.height()))
+    if part.width() > 0:
+        painter.fillRect(part, QColor(fill_color))
+
+
 class _SelectionColorDelegate(QStyledItemDelegate):
     """Makes selected rows easier to tell apart from everything else --
     the tree's Highlight color is set to a strong yellow by default (see
@@ -580,25 +612,46 @@ class _SelectionColorDelegate(QStyledItemDelegate):
         a selected row exactly like the cells to its right."""
         return self._get_selection_tint()
 
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        # A row being painted as a hash progress bar gets its whole
+        # background from paint() below.
+        if option.widget is not None and hash_fill_for(option.widget, index) is not None:
+            option.backgroundBrush = QBrush(Qt.NoBrush)
+
     def paint(self, painter, option, index):
-        if option.state & QStyle.State_Selected:
+        fill = hash_fill_for(option.widget, index) if option.widget is not None else None
+        selected = bool(option.state & QStyle.State_Selected)
+        if selected or fill is not None:
             option = QStyleOptionViewItem(option)
+        base_hex = None
+        if selected:
             is_dir = index.sibling(index.row(), 0).data(IS_DIR_ROLE)
             option.palette.setColor(QPalette.HighlightedText, QColor("blue" if is_dir else "black"))
+        if selected or fill is not None:
+            base_brush = index.data(Qt.BackgroundRole)
+            # A real per-item color (a diff-tag background) blends from
+            # itself; an item with none (see _apply_tag -- an empty QBrush()
+            # for a plain, undiffed file/directory) blends from the tree's
+            # own normal row color instead.
+            if isinstance(base_brush, QBrush) and base_brush.style() != Qt.NoBrush:
+                base_hex = base_brush.color().name()
+            else:
+                base_hex = option.palette.color(QPalette.Base).name()
+        fill_hex = fill[1] if fill is not None else None
+        if selected:
             tint_hex, opacity_pct = self._get_selection_tint()
             if tint_hex:
-                base_brush = index.data(Qt.BackgroundRole)
-                # A real per-item color (a diff-tag background) blends
-                # from itself; an item with none (see _apply_tag -- an
-                # empty QBrush() for a plain, undiffed file/directory)
-                # blends from the tree's own normal row color instead,
-                # so a plain row still gets a consistent tint rather
-                # than blending from nothing.
-                if isinstance(base_brush, QBrush) and base_brush.style() != Qt.NoBrush:
-                    base_hex = base_brush.color().name()
-                else:
-                    base_hex = option.palette.color(QPalette.Base).name()
-                option.palette.setColor(QPalette.Highlight, _press_blend(base_hex, tint_hex, opacity_pct / 100.0))
+                base_hex = _press_blend(base_hex, tint_hex, opacity_pct / 100.0).name()
+                if fill_hex:
+                    fill_hex = _press_blend(fill_hex, tint_hex, opacity_pct / 100.0).name()
+            else:
+                base_hex = option.palette.color(QPalette.Highlight).name()
+            option.palette.setColor(QPalette.Highlight, QColor(base_hex))
+        if fill is not None:
+            paint_hash_fill(painter, option.widget, option.rect, fill[0], base_hex, fill_hex)
+            if selected:
+                option.palette.setColor(QPalette.Highlight, QColor(0, 0, 0, 0))
         super().paint(painter, option, index)
 
 

@@ -89,7 +89,7 @@ _INDENT_TICK_SPINS = (
 _THEME_DEFAULTS = {
     "dark": {
         "gui_fg": "#F5F5F5", "gui_bg": "#3A3A3A", "base": "#2A2A2A",
-        "stats_bg": "#1E1E20", "stats_hover": "#FFFFFF", "stats_text": "#D2D2D2",
+        "stats_bg": "#2A2A2A", "stats_hover": "#FFFFFF", "stats_text": "#D2D2D2",
         "stats_grid": "#3C3C3C", "selection_info": "#E68C14",
         "progress_bg": "#2A2A2A",
         "scrollbar_groove": "#1A1A1A", "scrollbar_handle": "#E8E8E8",
@@ -1467,6 +1467,19 @@ class ThemeOpsMixin:
             if key not in _NON_COLOR_SET_KEYS:
                 new_set[key] = value
         # The captured set's non-color values (opacities, widget values) stay.
+        # Every button gets the theme's one default button color: the Select
+        # group (its own table), Clipboard / File Op / Both Panes / FLV buttons
+        # (the ones with a fixed design color of their own get it explicitly)
+        # and the Statistics View buttons. Only the Statistics View mode
+        # switch pressed-in looks (Main tab and Statistics View) keep their blue, to tell the modes apart.
+        btn_bg, btn_fg = self._theme_default_button_colors(self._theme)
+        new_set["select_colors"] = {k: [btn_fg, btn_bg] for k in new_set["select_colors"]}
+        new_set["main_button_colors"] = {
+            k: (v if k in ("mode_pressed", "dup_list_pressed")
+                else None if k in _THEME_DEFAULT_MAIN_BUTTON_KEYS else [btn_bg, btn_fg])
+            for k, v in builtin["main_button_colors"].items()
+        }
+        new_set["stats_button_colors"] = {k: None for k in new_set["stats_button_colors"]}
         widget_values = new_set.get("widgets") or {}
         self._gui_colors[self._theme] = None
         self._load_color_set_into_live(new_set)

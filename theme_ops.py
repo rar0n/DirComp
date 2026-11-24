@@ -1469,25 +1469,32 @@ class ThemeOpsMixin:
 
     def _shipped_theme_color_set(self, theme: str):
         """The color set shipped for `theme` in <theme>_colors.json (laid over
-        the built-in one), with its Comparison Type Colors Bg muted toward the
-        GUI background; None if the file is missing or unreadable."""
+        the built-in one) and its custom GUI colors ("_gui_colors"):
+        (color set, GUI colors or None), or (None, None) if the file is missing
+        or unreadable. Two changes to what the file holds: the Comparison Type
+        Colors Bg are muted toward the GUI background, and the Statistics View
+        File and Folder graph colors are swapped."""
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{theme}_colors.json")
         try:
             with open(path, "r", encoding="utf-8") as f:
                 shipped = json.load(f)
         except (OSError, ValueError):
-            return None
+            return None, None
         if not isinstance(shipped, dict):
-            return None
+            return None, None
         merged = self._merged_color_set(theme, shipped)
-        gui_bg = _THEME_DEFAULTS[theme]["gui_bg"]
+        gui = shipped.get("_gui_colors")
+        gui = tuple(gui) if gui else None
+        gui_bg = gui[1] if gui else _THEME_DEFAULTS[theme]["gui_bg"]
+        stats = merged["stats_colors"]
+        stats["file"], stats["folder"] = stats["folder"], stats["file"]
         tags = [t for pair in _SELECT_KEY_TO_TAG_COLOR_KEYS.values() for t in pair]
         tags += ["unhashed_file", "unhashed_dir", "changed_file", "changed_dir", "hashed_file", "hashed_dir"]
         for tag in tags:
             bg_fg = merged["tag_colors"].get(tag)
             if bg_fg and bg_fg[0]:
                 merged["tag_colors"][tag] = [self._mix_hex(bg_fg[0], gui_bg, _GLOAMING_MUTE_SHARE), bg_fg[1]]
-        return merged
+        return merged, gui
 
     @staticmethod
     def _theme_default_button_colors(theme: str) -> tuple[str, str]:
@@ -1512,8 +1519,10 @@ class ThemeOpsMixin:
         shipped = self._theme in _FILE_DEFAULT_THEMES
         if self._theme not in _OFFICIAL_THEMES and not shipped:
             return
-        builtin = (self._shipped_theme_color_set(self._theme) if shipped else None) \
-            or self._builtin_color_set(self._theme)
+        builtin, shipped_gui = self._shipped_theme_color_set(self._theme) if shipped else (None, None)
+        if builtin is None:
+            shipped = False
+            builtin = self._builtin_color_set(self._theme)
         btn_bg, btn_fg = self._theme_default_button_colors(self._theme)
         new_set = self._capture_color_set()
         for key, value in builtin.items():
@@ -1525,16 +1534,16 @@ class ThemeOpsMixin:
         # (the ones with a fixed design color of their own get it explicitly)
         # and the Statistics View buttons. Only the Statistics View mode
         # switch pressed-in looks (Main tab and Statistics View) keep their blue, to tell the modes apart.
-        if not shipped:  # a shipped set brings its own Select button colors
+        if not shipped:  # a shipped set brings all its own button colors
             new_set["select_colors"] = {k: [btn_fg, btn_bg] for k in new_set["select_colors"]}
-        new_set["main_button_colors"] = {
-            k: (v if k in ("mode_pressed", "dup_list_pressed")
-                else None if k in _THEME_DEFAULT_MAIN_BUTTON_KEYS else [btn_bg, btn_fg])
-            for k, v in builtin["main_button_colors"].items()
-        }
-        new_set["stats_button_colors"] = {k: None for k in new_set["stats_button_colors"]}
+            new_set["main_button_colors"] = {
+                k: (v if k in ("mode_pressed", "dup_list_pressed")
+                    else None if k in _THEME_DEFAULT_MAIN_BUTTON_KEYS else [btn_bg, btn_fg])
+                for k, v in builtin["main_button_colors"].items()
+            }
+            new_set["stats_button_colors"] = {k: None for k in new_set["stats_button_colors"]}
         widget_values = new_set.get("widgets") or {}
-        self._gui_colors[self._theme] = None
+        self._gui_colors[self._theme] = shipped_gui if shipped else None
         self._load_color_set_into_live(new_set)
         self._apply_theme_palette(self._theme)
         # Always a full rebuild: every button (Panel/Select, Clipboard, File

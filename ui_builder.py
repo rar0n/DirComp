@@ -430,6 +430,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             previous_tab = self.tabs.currentIndex()
         except (AttributeError, RuntimeError):
             previous_tab = 0
+        # Main-tab group boxes the build below may not recreate (the
+        # Comparison Options excerpt exists only in single-pane mode): drop
+        # the references to the previous build's, now deleted, widgets so
+        # _apply_group_borders never touches a dead one.
+        for stale in ("comparison_copy_group", "filter_frame_group", "global_options_group", "both_panes_group"):
+            setattr(self, stale, None)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")

@@ -1199,7 +1199,7 @@ class SettingsTabMixin:
             SpinSlider(self.selection_tint_opacity_spin),
         ), 0, Qt.AlignVCenter)
         tint_row.addStretch(1)
-        flv_general_outer.addLayout(tint_row)
+        flv_general_outer.insertLayout(1, tint_row)  # right below Font size
         self._aligned_option_rows.append((self.selection_tint_opacity_label, self.selection_tint_opacity_spin))
 
         # ---- Scrollbar handle style: how the File List View scrollbar handle shows the

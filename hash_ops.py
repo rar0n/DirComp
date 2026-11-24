@@ -93,7 +93,7 @@ class _HashLive:
                 self.done.setdefault(key, 0)
         self.scrollbar = self.tree.verticalScrollBar()
         self.orig_scroll = self.scrollbar.value()
-        self.follow = True
+        self.last_user_scroll = None  # monotonic time of the user's last manual scroll
         self._watcher = _UserScrollWatcher(self._user_scrolled)
         for target in (self.tree.viewport(), self.scrollbar, self.tree):
             target.installEventFilter(self._watcher)
@@ -159,12 +159,22 @@ class _HashLive:
                     break
         if reachable:
             target = self.items.get(path)
-        if target is None or not self.follow:
+        if target is None or self._user_is_scrolling():
             return
         tree.scrollToItem(target, QAbstractItemView.PositionAtCenter)
 
+    # Following pauses while the user scrolls by hand and takes over again
+    # this long after their last scroll input.
+    _RESUME_SECONDS = 1.5
+
     def _user_scrolled(self):
-        self.follow = False
+        self.last_user_scroll = time.monotonic()
+
+    def _user_is_scrolling(self):
+        if self.scrollbar.isSliderDown():
+            return True
+        return (self.last_user_scroll is not None
+                and time.monotonic() - self.last_user_scroll < self._RESUME_SECONDS)
 
     def _register(self, item):
         def walk(it):
@@ -191,8 +201,8 @@ class _HashLive:
 
     def restore_scroll(self):
         """After the rebuild: to the first selection made before hashing, or
-        back where the list was -- unless the user took over scrolling."""
-        if not self.follow:
+        back where the list was -- unless the user is scrolling right now."""
+        if self._user_is_scrolling():
             return
         if self.pre_selected:
             self.owner._scroll_tree_to_first_selected(self.tree)

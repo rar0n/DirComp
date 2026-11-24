@@ -593,7 +593,7 @@ class PaneBuilderMixin:
         title_left.addWidget(timeline_title_label)
         title_left.addSpacing(10)
 
-        # Reset View, retitled "Reset" and moved up here from the
+        # Reset view, moved up here from the
         # footer row below the chart (see _build_statistics_panel) --
         # it's a "restore the default view" action, same category as
         # the title/mode-toggle row it now shares, and consolidating it
@@ -603,7 +603,7 @@ class PaneBuilderMixin:
         # -- this title row is built first, before that widget.
         default_bg, default_fg = self._default_button_colors()
         _, uniform_h = self._uniform_button_size()
-        reset_button = QPushButton("Reset")
+        reset_button = QPushButton("Reset view")
         reset_button.setFixedHeight(uniform_h)
         reset_button.setStyleSheet(_bevel_button_stylesheet(*self._stats_button_color_for("reset")))
         pane.tl_reset_button = reset_button
@@ -626,7 +626,7 @@ class PaneBuilderMixin:
         files_mode_button.setCheckable(True)
         files_mode_button.setChecked(True)  # default mode
         files_mode_button.setFixedHeight(uniform_h)
-        files_mode_button.setStyleSheet(_bevel_button_stylesheet(*self._stats_button_color_for("files")))
+        files_mode_button.setStyleSheet(self._stats_mode_button_sheet())
         files_mode_button.toggled.connect(
             lambda checked, p=pane: self._on_timeline_mode_changed(p, False) if checked else None
         )
@@ -634,7 +634,7 @@ class PaneBuilderMixin:
         folders_mode_button = QPushButton("Folders")
         folders_mode_button.setCheckable(True)
         folders_mode_button.setFixedHeight(uniform_h)
-        folders_mode_button.setStyleSheet(_bevel_button_stylesheet(*self._stats_button_color_for("folders")))
+        folders_mode_button.setStyleSheet(self._stats_mode_button_sheet())
         folders_mode_button.toggled.connect(
             lambda checked, p=pane: self._on_timeline_mode_changed(p, True) if checked else None
         )

@@ -1284,6 +1284,14 @@ class ThemeOpsMixin:
             moved = merged["stats_button_colors"].pop(key, None)
             if moved and not saved_main.get(key):
                 merged["main_button_colors"][key] = moved
+        # The Statistics View's Files/Folders buttons got a mode-switch
+        # pair (released/pressed) instead of one color each: carry a picked
+        # Files color over as "released" and a Folders one as "pressed".
+        saved_stats = (saved or {}).get("stats_button_colors") or {}
+        for old, new in (("files", "mode_unpressed"), ("folders", "mode_pressed")):
+            moved = merged["stats_button_colors"].pop(old, None)
+            if moved and not saved_stats.get(new):
+                merged["stats_button_colors"][new] = moved
         return merged
 
     def _load_color_set_into_live(self, cs: dict):

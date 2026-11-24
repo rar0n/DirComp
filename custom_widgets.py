@@ -207,8 +207,10 @@ _THEME_DEFAULT_MAIN_BUTTON_KEYS = (
 # Statistics View -> Colors (both panes) -> Buttons) -- all start as None,
 # the theme's default button colors. Copy -->/Move --> used to be here;
 # they moved to _THEME_DEFAULT_MAIN_BUTTON_KEYS along with the buttons
-# themselves (into the Clipboard group).
-_STATS_BUTTON_KEYS = ("files", "folders", "zoom_to", "reset", "fit_range", "zoom_in", "zoom_out")
+# themselves (into the Clipboard group). "mode_unpressed"/"mode_pressed"
+# are the Files/Folders mode switch's released and pressed-in looks (they
+# replaced separate "files"/"folders" entries).
+_STATS_BUTTON_KEYS = ("mode_unpressed", "mode_pressed", "zoom_to", "reset", "fit_range", "zoom_in", "zoom_out")
 
 class ElidedLabel(QLabel):
     """A one-line QLabel that never forces its parent wider: text that does

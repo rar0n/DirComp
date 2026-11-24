@@ -2313,8 +2313,8 @@ class SettingsTabMixin:
         QVBoxLayout(info_colors_group).addWidget(info_colors_table)
         info_colors_block = self._l2_block("Info text colors", info_colors_group, "half")
 
-        # ---- Buttons -- every button in the Statistics view: Files/
-        # Folders and Zoom to/Reset in its title line, Fit Range and the
+        # ---- Buttons -- every button in the Statistics view: the Files/
+        # Folders mode switch and Zoom to/Reset view in its title line, Fit Range and the
         # +/- zoom buttons in its footer. A third Level 3 table next to
         # Graph colors/Info text colors. None of them has a color set
         # here until the user actually picks one -- see
@@ -2323,8 +2323,8 @@ class SettingsTabMixin:
         # here; they moved to Panel Button Colors -> Clipboard Buttons,
         # along with the buttons themselves.) ----
         _STATS_BUTTON_ROWS = [
-            ("files", "Files"), ("folders", "Folders"),
-            ("zoom_to", "Zoom to"), ("reset", "Reset"), ("fit_range", "Fit Range"),
+            ("mode_unpressed", "Mode switch (released)"), ("mode_pressed", "Mode switch (pressed)"),
+            ("zoom_to", "Zoom to"), ("reset", "Reset view"), ("fit_range", "Fit Range"),
             ("zoom_in", "Zoom in (+)"), ("zoom_out", "Zoom out (-)"),
         ]
         stats_buttons_table = QTableWidget(len(_STATS_BUTTON_ROWS), 3)

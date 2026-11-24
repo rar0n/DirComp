@@ -83,7 +83,7 @@
     "dup_groups": "#005500"
   },
   "folder_color": [
-    "#0000ff",
+    "#5b648d",
     "#e0e090"
   ],
   "progress_bar_colors": {
@@ -102,64 +102,64 @@
   "custom_default_button_colors": null,
   "tag_colors": {
     "common_file": [
-      "#90e0c0",
+      "#92baaa",
       "#000000"
     ],
     "common_dir": [
-      "#90e0c0",
+      "#92baaa",
       "#000080"
     ],
     "missing_file": [
-      "#ffa0a0",
+      "#9d8181",
       "#000000"
     ],
     "missing_dir": [
-      "#ffa0a0",
+      "#9d8181",
       "#000080"
     ],
     "diff_size_smaller_file": [
-      "#d9bcf0",
+      "#b6a8c2",
       "#000000"
     ],
     "diff_size_larger_file": [
-      "#b98ce0",
+      "#a690ba",
       "#000000"
     ],
     "diff_date_newer_file": [
-      "#decfa3",
+      "#b9b29c",
       "#000000"
     ],
     "diff_date_older_file": [
-      "#c9a96e",
+      "#ae9e81",
       "#000000"
     ],
     "diff_count_smaller_dir": [
-      "#d9bcf0",
+      "#b6a8c2",
       "#000080"
     ],
     "diff_count_larger_dir": [
-      "#b98ce0",
+      "#a690ba",
       "#000080"
     ],
     "diff_date_newer_dir": [
-      "#decfa3",
+      "#b9b29c",
       "#000080"
     ],
     "diff_date_older_dir": [
-      "#c9a96e",
+      "#ae9e81",
       "#000080"
     ],
     "diff_content_dir": [
-      "#7777dd",
+      "#8686b8",
       "#0000ff"
     ],
     "diff_content_file": [
-      "#7777dd",
+      "#8686b8",
       "#0000ff"
     ],
     "directory": [
       "#e0e090",
-      "#0000ff"
+      "#5b648d"
     ],
     "file": [
       null,
@@ -179,42 +179,42 @@
     ],
     "dupfolder": [
       null,
-      "#0000ff"
+      "#5b648d"
     ],
     "error": [
       "#ffb6c1",
       "#ff0000"
     ],
     "unhashed_file": [
-      "#c8c8c8",
+      "#aeaeae",
       "#000000"
     ],
     "unhashed_dir": [
-      "#b0b0b0",
+      "#a2a2a2",
       "#0000ff"
     ],
     "changed_file": [
-      "#e8c888",
+      "#beae8e",
       "#000000"
     ],
     "changed_dir": [
-      "#d4a85c",
+      "#b49e78",
       "#0000ff"
     ],
     "hashed_file": [
-      "#b8e0e8",
+      "#a6babe",
       "#000000"
     ],
     "hashed_dir": [
-      "#9ccbd6",
+      "#98b0b5",
       "#0000ff"
     ]
   },
-  "selection_tint_color": "#f5d400",
+  "selection_tint_color": "#ffffff",
   "flv_bg_color": "#949494",
   "title_numeric_color": "#ffffff",
-  "status_selected_color": "#ffffc0",
-  "status_unselected_color": null,
+  "status_selected_color": "#000000",
+  "status_unselected_color": "#ffffff",
   "status_warning_color": "#e02828",
   "group_border_color": "#737373",
   "history_live_color": "#ffffff",
@@ -224,20 +224,6 @@
   "indent_hover_color": "#7a6a00",
   "stats_colors": {
     "file": {
-      "background_color": "#a0a0a0",
-      "selection_color": "#c4c4c4",
-      "bin_info_color": "#ffffff",
-      "stripped_info_color": "#ffffff",
-      "hover_color": "#ffffff",
-      "hover_opacity": 35,
-      "partial_lerp": 50,
-      "bin_color": "#808080",
-      "grid_color": "#e0e0e0",
-      "axis_label_color": "#ffffff",
-      "hover_label_color": "#ffffff",
-      "selection_info_color": "#ffffff"
-    },
-    "folder": {
       "background_color": "#a0a0a0",
       "selection_color": "#404040",
       "bin_info_color": "#000000",
@@ -250,6 +236,20 @@
       "axis_label_color": "#000000",
       "hover_label_color": "#000000",
       "selection_info_color": "#000000"
+    },
+    "folder": {
+      "background_color": "#a0a0a0",
+      "selection_color": "#c4c4c4",
+      "bin_info_color": "#ffffff",
+      "stripped_info_color": "#ffffff",
+      "hover_color": "#ffffff",
+      "hover_opacity": 35,
+      "partial_lerp": 50,
+      "bin_color": "#808080",
+      "grid_color": "#e0e0e0",
+      "axis_label_color": "#ffffff",
+      "hover_label_color": "#ffffff",
+      "selection_info_color": "#ffffff"
     }
   },
   "stats_button_colors": {
@@ -329,9 +329,12 @@
     "filter_clear": null,
     "filter_apply": null
   },
-  "dup_color1": "#d88888",
-  "dup_color2": "#8888d8",
+  "dup_color1": "#95625e",
+  "dup_color2": "#777d8f",
   "dup_fg_color": "#000000",
+  "dup_steps": 7,
+  "dup_reverse": false,
+  "dup_fg_mode": 2,
   "_gui_colors": [
     "#000000",
     "#949494"

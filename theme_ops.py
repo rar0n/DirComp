@@ -1525,8 +1525,11 @@ class ThemeOpsMixin:
             builtin = self._builtin_color_set(self._theme)
         btn_bg, btn_fg = self._theme_default_button_colors(self._theme)
         new_set = self._capture_color_set()
+        # A shipped set also brings its Duplicate File Colors' steps / reverse /
+        # text-color mode, which belong to that color table.
+        dup_keys = ("dup_steps", "dup_reverse", "dup_fg_mode") if shipped else ()
         for key, value in builtin.items():
-            if key not in _NON_COLOR_SET_KEYS:
+            if key not in _NON_COLOR_SET_KEYS or key in dup_keys:
                 new_set[key] = value
         # The captured set's non-color values (opacities, widget values) stay.
         # Every button gets the theme's one default button color: the Select

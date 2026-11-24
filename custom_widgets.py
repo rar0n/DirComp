@@ -180,6 +180,8 @@ _DEFAULT_MAIN_BUTTON_COLORS = {
     "paste_folders": ["#6E6694", "#F5F5F5"],
     "new_folder": ["#3355DD", "black"],
     "delete": ["#C0392B", "#F5F5F5"],
+    # Both status-line Cancel buttons (Misc Buttons), while enabled.
+    "cancel": ["#C0392B", "#F5F5F5"],
     # Main tab's Duplicate finder / Compare Folders mode switch, while
     # that mode is the active ("pressed in") one -- see _mode_button_stylesheet.
     "mode_pressed": ["#2F6DB5", "#F5F5F5"],

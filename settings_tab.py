@@ -886,6 +886,7 @@ class SettingsTabMixin:
             ("filter_clear", "File Filter: Clear"),
             ("filter_apply", "File Filter: Apply"),
             ("refresh", "Refresh (global)"),
+            ("cancel", "Cancel"),
         ], custom={
             "default_button": (
                 lambda: self._custom_default_button_colors or self._default_button_colors(),
@@ -896,6 +897,8 @@ class SettingsTabMixin:
                               "current theme. Changing it rebuilds the GUI.",
             "refresh": "The Refresh button under Quick Options on the Main tab. Uses the "
                        "theme's default button colors until you pick one.",
+            "cancel": "Both Cancel buttons next to the progress bars on the Main tab (while "
+                      "they are enabled; disabled they fade toward the window color).",
         })
         global_settings_flow.addWidget(self._l2_block("Misc Buttons", misc_buttons_group, "third"))
 

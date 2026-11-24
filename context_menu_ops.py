@@ -264,6 +264,14 @@ class ContextMenuMixin:
             handlers[act] = handler
             return act
 
+        add(menu, "Open", lambda: self._open_paths(paths), has_sel)
+        if IS_WINDOWS or not has_sel:
+            add(menu, "Open with...", lambda: self._open_with_windows(paths), has_sel)
+        else:
+            open_with = menu.addMenu("Open with...")
+            self._fill_open_with_menu(open_with, paths, add)
+        menu.addSeparator()
+
         add(menu, "Copy", lambda: self.copy_to_clipboard(pane), has_sel)
         # Copy Metadata: the right-clicked item's name, size and dates (as
         # listed in the file list), and a file's stored hash / fingerprint,
@@ -299,14 +307,6 @@ class ContextMenuMixin:
         add(special, "Paste Folders",
             lambda: self.paste_folders_from_clipboard(pane, list(targets)),
             can_paste and bool(targets))
-
-        menu.addSeparator()
-        add(menu, "Open", lambda: self._open_paths(paths), has_sel)
-        if IS_WINDOWS or not has_sel:
-            add(menu, "Open with...", lambda: self._open_with_windows(paths), has_sel)
-        else:
-            open_with = menu.addMenu("Open with...")
-            self._fill_open_with_menu(open_with, paths, add)
 
         menu.addSeparator()
         add(menu, "Properties", lambda: self._show_properties(paths), has_sel)

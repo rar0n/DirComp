@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox, QPlain
 from trash_compat import send2trash, SEND2TRASH_AVAILABLE
 
 _LR, _RL = "lr", "rl"
+_BANNER_RED = "#8B1A1A"  # the warning banners' background (and a too-small free-space cell)
 _MAX_DETAIL_LINES = 400
 
 
@@ -246,12 +247,14 @@ class FolderSyncMixin:
             new, upd = self._sync_totals(plan, direction)
             folders = _plan_new_dirs(plan, direction)
             need = sum(op["size"] for op in new + upd)
-            rows.append((title, f"{share:.0%} ({only} of {total})", len(new), len(upd), folders, fmt(need)))
             try:
                 free = shutil.disk_usage(dest_dir).free
             except OSError:
                 free = None
-            if free is not None and need > free:
+            short = free is not None and need > free
+            rows.append((title, f"{share:.0%} ({only} of {total})", len(new), len(upd), folders, fmt(need),
+                         (fmt(free) if free is not None else "unknown", short)))
+            if short:
                 problems.append(f"Not enough free space in {esc(dest_dir)}: needs {fmt(need)}, {fmt(free)} free.")
         trashed = sum(1 for op in plan["ops"] if op["kind"] == "update")
 
@@ -354,24 +357,31 @@ class FolderSyncMixin:
 
     @staticmethod
     def _sync_table(rows) -> str:
-        """The per-direction summary: a header row, a header column, left-aligned,
+        """The per-direction summary: a two-line header row, a header column, left-aligned,
         with a blank line (the dialog's own font size) above it. rows: (title, missing ratio, new files, newer files,
-        new folders, extra size)."""
-        heads = ("Missing ratio", "New Files", "Newer files overwriting older", "New Folders",
-                 "Total extra size needed")
+        new folders, extra size, (free space text, too little)) -- the free-space cell
+        gets the banner's red background when `too little`."""
+        heads = ("Missing<br>ratio", "New<br>Files", "Newer files<br>overwriting older", "New<br>Folders",
+                 "Total extra<br>size needed", "Free space<br>on drive")
         pad = "cellpadding='6' cellspacing='0'"
         out = ["<p style='margin-top:0; margin-bottom:0'>&nbsp;</p>", f"<table border='1' {pad} style='border-color:#808080'>",
                "<tr><td></td>" + "".join(f"<td align='center'><b>{h}</b></td>" for h in heads) + "</tr>"]
         for title, *cells in rows:
+            *plain, (free_text, short) = cells
+            if short:
+                free_cell = (f"<td align='center' bgcolor='{_BANNER_RED}'>"
+                             f"<font color='#FFFFFF'><b>{free_text}</b></font></td>")
+            else:
+                free_cell = f"<td align='center'>{free_text}</td>"
             out.append(f"<tr><td><b>{title}</b></td>"
-                       + "".join(f"<td align='center'>{c}</td>" for c in cells) + "</tr>")
+                       + "".join(f"<td align='center'>{c}</td>" for c in plain) + free_cell + "</tr>")
         out.append("</table><br>")
         return "".join(out)
 
     @staticmethod
     def _sync_banner(text: str) -> str:
         """White bold text on a dark red block -- readable on any theme."""
-        return ("<table width='100%' cellpadding='8' cellspacing='0'><tr><td bgcolor='#8B1A1A'>"
+        return (f"<table width='100%' cellpadding='8' cellspacing='0'><tr><td bgcolor='{_BANNER_RED}'>"
                 f"<font color='#FFFFFF'><b>{text}</b></font></td></tr></table>")
 
     def _sync_execute(self, plan):

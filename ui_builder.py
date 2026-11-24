@@ -430,6 +430,12 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             previous_tab = self.tabs.currentIndex()
         except (AttributeError, RuntimeError):
             previous_tab = 0
+        # Main-tab group boxes the build below may not recreate (the
+        # Comparison Options excerpt exists only in single-pane mode): drop
+        # the references to the previous build's, now deleted, widgets so
+        # _apply_group_borders never touches a dead one.
+        for stale in ("comparison_copy_group", "filter_frame_group", "global_options_group", "both_panes_group"):
+            setattr(self, stale, None)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.tabs.addTab(self._build_main_tab(), "Main")
@@ -707,9 +713,9 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         )
         self.swap_pane_button.setFixedSize(uniform_w, uniform_h)
         self.swap_pane_button.clicked.connect(lambda checked=False: self._swap_panes())
-        self.sync_button = QPushButton("Sync")
+        self.sync_button = QPushButton("2-way\nSync")
         self.sync_button.setToolTip(self._SYNC_TOOLTIP)
-        self.sync_button.setFixedSize(uniform_w, uniform_h)
+        self.sync_button.setFixedSize(uniform_w, uniform_h * 2)
         self.sync_button.clicked.connect(lambda checked=False: self._sync_panes())
         self._both_panes_buttons = [self.sync_button, self.swap_pane_button]
         for row, button in enumerate(self._both_panes_buttons):
@@ -1196,6 +1202,13 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if refresh is not None:
             refresh.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("refresh")))
         self._apply_mode_button_colors()
+        for attr in ("left_cancel_button", "right_cancel_button"):
+            button = getattr(self, attr, None)
+            if button is not None:
+                try:
+                    button.setStyleSheet(self._cancel_button_stylesheet())
+                except RuntimeError:
+                    pass  # replaced by a UI rebuild
         for attr, key in (("clear_filter_button", "filter_clear"), ("apply_filter_button", "filter_apply")):
             button = getattr(self, attr, None)
             if button is not None:
@@ -1309,11 +1322,13 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         return self._refresh_button_dims
 
     def _cancel_button_stylesheet(self) -> str:
-        """Cancel buttons are red while active; while disabled they fade
+        """Cancel buttons use the "cancel" color (Settings -> Misc Buttons,
+        red by default) while active; while disabled they fade
         toward the window's own background color instead of staying a
-        flat/dark red, for a proper "grayed out" look regardless of the
+        flat/dark color, for a proper "grayed out" look regardless of the
         active Qt palette/theme."""
-        active = QColor("#C0392B")
+        active_hex, fg_hex = self._main_button_color_for("cancel")
+        active = QColor(active_hex)
         bg = getattr(self, "_theme_window_color", None) or self.palette().color(QPalette.Window)
         t = 0.65  # how far toward the background color to blend
         disabled = QColor(
@@ -1322,16 +1337,16 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             int(active.blue() + (bg.blue() - active.blue()) * t),
         )
         disabled_fg = bg.lighter(160) if bg.lightness() < 128 else bg.darker(160)
-        pressed = _darken_hex("#C0392B")
+        pressed = _darken_hex(active_hex)
         return (
             "QPushButton {"
-            " background-color: #C0392B; color: #F5F5F5;"
-            " border: 2px solid #C0392B; border-style: outset;"
+            f" background-color: {active_hex}; color: {fg_hex};"
+            f" border: 2px solid {active_hex}; border-style: outset;"
             " border-radius: 3px; padding: 4px 8px;"
             "}"
             f"QPushButton:pressed {{"
-            f" background-color: {pressed}; color: #F5F5F5;"
-            f" border: 2px solid #C0392B; border-style: inset;"
+            f" background-color: {pressed}; color: {fg_hex};"
+            f" border: 2px solid {active_hex}; border-style: inset;"
             f" border-radius: 3px; padding: 4px 8px;"
             f"}}"
             f"QPushButton:disabled {{"

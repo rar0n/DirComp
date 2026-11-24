@@ -886,6 +886,7 @@ class SettingsTabMixin:
             ("filter_clear", "File Filter: Clear"),
             ("filter_apply", "File Filter: Apply"),
             ("refresh", "Refresh (global)"),
+            ("cancel", "Cancel"),
         ], custom={
             "default_button": (
                 lambda: self._custom_default_button_colors or self._default_button_colors(),
@@ -896,6 +897,8 @@ class SettingsTabMixin:
                               "current theme. Changing it rebuilds the GUI.",
             "refresh": "The Refresh button under Quick Options on the Main tab. Uses the "
                        "theme's default button colors until you pick one.",
+            "cancel": "Both Cancel buttons next to the progress bars on the Main tab (while "
+                      "they are enabled; disabled they fade toward the window color).",
         })
         global_settings_flow.addWidget(self._l2_block("Misc Buttons", misc_buttons_group, "third"))
 
@@ -1208,8 +1211,8 @@ class SettingsTabMixin:
         # rebuild by itself (the radios are just re-checked from it
         # below). A QButtonGroup whose button ids index
         # custom_widgets._SCROLLBAR_HANDLE_STYLES; settings_ops persists
-        # it as the checked id (see _widget_value), shared, not per
-        # theme, like the Global Options. No Main-tab primary -- this
+        # it as the checked id (see _widget_value), inside each theme's set
+        # (a per-theme widget, like the two opacities). No Main-tab primary -- this
         # control only exists here. ----
         scrollbar_style_row = QHBoxLayout()
         scrollbar_style_row.setContentsMargins(0, 0, 0, 0)
@@ -2484,9 +2487,9 @@ class SettingsTabMixin:
         save_load_row, (self.save_settings_button, self.load_settings_button,
                         self.reset_settings_button) = self._build_save_load_row(
             "Reload Defaults", self._reset_to_defaults,
-            "Reset the current theme's colors (and the color-related options) back "
-            "to the program's shipped defaults (default_settings.json) -- the other themes' colors are "
-            "left alone, and the saved settings file isn't touched; Save Settings "
+            "Reset the current theme's settings (colors, opacities, line options, sizes, GUI "
+            "colors) back to the program's defaults (default_settings.json). The other themes "
+            "are left alone, and the saved settings file isn't touched; Save Settings "
             "afterward if you want the reset to stick.",
         )
 

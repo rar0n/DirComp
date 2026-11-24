@@ -9,6 +9,8 @@ Split out of ui_builder.py unchanged -- same methods, still reached as
 `self._...` because UiBuilderMixin inherits this class.
 """
 
+import json
+import os
 import sys
 
 from PySide6.QtCore import Qt
@@ -84,12 +86,13 @@ _INDENT_TICK_SPINS = (
 #
 # folder_fg_override: the Comparison Type Colors table's Folder Fg
 # override (None to leave every mode's default alone -- see
-# _builtin_color_set). file_bin_override: File mode's Statistics View
+# _builtin_color_set). file_bin_override: (unused now -- the Statistics View
+# per-mode color families are set in _builtin_color_set) File mode's Statistics View
 # bin color override (None to keep the shared blue default).
 _THEME_DEFAULTS = {
     "dark": {
         "gui_fg": "#F5F5F5", "gui_bg": "#3A3A3A", "base": "#2A2A2A",
-        "stats_bg": "#1E1E20", "stats_hover": "#FFFFFF", "stats_text": "#D2D2D2",
+        "stats_bg": "#2A2A2A", "stats_hover": "#FFFFFF", "stats_text": "#D2D2D2",
         "stats_grid": "#3C3C3C", "selection_info": "#E68C14",
         "progress_bg": "#2A2A2A",
         "scrollbar_groove": "#1A1A1A", "scrollbar_handle": "#E8E8E8",
@@ -901,8 +904,8 @@ class ThemeOpsMixin:
         radio group (QButtonGroup.idToggled: fires for the button that
         just got checked AND the one that just got unchecked, so only
         the former is acted on). style_id indexes _SCROLLBAR_HANDLE_STYLES.
-        Not a per-theme setting, so it lives in _SCROLLBAR_STYLE but not
-        in a color set (see _capture_color_set)."""
+        It lives in _SCROLLBAR_STYLE; the radio group's checked id is a
+        per-theme widget value, saved in each theme's set."""
         if not checked or not 0 <= style_id < len(_SCROLLBAR_HANDLE_STYLES):
             return
         _SCROLLBAR_STYLE["handle_style"] = _SCROLLBAR_HANDLE_STYLES[style_id]
@@ -1120,9 +1123,20 @@ class ThemeOpsMixin:
         for key in _THEME_DEFAULT_MAIN_BUTTON_KEYS:
             main_button_colors[key] = None
         stats_colors = {"file": dict(stats_palette), "folder": dict(stats_palette)}
-        if defaults["file_bin_override"]:
-            # File mode's bins (Folder mode keeps the shared blue ones).
-            stats_colors["file"]["bin_color"] = defaults["file_bin_override"]
+        # Each Statistics View mode in its own "standard" color family -- grey
+        # for File mode, blue for Folder mode: bins a mid shade, selection the
+        # extreme shade against the background (very light on Dark, black / very
+        # dark blue on Light), grid left as it looks good on both. Hover stays
+        # the theme's own white/black tint.
+        light = theme == "light"
+        families = {
+            "file": {"grid_color": "#505050" if light else "#4A4A4A", "bin_color": "#A0A0A0" if light else "#8C8C8C",
+                     "selection_color": "#404040" if light else "#E8E8E8"},
+            "folder": {"grid_color": "#2B5BA8" if light else "#1F3E6E", "bin_color": "#335EA0" if light else "#4682DC",
+                       "selection_color": "#1E3960" if light else "#CFE3FF"},
+        }
+        for mode, colors in families.items():
+            stats_colors[mode].update(colors)
         return {
             "select_colors": {k: list(v) for k, v in _DEFAULT_SELECT_COLORS.items()},
             "summary_colors": {
@@ -1442,12 +1456,10 @@ class ThemeOpsMixin:
         # theme itself isn't switched.
         shipped_set, shipped_gui = self._shipped_defaults_for_theme(self._theme)
         new_set = self._merged_color_set(self._theme, shipped_set) if shipped_set else self._builtin_color_set(self._theme)
-        new_custom = new_set.get("custom_default_button_colors")
-        old_gui = self._gui_colors.get(self._theme)
-        needs_rebuild = (
-            (tuple(new_custom) if new_custom else None) != self._custom_default_button_colors
-            or shipped_gui != (tuple(old_gui) if old_gui else None)
-        )
+        # Always a full rebuild: the defaults recolor every button (Select,
+        # Clipboard, File Op, FLV, Statistics, Cancel, the Settings tab's own)
+        # and may bring other GUI colors, so nothing is left on its old look.
+        needs_rebuild = True
         self._gui_colors[self._theme] = shipped_gui
         self._load_color_set_into_live(new_set)
         self._apply_theme_palette(self._theme)

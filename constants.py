@@ -24,8 +24,11 @@ GNOME_COPIED_FILES_MIME = "x-special/gnome-copied-files"
 TIMELINE_SCROLLBAR_RANGE = 100_000
 
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
-# counting the versions made on the same day (1, 2, ...). Bump on every batch.
-APP_VERSION = "2026.11.22.49"
+# counting the versions made on the same day (1, 2, ...). Bump on every batch
+# (every branch/commit batch that changes the program), not just now and then.
+APP_VERSION = "2026.11.24.9"
+# The author tag shown in front of the version in the window title.
+APP_AUTHOR = "raron"
 
 # st_ctime means different things on different platforms (same split as
 # Timeline Explorer's file_scanner.py, which this mirrors so the two

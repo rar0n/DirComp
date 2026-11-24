@@ -39,7 +39,7 @@ from name_filter_ops import NameFilterMixin
 from context_menu_ops import ContextMenuMixin
 from ui_builder import UiBuilderMixin, PANE_TIMELINE_HEIGHT
 from custom_widgets import install_spinbox_wheel_guard
-from constants import APP_VERSION
+from constants import APP_AUTHOR, APP_VERSION
 
 
 class DirectoryComparisonApp(
@@ -64,7 +64,7 @@ class DirectoryComparisonApp(
 ):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Directory Comparison {APP_VERSION}")
+        self.setWindowTitle(f"Directory Comparison  (C) {APP_AUTHOR} {APP_VERSION}")
         # +PANE_TIMELINE_HEIGHT: since each pane grew a timeline panel of
         # roughly that height, start the window that much taller so it
         # doesn't eat into room the file list used to have.

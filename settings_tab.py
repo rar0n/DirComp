@@ -736,11 +736,6 @@ class SettingsTabMixin:
              lambda: self._effective_gui_colors(self._theme)[1],
              lambda hexc: self._on_gui_color_changed(True, hexc),
              lambda hexc: self._on_gui_color_changed(False, hexc)),
-            ("Default Button",
-             lambda: (self._custom_default_button_colors or self._default_button_colors())[1],
-             lambda: (self._custom_default_button_colors or self._default_button_colors())[0],
-             lambda hexc: self._on_default_button_color_changed(True, hexc),
-             lambda hexc: self._on_default_button_color_changed(False, hexc)),
             ("Progress Bar",
              lambda: self._progress_bar_colors["fg"], lambda: self._progress_bar_colors["bg"],
              lambda hexc: self._on_progress_bar_color_changed("fg", hexc),
@@ -763,13 +758,6 @@ class SettingsTabMixin:
             ("Status line Unselected",
              lambda: self._status_unselected_color or self._effective_gui_colors(self._theme)[0], None,
              self._on_status_unselected_color_changed, None),
-            # Main tab -> Global Options' Refresh button. The theme's
-            # default button colors until one is picked.
-            ("Refresh (global)",
-             lambda: self._main_button_color_for("refresh")[1],
-             lambda: self._main_button_color_for("refresh")[0],
-             lambda hexc: self._on_main_button_color_changed("refresh", False, hexc),
-             lambda hexc: self._on_main_button_color_changed("refresh", True, hexc)),
             ("Status line warning",
              lambda: self._status_warning_color, None,
              self._on_status_warning_color_changed, None),
@@ -819,34 +807,30 @@ class SettingsTabMixin:
             "Text and background color of the whole GUI, for the current theme "
             "(the file lists' and text fields' background follows the Bg)."
         )
-        default_colors_table.item(4, 0).setToolTip(
+        default_colors_table.item(3, 0).setToolTip(
             "Color of the numbers in the titles (item counts, sizes, file and "
             "folder totals, free space). The Bold option is in the Bg column."
         )
-        default_colors_table.item(5, 0).setToolTip(
+        default_colors_table.item(4, 0).setToolTip(
             "Text color of each pane's status line at the bottom of the window "
             "while something is selected (\"N selected, X files, Y folders, size\")."
         )
-        default_colors_table.item(6, 0).setToolTip(
+        default_colors_table.item(5, 0).setToolTip(
             "Text color of that status line while nothing is selected, and of "
             "the operation messages shown there. Follows the GUI text color "
             "until you pick one."
         )
-        default_colors_table.item(7, 0).setToolTip(
-            "The Refresh button under Quick Options on the Main tab. Uses the "
-            "theme's default button colors until you pick one."
-        )
-        default_colors_table.item(8, 0).setToolTip(
+        default_colors_table.item(6, 0).setToolTip(
             "Text color of a warning in a pane's status line, e.g. when a loaded snapshot "
             "cannot be compared by hash and the comparison falls back to name, size and date."
         )
-        default_colors_table.item(9, 0).setToolTip(
+        default_colors_table.item(7, 0).setToolTip(
             "Text color of live-folder entries in each pane's folder-history drop-down."
         )
-        default_colors_table.item(10, 0).setToolTip(
+        default_colors_table.item(8, 0).setToolTip(
             "Text color of folder-snapshot (.fss) entries in each pane's folder-history drop-down."
         )
-        default_colors_table.item(11, 0).setToolTip(
+        default_colors_table.item(9, 0).setToolTip(
             "Color of the edge around the Main tab's button groups (Select, File Op, "
             "Clipboard, Both Panes, Quick Options, Global File Filter)."
         )
@@ -890,12 +874,29 @@ class SettingsTabMixin:
         # Swap pane button. Same Item | Fg | Bg swatch table as the other
         # button tables; kept per theme in self._main_button_colors. The
         # released/Swap rows start at the theme's default button colors. ----
+        # "Default Button" (the theme's default button colors, which every
+        # button without a color of its own falls back to) is the top row;
+        # it is stored per theme in self._custom_default_button_colors, not
+        # in self._main_button_colors, hence the custom getter/setter.
+        # "Refresh (global)" is the Main tab's Global Options Refresh button.
         misc_buttons_group = self._main_button_color_table([
+            ("default_button", "Default Button"),
             ("mode_unpressed", "Mode switch (released)"),
             ("mode_pressed", "Mode switch (pressed)"),
             ("filter_clear", "File Filter: Clear"),
             ("filter_apply", "File Filter: Apply"),
-        ])
+            ("refresh", "Refresh (global)"),
+        ], custom={
+            "default_button": (
+                lambda: self._custom_default_button_colors or self._default_button_colors(),
+                lambda is_bg, hexc: self._on_default_button_color_changed(not is_bg, hexc),
+            ),
+        }, tooltips={
+            "default_button": "The color every button without a color of its own uses, for the "
+                              "current theme. Changing it rebuilds the GUI.",
+            "refresh": "The Refresh button under Quick Options on the Main tab. Uses the "
+                       "theme's default button colors until you pick one.",
+        })
         global_settings_flow.addWidget(self._l2_block("Misc Buttons", misc_buttons_group, "third"))
 
         # ---- File List View (Settings-tab only -- no Main-tab copy,
@@ -2967,27 +2968,41 @@ class SettingsTabMixin:
         table.horizontalHeader().setSectionsClickable(False)
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
-    def _main_button_color_table(self, rows: list) -> QGroupBox:
+    def _main_button_color_table(self, rows: list, custom: dict | None = None,
+                                 tooltips: dict | None = None) -> QGroupBox:
         """A framed "Item | Fg | Bg" swatch table for buttons whose colors
         live in self._main_button_colors -- `rows` is (key, label) pairs.
         Shared by Panel Button Colors' Clipboard/File Op Buttons tables and
         File List View Colors' Button Colors table. A button without a
         color of its own shows (and starts from) the theme's default
-        button colors -- see _main_button_color_for."""
+        button colors -- see _main_button_color_for. `custom` maps a row's
+        key to (get_pair, set_color) for a row whose colors live somewhere
+        other than self._main_button_colors: get_pair() -> (bg, fg),
+        set_color(is_bg, hex); `tooltips` maps a key to a label tooltip."""
+        custom = custom or {}
+        tooltips = tooltips or {}
         group = QGroupBox("")
         group_outer = QVBoxLayout(group)
         table = QTableWidget(len(rows), 3)
         self._style_table_widget(table, ["Item", "Fg", "Bg"])
         for i, (key, label) in enumerate(rows):
-            table.setItem(i, 0, self._table_item(label))
-            table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(
-                lambda k=key: self._main_button_color_for(k)[1],
-                lambda hexc, k=key: self._on_main_button_color_changed(k, False, hexc),
-            )))
-            table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(
-                lambda k=key: self._main_button_color_for(k)[0],
-                lambda hexc, k=key: self._on_main_button_color_changed(k, True, hexc),
-            )))
+            item = self._table_item(label)
+            if key in tooltips:
+                item.setToolTip(tooltips[key])
+            table.setItem(i, 0, item)
+            if key in custom:
+                get_pair, set_color = custom[key]
+                get_fg = lambda g=get_pair: g()[1]
+                get_bg = lambda g=get_pair: g()[0]
+                set_fg = lambda hexc, f=set_color: f(False, hexc)
+                set_bg = lambda hexc, f=set_color: f(True, hexc)
+            else:
+                get_fg = lambda k=key: self._main_button_color_for(k)[1]
+                get_bg = lambda k=key: self._main_button_color_for(k)[0]
+                set_fg = lambda hexc, k=key: self._on_main_button_color_changed(k, False, hexc)
+                set_bg = lambda hexc, k=key: self._on_main_button_color_changed(k, True, hexc)
+            table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(get_fg, set_fg)))
+            table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(get_bg, set_bg)))
         self._size_table_to_contents(table)
         group_outer.addWidget(table)
         return group

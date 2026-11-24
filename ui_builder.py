@@ -1170,7 +1170,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
     def _main_button_color_for(self, key: str) -> tuple[str, str]:
         """(bg, fg) for one of Clipboard's Copy/Cut/Paste/Paste Folders/
         Copy -->/Move -->, File Op's Rename/New Folder/Delete, Refresh, or
-        the File List View's Up one folder/Select Directory/Clear view/
+        the File List View's Up one folder/Select Directory/Empty view/
         Expand/Collapse. An explicit self._main_button_colors[key] (list,
         not None) always wins; failing that, _DEFAULT_MAIN_BUTTON_COLORS
         [key]'s fixed design color for the ones that have one, or
@@ -1253,7 +1253,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         return self._uniform_button_dims
 
     def _view_button_width(self) -> int:
-        """Shared width of the File List View's "Clear view" and the
+        """Shared width of the File List View's "Empty view" and the
         Statistics View's "Reset view" buttons, which sit one above the
         other at the pane's outer edge: the wider of the two labels plus
         the usual bevel and one-average-character padding. Cached --
@@ -1261,7 +1261,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
         if not hasattr(self, "_view_button_w"):
             fm = QFontMetrics(self.font())
             self._view_button_w = max(
-                fm.horizontalAdvance("Clear view"), fm.horizontalAdvance("Reset view")
+                fm.horizontalAdvance("Empty view"), fm.horizontalAdvance("Reset view")
             ) + 14 + fm.averageCharWidth()
         return self._view_button_w
 
@@ -2028,7 +2028,7 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
     # ------------------------------------------------------------ Listings
 
     def clear_pane_view(self, pane: DirectoryPane):
-        """"Clear view": empty this pane's directory entry, file list, and
+        """"Empty view": empty this pane's directory entry, file list, and
         embedded timeline entirely -- the same blank state a pane starts
         in before any folder's ever been opened. The other pane's own
         folder stays put; only its diff coloring resets to plain, the

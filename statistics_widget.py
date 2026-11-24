@@ -262,7 +262,7 @@ class TimelineWidget(QWidget):
         #: set_records([]) for a pane with no folder too -- which is
         #: what made a pane with nothing open say "No files in view"
         #: as soon as the *other* pane loaded something, and left that
-        #: same message sitting there after "Clear view".
+        #: same message sitting there after "Empty view".
         self._folder_open: Optional[bool] = None
         self.metric_name: str = "modified"
         self.axis: BinAxis = TimeAxis()

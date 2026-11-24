@@ -736,7 +736,7 @@ class SelectionMixin:
                 self._type_count_separator_width = metrics.horizontalAdvance(self._TYPE_COUNT_SEPARATOR)
                 # Room beside the Expand/Collapse buttons in the same row.
                 spacing = max(0, label.parentWidget().layout().spacing()) if label.parentWidget() and label.parentWidget().layout() else 6
-                # Row is [+][-] <label> [Clear view] (mirrored on the right
+                # Row is [+][-] <label> [Empty view] (mirrored on the right
                 # pane): the label only gets what's left between them.
                 clear_btn = getattr(pane, "clear_view_button", None)
                 # sizeHint, never .width(): a hidden button (the right pane's

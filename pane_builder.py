@@ -354,7 +354,7 @@ class PaneBuilderMixin:
         # outer edge opposite Expand/Collapse All -- right-aligned by
         # default like everything else that follows layout_left, mirrored
         # to the left edge for the right pane while Symmetrical GUI is on.
-        clear_view_button = QPushButton("Clear view")
+        clear_view_button = QPushButton("Empty view")
         clear_view_button.setToolTip("Empty this pane's file list and timeline, as if starting over.")
         clear_view_button.setFixedSize(self._view_button_width(), uniform_h)
         clear_view_button.setStyleSheet(_bevel_button_stylesheet(*self._main_button_color_for("clear_view")))
@@ -379,7 +379,7 @@ class PaneBuilderMixin:
         hash_button.setEnabled(self._hash_type_selected())
         pane.hash_button = hash_button
 
-        # This pane's own Refresh (next to Clear view): re-reads this pane's
+        # This pane's own Refresh (next to Empty view): re-reads this pane's
         # folder from disk; with a hash comparison type it also rehashes --
         # see HashOpsMixin._refresh_pane.
         pane_refresh_button = QPushButton("Refresh")
@@ -439,7 +439,7 @@ class PaneBuilderMixin:
         pane._free_atoms = []
 
         # Roughly a third/two-thirds of the way across the row between
-        # Select Directory and Clear view -- three equal stretch spans
+        # Select Directory and Empty view -- three equal stretch spans
         # around the two labels lands each one at the boundary between
         # spans, close enough to 1/3 and 2/3 without needing to measure
         # actual pixel widths. Mirrored right pane (Symmetrical GUI on)
@@ -604,7 +604,7 @@ class PaneBuilderMixin:
         default_bg, default_fg = self._default_button_colors()
         _, uniform_h = self._uniform_button_size()
         reset_button = QPushButton("Reset view")
-        # Same size as the File List View's Clear view button above it.
+        # Same size as the File List View's Empty view button above it.
         reset_button.setFixedSize(self._view_button_width(), uniform_h)
         reset_button.setStyleSheet(_bevel_button_stylesheet(*self._stats_button_color_for("reset")))
         pane.tl_reset_button = reset_button

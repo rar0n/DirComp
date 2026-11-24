@@ -276,7 +276,7 @@ MIN_FINGERPRINT_CHUNK_KB, MAX_FINGERPRINT_CHUNK_KB = 1, 1024
 FILTER_SEPARATOR = "/"
 
 # The File Type dropdown's built-in list (Main tab, Global File Filter) --
-# every entry is one complete search term. Also what the Settings tab's file type list
+# every entry is one complete search term. Also what the Settings tab's File Filter List
 # "Defaults" button puts back. Sorted.
 DEFAULT_FILE_FILTER_TYPES = ["*." + ext for ext in sorted([
     "txt", "safetensors", "ckpt", "pt", "pdf", "json", "doc", "docx",

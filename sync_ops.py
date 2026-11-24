@@ -378,6 +378,9 @@ class FolderSyncMixin:
         ops = plan["ops"]
         progress = self._start_transfer_progress(label="Syncing...", pane=None)
         errors, copied, pairs = [], 0, []
+        # New/updated files by the pane they landed in (a Left -> Right copy
+        # lands in the right pane): selected there afterwards.
+        arrived = {self.left: [], self.right: []}
         try:
             progress.start_phase(len(ops) + len(plan["mkdirs"]))
             for path, _direction in plan["mkdirs"]:
@@ -411,9 +414,25 @@ class FolderSyncMixin:
                     continue
                 copied += 1
                 pairs.append((src, dest))
+                arrived[self.right if op["dir"] == _LR else self.left].append(dest)
             if pairs:
                 self._cache_files_copied(pairs)
             self._update_listings_after_transfer(progress)
+            # Each pane now selects exactly what the sync put into it (the
+            # earlier selection is replaced, or just cleared when nothing
+            # arrived there).
+            if not progress.cancelled:
+                self._set_transfer_label("Selecting...")
+                progress.start_phase(sum(1 for pane in arrived for _ in self._iter_items(pane.tree)) or None)
+                for pane, paths in arrived.items():
+                    if paths:
+                        self._select_paths_in_tree(
+                            pane.tree, paths, progress=progress,
+                            auto_expand=self._expand_folders_matching_selection_enabled(),
+                        )
+                        self._scroll_tree_to_first_selected(pane.tree)
+                    else:
+                        pane.tree.clearSelection()
         finally:
             self._finish_transfer_progress()
             self._show_result_count(copied)

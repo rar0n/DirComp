@@ -476,12 +476,17 @@ class DirDropComboBox(QComboBox):
 
 class DirDropTreeWidget(QTreeWidget):
     """QTreeWidget that:
-    - accepts a dropped directory (from outside, or from the other pane) and
+    - accepts a dropped directory from outside (a file manager) and
       navigates this view into it
     - lets selected items be dragged out as real files/folders, e.g. onto a
       file manager window
+    - takes items dragged from this or the other pane only with a modifier:
+      Ctrl+drop copies, Shift+drop moves (see _internal_drop_plan);
+      a plain drop does nothing
     """
     directoryDropped = Signal(str)
+    # (paths, target folder or "" for this pane's own root, move?, source tree)
+    pathsDropped = Signal(list, str, bool, object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -952,15 +957,68 @@ class DirDropTreeWidget(QTreeWidget):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
+    def _internal_drop_plan(self, event):
+        """For a drag that started in one of the app's own file lists (either
+        pane, or this one): (paths, target folder or "" for this pane's own
+        root, move) when dropping here would do something, else None.
+        Nothing happens without a modifier, so an accidental drag-and-drop
+        is harmless: Ctrl+drop copies, Shift+drop moves (Shift wins if both
+        are held). Dropped on a folder row the items go into that folder;
+        anywhere else, into the pane's root folder (not from this same
+        pane, where that would be a no-op)."""
+        modifiers = event.modifiers()
+        move = bool(modifiers & Qt.ShiftModifier)
+        if not (move or modifiers & Qt.ControlModifier):
+            return None
+        paths = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+        if not paths:
+            return None
+        item = self.itemAt(event.position().toPoint())
+        target = ""
+        if item is not None:
+            path = item.data(0, PATH_ROLE)
+            if path and os.path.isdir(path):
+                target = path
+        if event.source() is self:
+            if not target:
+                return None
+            norm = os.path.normpath
+            # Not onto itself or into its own subtree, and not into the
+            # folder it is already in.
+            paths = [p for p in paths
+                     if norm(p) != norm(target)
+                     and not norm(target).startswith(norm(p) + os.sep)
+                     and norm(os.path.dirname(p)) != norm(target)]
+            if not paths:
+                return None
+        return paths, target, move
+
     def dragMoveEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
+        if not event.mimeData().hasUrls():
+            return
+        if isinstance(event.source(), DirDropTreeWidget):
+            plan = self._internal_drop_plan(event)
+            if plan is None:
+                event.ignore()
+                return
+            event.setDropAction(Qt.MoveAction if plan[2] else Qt.CopyAction)
+            event.accept()
+            return
+        event.acceptProposedAction()
 
     def dropEvent(self, event):
-        if event.source() is self:
-            # Dragging a folder within its own view shouldn't navigate;
-            # double-click is used for that instead.
-            event.ignore()
+        source = event.source()
+        if isinstance(source, DirDropTreeWidget):
+            plan = self._internal_drop_plan(event)
+            if plan is None:
+                event.ignore()
+                return
+            paths, target, move = plan
+            # Accepted as a copy whatever the action: the originals are
+            # only ever removed by the move itself, never by the drag.
+            event.setDropAction(Qt.CopyAction)
+            event.accept()
+            self.pathsDropped.emit(paths, target, move, source)
             return
         urls = event.mimeData().urls()
         if len(urls) == 1:

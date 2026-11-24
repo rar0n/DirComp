@@ -354,13 +354,13 @@ class FolderSyncMixin:
 
     @staticmethod
     def _sync_table(rows) -> str:
-        """The per-direction summary: a header row, a header column, centered
-        in the dialog. rows: (title, missing ratio, new files, newer files,
+        """The per-direction summary: a header row, a header column, left-aligned,
+        with a blank line (the dialog's own font size) above it. rows: (title, missing ratio, new files, newer files,
         new folders, extra size)."""
         heads = ("Missing ratio", "New Files", "Newer files overwriting older", "New Folders",
                  "Total extra size needed")
         pad = "cellpadding='6' cellspacing='0'"
-        out = ["<br>", f"<table align='center' border='1' {pad} style='border-color:#808080'>",
+        out = ["<p style='margin-top:0; margin-bottom:0'>&nbsp;</p>", f"<table border='1' {pad} style='border-color:#808080'>",
                "<tr><td></td>" + "".join(f"<td align='center'><b>{h}</b></td>" for h in heads) + "</tr>"]
         for title, *cells in rows:
             out.append(f"<tr><td><b>{title}</b></td>"

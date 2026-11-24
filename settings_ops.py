@@ -57,7 +57,7 @@ _DEFAULTS_FILENAME = "default_settings.json"
 _SHARED_WIDGET_KEYS = frozenset({
     "recursive_folder_contents", "expand_matching", "list_directories", "list_files",
     "sort_directories_first", "symmetrical_buttons", "synchronize_views",
-    "dual_pane", "unnatural_scrolling",
+    "dual_pane", "unnatural_scrolling", "hash_progress_in_list",
     "invert_statistics_zoom", "file_list_history_limit", "scrollbar_handle_style",
     "comparison_type", "hash_algorithm", "fingerprint_start_kb", "fingerprint_end_kb",
     "ignore_file_extensions", "first_name_only",
@@ -107,6 +107,7 @@ class SettingsMixin:
             "synchronize_views": getattr(self, "synchronize_views_cb", None),
             "dual_pane": getattr(self, "dual_pane_cb", None),
             "unnatural_scrolling": getattr(self, "unnatural_scrolling_cb", None),
+            "hash_progress_in_list": getattr(self, "hash_progress_in_list_cb", None),
             "invert_statistics_zoom": getattr(self, "invert_statistics_zoom_cb", None),
             "force_single_date_column": getattr(self, "force_single_date_column_cb", None),
             "mirror_statistics_buttons": getattr(self, "mirror_statistics_buttons_cb", None),

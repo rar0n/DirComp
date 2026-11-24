@@ -8,6 +8,7 @@
   "synchronize_views": false,
   "dual_pane": true,
   "unnatural_scrolling": false,
+  "hash_progress_in_list": true,
   "invert_statistics_zoom": false,
   "file_list_history_limit": 30,
   "scrollbar_handle_style": 2,

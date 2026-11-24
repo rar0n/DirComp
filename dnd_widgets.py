@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from constants import IS_DIR_ROLE, PATH_ROLE
-from custom_widgets import _press_blend, _indent_wheel_color
+from custom_widgets import _press_blend, _indent_wheel_color, hash_fill_for
 
 
 # Indentation line styles (Settings tab -> Indentation Line -> Line style).
@@ -755,6 +755,27 @@ class DirDropTreeWidget(QTreeWidget):
         base_hex = self.palette().color(QPalette.Base).name()
         painter.fillRect(rect, _press_blend(base_hex, tint_hex, opacity_pct / 100.0))
 
+    def _paint_hash_fill_indent(self, painter, rect, index):
+        """The indentation area's share of a row's hash progress fill (see
+        custom_widgets.hash_fill_for): the same left-to-right fraction as the
+        cells, measured over the whole viewport width."""
+        fill = hash_fill_for(self, index)
+        if fill is None:
+            return
+        fraction, fill_hex = fill
+        color = QColor(fill_hex)
+        selection = self.selectionModel()
+        if selection is not None and selection.isSelected(index):
+            delegate = self.itemDelegateForColumn(0) or self.itemDelegate()
+            get_tint = getattr(delegate, "selection_tint", None)
+            tint_hex, opacity_pct = get_tint() if get_tint else (None, 100)
+            if tint_hex:
+                color = _press_blend(fill_hex, tint_hex, opacity_pct / 100.0)
+        edge = int(round(fraction * self.viewport().width()))
+        part = rect.intersected(QRect(0, rect.top(), edge, rect.height()))
+        if part.width() > 0:
+            painter.fillRect(part, color)
+
     def drawBranches(self, painter, rect, index):
         """Replaces Qt's native branch painting (previously just QSS
         border-image tiles set on QTreeView::branch -- see the removed
@@ -808,6 +829,7 @@ class DirDropTreeWidget(QTreeWidget):
         item = self.itemFromIndex(index)
         if item is not None:
             self._paint_selected_indent_tint(painter, rect, index)
+            self._paint_hash_fill_indent(painter, rect, index)
         settings = self._line_settings()
         if item is None or settings is None:
             return

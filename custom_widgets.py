@@ -22,6 +22,7 @@ import textwrap
 from PySide6.QtCore import Qt, QPoint, QPointF, QObject, QEvent, QRect, QSize
 from PySide6.QtGui import (
     QColor, QPainter, QPen, QPolygonF, QPainterPath, QPalette, QBrush, QRegion, QWheelEvent,
+    QLinearGradient,
 )
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QAbstractItemView, QPushButton, QScrollBar, QStyle, QProxyStyle,
@@ -29,7 +30,9 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox, QHBoxLayout, QLabel, QLayout, QSizePolicy, QSlider, QSpinBox, QToolButton, QVBoxLayout,
 )
 
-from constants import IS_DIR_ROLE
+import os
+
+from constants import IS_DIR_ROLE, PATH_ROLE, TAG_COLORS
 
 # The tree's own selection-highlight yellow (see the palette setup in
 # ui_builder._build_directory_widgets) and Select All's matching button
@@ -546,6 +549,37 @@ class InvertButton(QPushButton):
         painter.drawLine(rect.topRight(), rect.bottomRight())
 
 
+def hash_fill_for(widget, index):
+    """(fraction, fill_hex) if this row is being painted as a hash progress
+    bar (see HashOpsMixin: the tree's `_hash_fill` dict, path -> 0..1), else
+    None. Fill color: the "Hashed, not compared" file/folder color."""
+    fills = getattr(widget, "_hash_fill", None)
+    if not fills:
+        return None
+    first = index.sibling(index.row(), 0)
+    path = first.data(PATH_ROLE)
+    if not path:
+        return None
+    fraction = fills.get(os.path.normpath(path))
+    if fraction is None:
+        return None
+    tag = "hashed_dir" if first.data(IS_DIR_ROLE) else "hashed_file"
+    return fraction, (TAG_COLORS.get(tag) or ("#B8E0E8",))[0] or "#B8E0E8"
+
+
+def hash_fill_brush(widget, fraction, fill_color, base_color) -> QBrush:
+    """Hard-edged left-to-right brush in viewport coordinates, so one fraction
+    spans the whole row (indent area and every column alike)."""
+    x = max(0.0, min(1.0, fraction))
+    gradient = QLinearGradient(0, 0, max(1, widget.viewport().width()), 0)
+    gradient.setColorAt(0.0, QColor(fill_color))
+    gradient.setColorAt(x, QColor(fill_color))
+    if x < 1.0:
+        gradient.setColorAt(min(1.0, x + 1e-6), QColor(base_color))
+        gradient.setColorAt(1.0, QColor(base_color))
+    return QBrush(gradient)
+
+
 class _SelectionColorDelegate(QStyledItemDelegate):
     """Makes selected rows easier to tell apart from everything else --
     the tree's Highlight color is set to a strong yellow by default (see
@@ -580,6 +614,20 @@ class _SelectionColorDelegate(QStyledItemDelegate):
         a selected row exactly like the cells to its right."""
         return self._get_selection_tint()
 
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        if option.state & QStyle.State_Selected or option.widget is None:
+            return
+        fill = hash_fill_for(option.widget, index)
+        if fill is None:
+            return
+        base = index.data(Qt.BackgroundRole)
+        if isinstance(base, QBrush) and base.style() != Qt.NoBrush:
+            base_hex = base.color().name()
+        else:
+            base_hex = option.palette.color(QPalette.Base).name()
+        option.backgroundBrush = hash_fill_brush(option.widget, fill[0], fill[1], base_hex)
+
     def paint(self, painter, option, index):
         if option.state & QStyle.State_Selected:
             option = QStyleOptionViewItem(option)
@@ -598,7 +646,13 @@ class _SelectionColorDelegate(QStyledItemDelegate):
                     base_hex = base_brush.color().name()
                 else:
                     base_hex = option.palette.color(QPalette.Base).name()
-                option.palette.setColor(QPalette.Highlight, _press_blend(base_hex, tint_hex, opacity_pct / 100.0))
+                selected_base = _press_blend(base_hex, tint_hex, opacity_pct / 100.0)
+                option.palette.setColor(QPalette.Highlight, selected_base)
+                fill = hash_fill_for(option.widget, index) if option.widget is not None else None
+                if fill is not None:
+                    filled = _press_blend(fill[1], tint_hex, opacity_pct / 100.0)
+                    option.palette.setBrush(QPalette.Highlight, hash_fill_brush(
+                        option.widget, fill[0], filled.name(), selected_base.name()))
         super().paint(painter, option, index)
 
 

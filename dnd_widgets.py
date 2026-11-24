@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from constants import IS_DIR_ROLE, PATH_ROLE
-from custom_widgets import _press_blend, _indent_wheel_color, hash_fill_for
+from custom_widgets import _press_blend, _indent_wheel_color, hash_fill_for, paint_hash_fill
 
 
 # Indentation line styles (Settings tab -> Indentation Line -> Line style).
@@ -763,18 +763,16 @@ class DirDropTreeWidget(QTreeWidget):
         if fill is None:
             return
         fraction, fill_hex = fill
-        color = QColor(fill_hex)
+        base_hex = self.palette().color(QPalette.Base).name()
         selection = self.selectionModel()
         if selection is not None and selection.isSelected(index):
             delegate = self.itemDelegateForColumn(0) or self.itemDelegate()
             get_tint = getattr(delegate, "selection_tint", None)
             tint_hex, opacity_pct = get_tint() if get_tint else (None, 100)
             if tint_hex:
-                color = _press_blend(fill_hex, tint_hex, opacity_pct / 100.0)
-        edge = int(round(fraction * self.viewport().width()))
-        part = rect.intersected(QRect(0, rect.top(), edge, rect.height()))
-        if part.width() > 0:
-            painter.fillRect(part, color)
+                base_hex = _press_blend(base_hex, tint_hex, opacity_pct / 100.0).name()
+                fill_hex = _press_blend(fill_hex, tint_hex, opacity_pct / 100.0).name()
+        paint_hash_fill(painter, self, rect, fraction, base_hex, fill_hex)
 
     def drawBranches(self, painter, rect, index):
         """Replaces Qt's native branch painting (previously just QSS

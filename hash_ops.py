@@ -25,7 +25,8 @@ import hashlib
 import os
 import time
 
-from PySide6.QtWidgets import QAbstractItemView, QApplication, QMessageBox
+from PySide6.QtCore import QEvent, QObject
+from PySide6.QtWidgets import QAbstractItemView, QScrollBar, QApplication, QMessageBox
 
 from constants import CMP_FINGERPRINT, CMP_HASH, HASH_ALGORITHMS, PATH_ROLE
 from hash_cache_store import HashCacheStore
@@ -38,6 +39,23 @@ _ALGORITHM_FACTORIES = {
     "MD5": hashlib.md5, "SHA-1": hashlib.sha1, "SHA-256": hashlib.sha256,
     "BLAKE2b": hashlib.blake2b,
 }
+
+
+class _UserScrollWatcher(QObject):
+    """Calls `on_scroll` when the user scrolls by hand: mouse wheel over the
+    list or its scrollbar, a click/drag on the scrollbar, or a navigation key."""
+    _KEYS = None
+
+    def __init__(self, on_scroll):
+        super().__init__()
+        self._on_scroll = on_scroll
+
+    def eventFilter(self, obj, event):
+        kind = event.type()
+        if kind in (QEvent.Wheel, QEvent.KeyPress) or (
+                kind == QEvent.MouseButtonPress and isinstance(obj, QScrollBar)):
+            self._on_scroll()
+        return False
 
 
 class _HashLive:
@@ -76,7 +94,9 @@ class _HashLive:
         self.scrollbar = self.tree.verticalScrollBar()
         self.orig_scroll = self.scrollbar.value()
         self.follow = True
-        self._set_value = None
+        self._watcher = _UserScrollWatcher(self._user_scrolled)
+        for target in (self.tree.viewport(), self.scrollbar, self.tree):
+            target.installEventFilter(self._watcher)
         self.expanded = []
         self.items = {}
         for item in owner._iter_items(self.tree):
@@ -141,11 +161,10 @@ class _HashLive:
             target = self.items.get(path)
         if target is None or not self.follow:
             return
-        if self._set_value is not None and self.scrollbar.value() != self._set_value:
-            self.follow = False  # the user scrolled: stop following
-            return
         tree.scrollToItem(target, QAbstractItemView.PositionAtCenter)
-        self._set_value = self.scrollbar.value()
+
+    def _user_scrolled(self):
+        self.follow = False
 
     def _register(self, item):
         def walk(it):
@@ -161,6 +180,8 @@ class _HashLive:
         """Stop painting; close what was opened. Call before the listing is
         rebuilt (which keeps the expand state it finds)."""
         self.tree._hash_fill = None
+        for target in (self.tree.viewport(), self.scrollbar, self.tree):
+            target.removeEventFilter(self._watcher)
         for item in reversed(self.expanded):
             try:
                 item.setExpanded(False)

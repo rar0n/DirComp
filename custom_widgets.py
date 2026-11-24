@@ -567,17 +567,15 @@ def hash_fill_for(widget, index):
     return fraction, (TAG_COLORS.get(tag) or ("#B8E0E8",))[0] or "#B8E0E8"
 
 
-def hash_fill_brush(widget, fraction, fill_color, base_color) -> QBrush:
-    """Hard-edged left-to-right brush in viewport coordinates, so one fraction
-    spans the whole row (indent area and every column alike)."""
-    x = max(0.0, min(1.0, fraction))
-    gradient = QLinearGradient(0, 0, max(1, widget.viewport().width()), 0)
-    gradient.setColorAt(0.0, QColor(fill_color))
-    gradient.setColorAt(x, QColor(fill_color))
-    if x < 1.0:
-        gradient.setColorAt(min(1.0, x + 1e-6), QColor(base_color))
-        gradient.setColorAt(1.0, QColor(base_color))
-    return QBrush(gradient)
+def paint_hash_fill(painter, widget, rect, fraction, base_color, fill_color):
+    """One cell's (or the indent area's) share of a row's hash progress bar:
+    the row is one continuous bar over the whole viewport width, so each
+    piece paints only the part of itself left of the row's fill edge."""
+    painter.fillRect(rect, QColor(base_color))
+    edge = int(round(max(0.0, min(1.0, fraction)) * widget.viewport().width()))
+    part = rect.intersected(QRect(0, rect.top(), edge, rect.height()))
+    if part.width() > 0:
+        painter.fillRect(part, QColor(fill_color))
 
 
 class _SelectionColorDelegate(QStyledItemDelegate):
@@ -616,43 +614,44 @@ class _SelectionColorDelegate(QStyledItemDelegate):
 
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
-        if option.state & QStyle.State_Selected or option.widget is None:
-            return
-        fill = hash_fill_for(option.widget, index)
-        if fill is None:
-            return
-        base = index.data(Qt.BackgroundRole)
-        if isinstance(base, QBrush) and base.style() != Qt.NoBrush:
-            base_hex = base.color().name()
-        else:
-            base_hex = option.palette.color(QPalette.Base).name()
-        option.backgroundBrush = hash_fill_brush(option.widget, fill[0], fill[1], base_hex)
+        # A row being painted as a hash progress bar gets its whole
+        # background from paint() below.
+        if option.widget is not None and hash_fill_for(option.widget, index) is not None:
+            option.backgroundBrush = QBrush(Qt.NoBrush)
 
     def paint(self, painter, option, index):
-        if option.state & QStyle.State_Selected:
+        fill = hash_fill_for(option.widget, index) if option.widget is not None else None
+        selected = bool(option.state & QStyle.State_Selected)
+        if selected or fill is not None:
             option = QStyleOptionViewItem(option)
+        base_hex = None
+        if selected:
             is_dir = index.sibling(index.row(), 0).data(IS_DIR_ROLE)
             option.palette.setColor(QPalette.HighlightedText, QColor("blue" if is_dir else "black"))
+        if selected or fill is not None:
+            base_brush = index.data(Qt.BackgroundRole)
+            # A real per-item color (a diff-tag background) blends from
+            # itself; an item with none (see _apply_tag -- an empty QBrush()
+            # for a plain, undiffed file/directory) blends from the tree's
+            # own normal row color instead.
+            if isinstance(base_brush, QBrush) and base_brush.style() != Qt.NoBrush:
+                base_hex = base_brush.color().name()
+            else:
+                base_hex = option.palette.color(QPalette.Base).name()
+        fill_hex = fill[1] if fill is not None else None
+        if selected:
             tint_hex, opacity_pct = self._get_selection_tint()
             if tint_hex:
-                base_brush = index.data(Qt.BackgroundRole)
-                # A real per-item color (a diff-tag background) blends
-                # from itself; an item with none (see _apply_tag -- an
-                # empty QBrush() for a plain, undiffed file/directory)
-                # blends from the tree's own normal row color instead,
-                # so a plain row still gets a consistent tint rather
-                # than blending from nothing.
-                if isinstance(base_brush, QBrush) and base_brush.style() != Qt.NoBrush:
-                    base_hex = base_brush.color().name()
-                else:
-                    base_hex = option.palette.color(QPalette.Base).name()
-                selected_base = _press_blend(base_hex, tint_hex, opacity_pct / 100.0)
-                option.palette.setColor(QPalette.Highlight, selected_base)
-                fill = hash_fill_for(option.widget, index) if option.widget is not None else None
-                if fill is not None:
-                    filled = _press_blend(fill[1], tint_hex, opacity_pct / 100.0)
-                    option.palette.setBrush(QPalette.Highlight, hash_fill_brush(
-                        option.widget, fill[0], filled.name(), selected_base.name()))
+                base_hex = _press_blend(base_hex, tint_hex, opacity_pct / 100.0).name()
+                if fill_hex:
+                    fill_hex = _press_blend(fill_hex, tint_hex, opacity_pct / 100.0).name()
+            else:
+                base_hex = option.palette.color(QPalette.Highlight).name()
+            option.palette.setColor(QPalette.Highlight, QColor(base_hex))
+        if fill is not None:
+            paint_hash_fill(painter, option.widget, option.rect, fill[0], base_hex, fill_hex)
+            if selected:
+                option.palette.setColor(QPalette.Highlight, QColor(0, 0, 0, 0))
         super().paint(painter, option, index)
 
 

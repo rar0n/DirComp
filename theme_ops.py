@@ -1439,9 +1439,23 @@ class ThemeOpsMixin:
         except Exception:
             pass
 
+    @staticmethod
+    def _theme_default_button_colors(theme: str) -> tuple[str, str]:
+        """(bg, fg) the automatic default button color gives on the official
+        `theme`'s built-in window color (see _default_button_colors) -- Dark's
+        for any other theme, whatever its own tones."""
+        defaults = _THEME_DEFAULTS[theme if theme in _OFFICIAL_THEMES else "dark"]
+        bg = QColor(defaults["gui_bg"])
+        if bg.lightness() < 128:
+            return bg.lighter(130).name(), "#F5F5F5"
+        return bg.darker(110).name(), "black"
+
     def _reset_to_theme_default_colors(self):
         """"Default theme colors": every COLOR of the active official theme
-        (Dark/Light) back to its built-in value, plus its custom GUI colors
+        (Dark/Light) back to its built-in value -- all button colors (Panel/
+        Select, Clipboard, File Op, FLV, Statistics, default button), the
+        file/folder row colors, Statistics, scrollbar, indentation-line and
+        every other color -- plus its custom GUI colors
         -- not the opacities, line options or other widget values, not the
         Global Options, not the other themes. Nothing is saved to disk
         (Save Settings afterward to keep it)."""
@@ -1453,21 +1467,15 @@ class ThemeOpsMixin:
             if key not in _NON_COLOR_SET_KEYS:
                 new_set[key] = value
         # The captured set's non-color values (opacities, widget values) stay.
-        new_custom = new_set.get("custom_default_button_colors")
-        old_gui = self._gui_colors.get(self._theme)
-        needs_rebuild = (
-            (tuple(new_custom) if new_custom else None) != self._custom_default_button_colors
-            or old_gui is not None
-        )
         widget_values = new_set.get("widgets") or {}
         self._gui_colors[self._theme] = None
         self._load_color_set_into_live(new_set)
         self._apply_theme_palette(self._theme)
-        if needs_rebuild:
-            self._rebuild_ui()
-            self._apply_theme_widget_values(widget_values)
-        else:
-            self._refresh_color_dependent_widgets()
+        # Always a full rebuild: every button (Panel/Select, Clipboard, File
+        # Op, FLV, Statistics, the Settings tab's own) and any other themed
+        # widget is rebuilt from the reset colors, none left on its old look.
+        self._rebuild_ui()
+        self._apply_theme_widget_values(widget_values)
         self._set_settings_status(
             f"{self._theme.replace('_', ' ').title()} theme colors reset to the theme defaults "
             "(not saved -- press Save Settings to keep).")

@@ -2498,7 +2498,7 @@ class SettingsTabMixin:
             self.reset_settings_button.minimumWidth()
             + QFontMetrics(self.font()).horizontalAdvance("Default theme colors") // 3,
             self.reset_settings_button.minimumHeight())
-        theme_colors_button.setStyleSheet(self.reset_settings_button.styleSheet())
+        theme_colors_button.setStyleSheet(_bevel_button_stylesheet(*self._theme_default_button_colors(self._theme)))
         theme_colors_button.setToolTip(
             "Reset every color of the current theme to the theme's own built-in default "
             "colors (Dark and Light only). Other settings (opacities, sizes, options) are "

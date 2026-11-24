@@ -1209,7 +1209,7 @@ class SettingsTabMixin:
              "Magnifies the selection markers around the middle of what the File List View "
              "currently shows, spreading them over the whole handle and easing back to "
              "normal towards its top and bottom edges."),
-            (2, "Mirrored quarter circle (experimental)",
+            (2, "Quarter circle (test)",
              "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
              "of the view, while markers near the handle's edges bunch together."),
         ):

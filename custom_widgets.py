@@ -642,7 +642,7 @@ _SCROLLBAR_HANDLE_OPACITY = _DEFAULT_SCROLLBAR_HANDLE_OPACITY_PCT / 100.0
 # _SCROLLBAR_STYLE.
 _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
 # Marker luminance difference threshold (Settings tab -> File List View ->
-# "Marker luminance difference threshold"; per theme, like the two
+# "Marker Δ luminance threshold"; per theme, like the two
 # opacities): a selection marker that, as it is actually seen (faded by the
 # track opacity, or by the handle's), differs in luminance (0..255) from
 # the track by less than this gets its luminance inverted (see _contrasting_marker_color), so e.g. a black row

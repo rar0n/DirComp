@@ -1284,7 +1284,7 @@ class SettingsTabMixin:
         # inverted, so e.g. a black row on a dark track stays visible
         # (custom_widgets._contrasting_marker_color). 0 = off. Per theme. ----
         marker_luma_row = QHBoxLayout()
-        self.scrollbar_marker_luma_label = QLabel("Marker luminance difference:")
+        self.scrollbar_marker_luma_label = QLabel("Marker Δ luminance threshold:")
         self.scrollbar_marker_luma_spin = SliderSpinBox()
         self.scrollbar_marker_luma_spin.setRange(0, 255)
         self.scrollbar_marker_luma_spin.setValue(_SCROLLBAR_STYLE["marker_luma_threshold"])

@@ -1205,7 +1205,7 @@
         "widgets": {
           "force_single_date_column": false,
           "mirror_statistics_buttons": false,
-          "file_list_ratio": 0.75,
+          "file_list_ratio": 0.64,
           "title_numeric_bold": true,
           "file_list_indentation": 20,
           "flv_font_size": 10,

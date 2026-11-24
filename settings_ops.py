@@ -476,9 +476,16 @@ class SettingsMixin:
         since that's a deliberate user action."""
         path = self._settings_path()
         if not os.path.isfile(path):
-            if not quiet:
-                self._set_settings_status("No saved settings found.")
-            return
+            # First run (the automatic startup load): start from the shipped
+            # defaults instead. The Load Settings button still reports that
+            # nothing has been saved yet.
+            shipped = os.path.join(os.path.dirname(os.path.abspath(__file__)), _DEFAULTS_FILENAME)
+            if quiet and os.path.isfile(shipped):
+                path = shipped
+            else:
+                if not quiet:
+                    self._set_settings_status("No saved settings found.")
+                return
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)

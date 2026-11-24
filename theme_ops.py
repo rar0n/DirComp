@@ -84,7 +84,8 @@ _INDENT_TICK_SPINS = (
 #
 # folder_fg_override: the Comparison Type Colors table's Folder Fg
 # override (None to leave every mode's default alone -- see
-# _builtin_color_set). file_bin_override: File mode's Statistics View
+# _builtin_color_set). file_bin_override: (unused now -- the Statistics View
+# per-mode color families are set in _builtin_color_set) File mode's Statistics View
 # bin color override (None to keep the shared blue default).
 _THEME_DEFAULTS = {
     "dark": {
@@ -1131,9 +1132,20 @@ class ThemeOpsMixin:
         for key in _THEME_DEFAULT_MAIN_BUTTON_KEYS:
             main_button_colors[key] = None
         stats_colors = {"file": dict(stats_palette), "folder": dict(stats_palette)}
-        if defaults["file_bin_override"]:
-            # File mode's bins (Folder mode keeps the shared blue ones).
-            stats_colors["file"]["bin_color"] = defaults["file_bin_override"]
+        # Each Statistics View mode in its own "standard" color family -- grey
+        # for File mode, blue for Folder mode: grid the darkest shade, bins a
+        # mid shade, selection a very light one (hover stays the theme's own
+        # white/black tint). Light theme shades are kept dark/saturated
+        # enough to show on its white background.
+        light = theme == "light"
+        families = {
+            "file": {"grid_color": "#505050" if light else "#4A4A4A", "bin_color": "#808080" if light else "#8C8C8C",
+                     "selection_color": "#C8C8C8" if light else "#E8E8E8"},
+            "folder": {"grid_color": "#2B5BA8" if light else "#1F3E6E", "bin_color": "#4682DC",
+                       "selection_color": "#BBD5F7" if light else "#CFE3FF"},
+        }
+        for mode, colors in families.items():
+            stats_colors[mode].update(colors)
         return {
             "select_colors": {k: list(v) for k, v in _DEFAULT_SELECT_COLORS.items()},
             "summary_colors": {

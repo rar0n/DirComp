@@ -70,7 +70,7 @@ class _HashLive:
 
     _REPAINT_SECONDS = 0.04
 
-    def __init__(self, owner, pane, todo, cost):
+    def __init__(self, owner, pane, todo, cost, scope=None):
         self.owner, self.pane, self.tree = owner, pane, pane.tree
         self.expand = owner.expand_matching_cb.isChecked()
         root = pane.snapshot_root.get("full_path") or ""
@@ -91,6 +91,27 @@ class _HashLive:
             for key in [path] + chain:
                 self.total[key] = self.total.get(key, 0) + c
                 self.done.setdefault(key, 0)
+        # Files in scope that were hashed before this run: painted as
+        # finished from the start (and counted as done in their folders), so
+        # the whole list reads consistently -- hashed rows in the "Hashed,
+        # not compared" color, the rest filling in as they are hashed.
+        todo_paths = set(self.ancestors)
+        for node in scope or ():
+            path = os.path.normpath(node["full_path"])
+            if path in todo_paths:
+                continue
+            chain, parent = [], os.path.dirname(path)
+            while self.root and parent != self.root and len(parent) > len(self.root) and parent != os.path.dirname(parent):
+                chain.append(parent)
+                parent = os.path.dirname(parent)
+            c = max(0, cost(node["size"]))
+            self.fill[path] = 1.0
+            for key in chain:
+                self.total[key] = self.total.get(key, 0) + c
+                self.done[key] = self.done.get(key, 0) + c
+        for key in self.total:
+            if key not in self.fill:
+                self._publish(key)
         self.scrollbar = self.tree.verticalScrollBar()
         self.orig_scroll = self.scrollbar.value()
         self.last_user_scroll = None  # monotonic time of the user's last manual scroll
@@ -343,7 +364,7 @@ class HashOpsMixin:
                 if getattr(self, "hash_progress_in_list_cb", None) is not None \
                         and self.hash_progress_in_list_cb.isChecked():
                     todo.sort(key=self._display_order_key(pane))
-                    live = _HashLive(self, pane, todo, self._hash_cost)
+                    live = _HashLive(self, pane, todo, self._hash_cost, nodes)
                 total_units = sum(self._hash_cost(n["size"]) for n in todo) // _UNIT + 1
                 progress.start_phase(total_units)
                 progress._on_tick = None

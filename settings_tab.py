@@ -34,7 +34,7 @@ from custom_widgets import (
     spin_slider_inline,
 )
 from statistics_widget import DEFAULT_BIN_COUNT, DEFAULT_LABEL_FONT_PT, TICK_LABEL_ANGLE_DEG
-from theme_ops import _THEMES
+from theme_ops import _THEMES, _OFFICIAL_THEMES
 
 
 class SettingsTabMixin:
@@ -2489,6 +2489,24 @@ class SettingsTabMixin:
             "left alone, and the saved settings file isn't touched; Save Settings "
             "afterward if you want the reset to stick.",
         )
+
+        # "Default theme colors": next to Reload Defaults; resets only the
+        # colors to the official theme's built-in values. Only for the
+        # official Dark/Light themes (any other has no such defaults).
+        theme_colors_button = QPushButton("Default theme colors")
+        theme_colors_button.setFixedSize(
+            self.reset_settings_button.minimumWidth()
+            + QFontMetrics(self.font()).horizontalAdvance("Default theme colors") // 3,
+            self.reset_settings_button.minimumHeight())
+        theme_colors_button.setStyleSheet(self.reset_settings_button.styleSheet())
+        theme_colors_button.setToolTip(
+            "Reset every color of the current theme to the theme's own built-in default "
+            "colors (Dark and Light only). Other settings (opacities, sizes, options) are "
+            "left alone, and nothing is saved until Save Settings is pressed.")
+        theme_colors_button.setEnabled(self._theme in _OFFICIAL_THEMES)
+        theme_colors_button.clicked.connect(lambda checked=False: self._reset_to_theme_default_colors())
+        save_load_row.insertWidget(save_load_row.indexOf(self.reset_settings_button) + 1, theme_colors_button)
+        self.theme_colors_button = theme_colors_button
 
         self.settings_status_label = QLabel("")
         self.settings_status_label.setAlignment(Qt.AlignCenter)

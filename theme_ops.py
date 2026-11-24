@@ -121,6 +121,17 @@ _THEME_DEFAULTS = {
     },
 }
 _THEMES = tuple(_THEME_DEFAULTS.keys())
+# The themes whose built-in colors are THE defaults ("Default theme colors"
+# button); the others (Gloaming Grey, ...) are free variants.
+_OFFICIAL_THEMES = ("dark", "light")
+# Color-set entries that are not colors (opacities, line options, widget
+# values) -- left alone by "Default theme colors".
+_NON_COLOR_SET_KEYS = frozenset({
+    "selection_tint_opacity", "scrollbar_handle_opacity", "scrollbar_track_opacity",
+    "scrollbar_marker_luma_threshold", "stats_selection_opacity", "indent_line_steps",
+    "indent_line_reverse", "dup_steps", "dup_reverse", "dup_fg_mode", "indent_hover_opacity",
+    "indent_lines_enabled", "indent_line_thickness", "indent_line_style", "widgets",
+})
 
 
 class ThemeOpsMixin:
@@ -1427,6 +1438,39 @@ class ThemeOpsMixin:
                     break
         except Exception:
             pass
+
+    def _reset_to_theme_default_colors(self):
+        """"Default theme colors": every COLOR of the active official theme
+        (Dark/Light) back to its built-in value, plus its custom GUI colors
+        -- not the opacities, line options or other widget values, not the
+        Global Options, not the other themes. Nothing is saved to disk
+        (Save Settings afterward to keep it)."""
+        if self._theme not in _OFFICIAL_THEMES:
+            return
+        builtin = self._builtin_color_set(self._theme)
+        new_set = self._capture_color_set()
+        for key, value in builtin.items():
+            if key not in _NON_COLOR_SET_KEYS:
+                new_set[key] = value
+        # The captured set's non-color values (opacities, widget values) stay.
+        new_custom = new_set.get("custom_default_button_colors")
+        old_gui = self._gui_colors.get(self._theme)
+        needs_rebuild = (
+            (tuple(new_custom) if new_custom else None) != self._custom_default_button_colors
+            or old_gui is not None
+        )
+        widget_values = new_set.get("widgets") or {}
+        self._gui_colors[self._theme] = None
+        self._load_color_set_into_live(new_set)
+        self._apply_theme_palette(self._theme)
+        if needs_rebuild:
+            self._rebuild_ui()
+            self._apply_theme_widget_values(widget_values)
+        else:
+            self._refresh_color_dependent_widgets()
+        self._set_settings_status(
+            f"{self._theme.replace('_', ' ').title()} theme colors reset to the theme defaults "
+            "(not saved -- press Save Settings to keep).")
 
     def _reset_to_defaults(self):
         """"Reload Defaults": every setting of the ACTIVE theme (its

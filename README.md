@@ -31,8 +31,8 @@ Back up your files! And also your folders!
    - Duplicate finder
      - Re-uses right-side pane to display duplicate files that are in the left pane
      - Two view modes
-       - Tree structure: Show duplicate files inside their parent folders
-       - Flat list: Only show duplicate files and a duplicate count.
+       - Include paths: Show all duplicate files with their parent folders (Tree view)
+       - Unique files only: Each item in the list represents a set of duplicate files in the left pane, with a count (Flat list)
      - Selecting duplicates on the right pane also selects all duplicates in the left pane
  - Compare files based on (both modes)
    - Filename, size and / or date
@@ -41,21 +41,21 @@ Back up your files! And also your folders!
    - Hash value
    - Fingerprint (quick hash beginning / end of file + filesize)
      - Setable start / end hash chunk size
- - Two views (both modes)
+ - Two views
    - Tree view of files and folders (File List View)
+     - Color coded for at-a-glance for which items are missing from either side
+     - Synchronize Views (Same selection in both panes, if the corresponding item (file or folder) exists in the other pane)
+     - Copy items from one pane and pasting it automatically re-create their folder structure up to the pane's root (recreating relative path)
    - Statistics view (bar charts)
-     - Select files or folders via (multi) selecting bars or a range of bars
-     - Unselect all files or folders by clicking in an empty area inside Statistics View
-     - Two modes in Statistics View
-       - Files
-       - Folders
      - Bar chart overview of files or folders
        - Timeline from oldest to newest item
        - File sizes
        - File Filter entries (E.G. file extension statistics counts)
- - Color coded for at-a-glance for which items are missing from either side
- - Synchronize Views (Same selection in both panes, if the corresponding item (file or folder) exists in the other pane)
- - Pastes multi-selected files from one pane and automatically re-create their folder structure (copying their relative path)
+     - Two modes in Statistics View
+       - Files
+       - Folders
+     - Select files or folders via (multi) selecting bars or a range of bars
+     - Unselect all files or folders by clicking in an empty area inside Statistics View
  - Symmetrical (ish) GUI, or not, depending on settings.
  - Color customization (theme colors, custom colors for most buttons etc.)
  - Cached folders
@@ -269,7 +269,7 @@ Sets Theme, lots of custom colors for highigths and other stuff. Basically a zil
 ### Comparison Options
 (Settings tab, Global Settngs)
 
-Which files are considered "counterparts" of each other is set here.
+Which files are considered "counterparts" or "identical" of each other is set here (Though not necessarily exactly identical, depending on these settings).
 - Name, size and date - they all must match
 - Name and size
 - Name

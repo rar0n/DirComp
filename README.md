@@ -285,5 +285,8 @@ Fingerprint is a shortened hash value, very fast but it's only hashing the file 
 
 
 
+## Known issues
+
+Nothing major, but starting the program has become a bit slow lately, 2-3 seconds ish (not measured).
 
 

@@ -1,9 +1,8 @@
 # DirComp - Directory Compare and Duplicate Finder
 
 ## Two modes
-- Compare Folders  (two folders side-by-side)
-- Duplicate Finder (find duplicates in same folder or sub folders)
-
+- Compare Folders
+- Duplicate Finder
 
 WIP! (Work in progress)
 
@@ -27,28 +26,25 @@ Back up your files! And also your folders!
 
  - Two main modes (central buttons at the top of Main tab)
    - Compare Folders
-     - Compare two folders side-by-side (manually synchronize their contents)
+     - Compare two folders side-by-side (Optionally manually synchronize their contents)
    - Duplicate finder
      - Re-uses right-side pane to display duplicate files that are in the left pane
      - Two view modes
        - Include paths: Show all duplicate files with their parent folders (Tree view)
        - Unique files only: Each item in the list represents a set of duplicate files in the left pane, with a count (Flat list)
      - Selecting duplicates on the right pane also selects all duplicates in the left pane
- - Compare files based on (both modes)
-   - Filename, size and / or date
-     - Optional File extension.
-     - Optional only first part of filename (disregard multiple file extensions)
+ - Comparing files based on
+   - Filename, size and / or date (File extension(s) optional)
    - Hash value
    - Fingerprint (quick hash beginning / end of file + filesize)
-     - Setable start / end hash chunk size
- - Two views
+ - Two views pr pane (left / right)
    - Tree view of files and folders (File List View)
      - Color coded for at-a-glance for which items are missing from either side
      - Synchronize Views (Same selection in both panes, if the corresponding item (file or folder) exists in the other pane)
      - Copy items from one pane and pasting it automatically re-create their folder structure up to the pane's root (recreating relative path)
    - Statistics view (bar charts)
      - Bar chart overview of files or folders
-       - Timeline from oldest to newest item
+       - Timeline (from oldest to newest item)
        - File sizes
        - File Filter entries (E.G. file extension statistics counts)
      - Two modes in Statistics View

@@ -111,6 +111,7 @@ class SettingsMixin:
             "invert_statistics_zoom": getattr(self, "invert_statistics_zoom_cb", None),
             "force_single_date_column": getattr(self, "force_single_date_column_cb", None),
             "mirror_statistics_buttons": getattr(self, "mirror_statistics_buttons_cb", None),
+            "subdivide_log_grid": getattr(self, "subdivide_log_grid_cb", None),
             "file_list_ratio": getattr(self, "file_list_ratio_spin", None),
             "title_numeric_bold": getattr(self, "title_numeric_bold_cb", None),
             "file_list_indentation": getattr(self, "tree_indentation_spin", None),

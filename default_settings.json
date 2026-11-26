@@ -424,6 +424,7 @@
         "widgets": {
           "force_single_date_column": true,
           "mirror_statistics_buttons": false,
+          "subdivide_log_grid": false,
           "file_list_ratio": 0.63,
           "title_numeric_bold": true,
           "file_list_indentation": 16,
@@ -807,6 +808,7 @@
         "widgets": {
           "force_single_date_column": true,
           "mirror_statistics_buttons": false,
+          "subdivide_log_grid": false,
           "file_list_ratio": 0.67,
           "title_numeric_bold": true,
           "file_list_indentation": 20,
@@ -1206,6 +1208,7 @@
         "widgets": {
           "force_single_date_column": false,
           "mirror_statistics_buttons": false,
+          "subdivide_log_grid": false,
           "file_list_ratio": 0.64,
           "title_numeric_bold": true,
           "file_list_indentation": 20,

@@ -2068,6 +2068,22 @@ class SettingsTabMixin:
         stats_week_row.addStretch(1)
         stats_options_outer.addLayout(stats_week_row)
 
+        stats_subgrid_row = QHBoxLayout()
+        self.subdivide_log_grid_cb = QCheckBox("Subdivide logarithmic axis grid")
+        self.subdivide_log_grid_cb.setToolTip(
+            "Adds a logarithmic sub-grid inside each grid cell of a logarithmic \n"
+            "axis, one layer deep, like log paper (lines at 2, 3, ... 9 times the \n"
+            "cell's start), in the grid color:\n"
+            "- the size axis with Log size axis on: inside each bin,\n"
+            "- the vertical (count) axis with Log scale on: between its decades.\n"
+            "Lines that would crowd each other are left out."
+        )
+        self.subdivide_log_grid_cb.setChecked(self._subdivide_log_grid)
+        self.subdivide_log_grid_cb.toggled.connect(self._on_subdivide_log_grid_changed)
+        stats_subgrid_row.addWidget(self.subdivide_log_grid_cb)
+        stats_subgrid_row.addStretch(1)
+        stats_options_outer.addLayout(stats_subgrid_row)
+
         stats_footer_row = QHBoxLayout()
         self.mirror_statistics_buttons_cb = QCheckBox("Include footer buttons/options in Symmetrical (ish) GUI")
         self.mirror_statistics_buttons_cb.setToolTip(
@@ -2111,6 +2127,7 @@ class SettingsTabMixin:
             pane.timeline.set_strip_use_names(self.common_strip_names_cb.isChecked())
             pane.timeline.set_strip_abbreviate_names(self.common_strip_abbreviate_cb.isChecked())
             pane.timeline.set_strip_use_week_number(self.common_strip_week_number_cb.isChecked())
+            pane.timeline.set_subdivide_log_grid(self._subdivide_log_grid)
             pane.tl_strip_units_cb = self.common_strip_units_cb
             pane.tl_strip_names_cb = self.common_strip_names_cb
             pane.tl_strip_abbreviate_cb = self.common_strip_abbreviate_cb
@@ -2667,7 +2684,7 @@ class SettingsTabMixin:
         for pane in (self.left, self.right):
             timeline = getattr(pane, "timeline", None)
             if timeline is not None:
-                timeline.update()
+                timeline.refresh_text()  # size labels/readouts change units
         self.apply_filter()  # relists (deferred) so every size text is rebuilt
 
     def _on_folder_counts_subfolders_toggled(self, checked):
@@ -2857,6 +2874,11 @@ class SettingsTabMixin:
         self.common_tick_angle_spin.setEnabled(not checked)
         for pane in (self.left, self.right):
             pane.timeline.set_auto_tick_angle(checked)
+
+    def _on_subdivide_log_grid_changed(self, checked):
+        self._subdivide_log_grid = bool(checked)
+        for pane in (self.left, self.right):
+            pane.timeline.set_subdivide_log_grid(checked)
 
     def _on_mirror_statistics_buttons_changed(self, checked):
         self._mirror_statistics_buttons = bool(checked)

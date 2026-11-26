@@ -317,6 +317,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             self._gui_colors = {"dark": None, "light": None}
         if not hasattr(self, "_mirror_statistics_buttons"):
             self._mirror_statistics_buttons = False
+        if not hasattr(self, "_subdivide_log_grid"):
+            # Settings tab -> Statistics View -> General options:
+            # "Subdivide logarithmic axis grid"
+            self._subdivide_log_grid = False
         if not hasattr(self, "_file_list_ratio"):
             # Fraction of each pane's vertical space the File List view
             # gets, the rest going to the Statistics view below it --

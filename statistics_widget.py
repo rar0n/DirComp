@@ -76,6 +76,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
+import binning
 from binning import BinAxis, SizeAxis, TimeAxis
 
 MARGIN_LEFT = 55  # fallback width before there's any data to size against - see _y_axis_margin_left
@@ -188,14 +189,20 @@ def _format_bytes(num: float) -> str:
     return f"{num:.2f} {'TiB' if BINARY_SIZES else 'TB'}"
 
 
+#: logarithmic sub-grid lines closer than this (in pixels) to a
+#: neighbouring gridline are left out
+SUBGRID_MIN_GAP_PX = 3.0
+
 #: decimal (kB/MB, 1000) by default; the host flips this with set_binary_sizes
 BINARY_SIZES = False
 
 
 def set_binary_sizes(enabled: bool):
-    """Binary (KiB/MiB, 1024) instead of decimal sizes in this module's text."""
+    """Binary (KiB/MiB, 1024) instead of decimal sizes in this module's
+    text -- and in the size axis's labels/readouts (binning module)."""
     global BINARY_SIZES
     BINARY_SIZES = bool(enabled)
+    binning.set_binary_sizes(enabled)
 
 # Built-in time-based metrics (datetime attributes on FileRecord). "size" is
 # handled separately (byte count -> SizeAxis).
@@ -441,6 +448,9 @@ class TimelineWidget(QWidget):
         #: TimeAxis and is simply held onto (unapplied) if the metric
         #: gets switched away from size and back.
         self.log_size_axis: bool = False
+        #: draw a log-paper sub-grid in logarithmic axes' grid cells
+        #: (see set_subdivide_log_grid)
+        self.subdivide_log_grid: bool = False
 
         # ---------------------------------------------------- colors
         # Per-instance, overridable via set_palette -- default to the
@@ -673,6 +683,21 @@ class TimelineWidget(QWidget):
                 use_week_number=self.strip_use_week_number,
             )
         return self.axis.format_tick(value, step)
+
+    def set_subdivide_log_grid(self, enabled: bool):
+        """Settings tab "Subdivide logarithmic axis grid": a log-paper
+        sub-grid inside each cell of a logarithmic axis (log size x-axis,
+        log count y-axis), one layer deep, in the grid color."""
+        self.subdivide_log_grid = bool(enabled)
+        self.update()
+
+    def refresh_text(self):
+        """Re-lay out the axis text after something that changes how it
+        reads (e.g. binary/decimal size units): label widths feed the
+        bottom margin and the auto label angle."""
+        if self.view_start is not None:
+            self._recompute_bins()
+        self.update()
 
     def set_log_scale(self, enabled: bool):
         self.log_scale = bool(enabled)
@@ -1390,9 +1415,33 @@ class TimelineWidget(QWidget):
         bars. Labels are drawn separately, in the left margin, via
         `_draw_y_axis_labels`."""
         painter.setPen(QPen(self.grid_color, 1, Qt.DotLine))
-        for v in self._y_tick_values(max_count):
+        major = self._y_tick_values(max_count)
+        major_ys = []
+        for v in major:
             y = rect.bottom() - self._count_to_frac(v) * (rect.height() - 4)
+            major_ys.append(y)
             painter.drawLine(rect.left(), y, rect.right(), y)
+        if self.subdivide_log_grid and self.log_scale and max_count > 1:
+            # "Subdivide logarithmic axis grid": 1..9 x 10^d between the
+            # decade gridlines (k = 1 too, for decades the major ticks
+            # skipped when thinned out), same pen; a line too close to
+            # another one is left out.
+            majors = set(major)
+            last_y = None
+            for d in range(0, math.ceil(math.log10(max_count)) + 1):
+                for k in range(1, 10):
+                    v = float(k * 10 ** d)
+                    if v >= max_count:
+                        break
+                    if v in majors:
+                        continue
+                    y = rect.bottom() - self._count_to_frac(v) * (rect.height() - 4)
+                    if any(abs(y - my) < SUBGRID_MIN_GAP_PX for my in major_ys):
+                        continue
+                    if last_y is not None and abs(last_y - y) < SUBGRID_MIN_GAP_PX:
+                        continue
+                    painter.drawLine(rect.left(), y, rect.right(), y)
+                    last_y = y
 
     def _y_axis_label_positions(self, ticks: list, rect: QRectF, label_h: float) -> set:
         """Which of `ticks` (ascending) actually get a label drawn, so
@@ -1657,9 +1706,10 @@ class TimelineWidget(QWidget):
         if self._hover_bin is not None and not self._panning and not self._selecting:
             i = self._hover_bin
             v0 = self.bin_edges[i]
-            # Just the bin's own start value, in the axis's plain
-            # (never stripped/named -- see _format_x_tick) tick format,
-            # plus how many records it holds -- format_bin's fuller
+            # The bin's start value (or, for the size axis, its whole
+            # "start - end" range -- see format_hover_range), in the
+            # axis's plain (never stripped/named -- see _format_x_tick)
+            # tick format, plus how many records it holds -- format_bin's fuller
             # "start - end" range read as noise once the "Bin: ..."
             # segment above it already states the width. Same
             # nice-bins-or-not step lookup _recompute_bottom_margin
@@ -1667,7 +1717,7 @@ class TimelineWidget(QWidget):
             # tick format instead of None.
             step = self._current_step if self._nice() else self.axis.choose_step(v0, self.bin_edges[i + 1], 1)
             hover_segment = (
-                f"{self.axis.format_hover_value(v0, step)} - {self.bin_counts[i]} {self._item_label}(s)",
+                f"{self.axis.format_hover_range(v0, self.bin_edges[i + 1], step)} - {self.bin_counts[i]} {self._item_label}(s)",
                 self.hover_label_color,
             )
         if hover_segment is not None:
@@ -1775,9 +1825,29 @@ class TimelineWidget(QWidget):
         font.setPointSize(self.label_font_pt)
         painter.setFont(font)
         painter.setPen(QPen(self.grid_color, 1, Qt.DotLine))
-        for t in self.bin_edges:
-            x = self._value_to_x(t)
+        xs = [self._value_to_x(t) for t in self.bin_edges]
+        for x in xs:
             painter.drawLine(x, rect.top(), x, rect.bottom())
+        if self.subdivide_log_grid and self._nice() and self._current_step is not None:
+            # "Subdivide logarithmic axis grid": a log-paper pattern inside
+            # each bin of a logarithmic x-axis (see the axis's
+            # log_subgrid_fractions), same pen; lines that would sit
+            # closer than SUBGRID_MIN_GAP_PX to their neighbour or the
+            # bin's own edges are left out, so narrow bins stay clean.
+            for i in range(len(xs) - 1):
+                x0, x1 = xs[i], xs[i + 1]
+                if x1 < rect.left() or x0 > rect.right():
+                    continue
+                fracs = self.axis.log_subgrid_fractions(
+                    self.bin_edges[i], self.bin_edges[i + 1], self._current_step
+                )
+                last = x0
+                for f in fracs:
+                    x = x0 + f * (x1 - x0)
+                    if x - last < SUBGRID_MIN_GAP_PX or x1 - x < SUBGRID_MIN_GAP_PX:
+                        continue
+                    painter.drawLine(x, rect.top(), x, rect.bottom())
+                    last = x
 
     def _strip_readout_text(self) -> Optional[str]:
         """The "Chart: ..." segment of the upper-left readout -- always

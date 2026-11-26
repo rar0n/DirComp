@@ -99,10 +99,21 @@ class BinAxis(ABC):
         readouts), e.g. '2024-03 (Mar 2024)' or '10 MB - 20 MB'."""
 
     def format_hover_value(self, value: float, step: Any) -> str:
-        """A bin's start value as shown in the hover readout. Default:
-        the tick label (SizeAxis's nested log mode shows the full exact
-        value there instead of its "+offset" tick labels)."""
+        """A bin boundary value as shown in the hover/Chart readouts.
+        Default: the tick label (SizeAxis's nested log mode shows the
+        full exact value there instead of its "+offset" tick labels)."""
         return self.format_tick(value, step)
+
+    def format_hover_range(self, start: float, end: float, step: Any) -> str:
+        """The hovered bin as shown in the hover readout. Default: just
+        its start value (as before); SizeAxis shows "start - end"."""
+        return self.format_hover_value(start, step)
+
+    def log_subgrid_fractions(self, start: float, end: float, step: Any) -> list:
+        """Positions (0..1 across the bin) of the logarithmic sub-grid
+        lines inside bin [start, end) -- the "Subdivide logarithmic axis
+        grid" option. Empty for a non-logarithmic axis (the default)."""
+        return []
 
     @abstractmethod
     def format_step(self, step: Any) -> str:
@@ -432,13 +443,32 @@ _SIZE_UNITS = [
     (1_000 ** 5, "PB"), (1_000 ** 4, "TB"), (1_000 ** 3, "GB"),
     (1_000 ** 2, "MB"), (1_000, "kB"), (1, "B"),
 ]
+_SIZE_UNITS_BINARY = [
+    (1_024 ** 5, "PiB"), (1_024 ** 4, "TiB"), (1_024 ** 3, "GiB"),
+    (1_024 ** 2, "MiB"), (1_024, "KiB"), (1, "B"),
+]
+
+#: binary (KiB/MiB, 1024) instead of decimal (kB/MB, 1000) size units in
+#: this module's text -- the host's "Use binary sizes" option, set via
+#: set_binary_sizes. Only the units change: SizeAxis's bins themselves
+#: stay on decimal (power-of-10) boundaries.
+BINARY_SIZES = False
+
+
+def set_binary_sizes(enabled: bool):
+    global BINARY_SIZES
+    BINARY_SIZES = bool(enabled)
+
+
+def _size_units():
+    return _SIZE_UNITS_BINARY if BINARY_SIZES else _SIZE_UNITS
 
 
 def format_size_si(num_bytes: float) -> str:
-    """Decimal (SI, power-of-1000) size formatting - TB/GB/MB/kB/B, not
-    binary KiB/MiB, per the user's request for 'decade order' sizes."""
+    """Short size text: decimal (SI, power-of-1000) TB/GB/MB/kB/B, or
+    binary TiB/GiB/MiB/KiB/B while BINARY_SIZES is on."""
     n = abs(num_bytes)
-    for factor, unit in _SIZE_UNITS:
+    for factor, unit in _size_units():
         if n >= factor:
             value = num_bytes / factor
             return f"{value:.0f} {unit}" if value >= 100 else f"{value:.1f} {unit}"
@@ -461,20 +491,26 @@ def _generate_size_steps(max_value: float) -> list[float]:
     return steps
 
 
-def format_size_exact(num_bytes: float) -> str:
+def format_size_exact(num_bytes: float, sig_digits: Optional[int] = None) -> str:
     """Like format_size_si, but never rounds: every significant digit of
     the (whole-byte) value is kept, trailing zeros dropped -- e.g.
     1_000_000_001 -> "1.000000001 GB", 1_010_000_000 -> "1.01 GB",
     10_000_000 -> "10 MB". Used by SizeAxis's nested log bins, whose
     boundaries (1 GB + 1 B, 1 GB + 10 B, ...) would all read "1.0 GB"
-    with format_size_si's single decimal."""
-    from decimal import Decimal
+    with format_size_si's single decimal. `sig_digits` caps the
+    significant digits instead (rounded)."""
+    from decimal import Decimal, localcontext
     n = int(round(num_bytes))
     if n < 0:
-        return "-" + format_size_exact(-n)
-    for factor, unit in _SIZE_UNITS:
+        return "-" + format_size_exact(-n, sig_digits)
+    for factor, unit in _size_units():
         if n >= factor:
-            value = Decimal(n) / Decimal(factor)
+            with localcontext() as ctx:
+                # Decimal units divide exactly; binary ones give long
+                # (but terminating) fractions -- 15 significant digits
+                # still tell neighbouring bytes apart up to ~100 TB.
+                ctx.prec = sig_digits or (15 if BINARY_SIZES else 40)
+                value = Decimal(n) / Decimal(factor)
             text = format(value.normalize(), "f")
             return f"{text} {unit}"
     return "0 B"
@@ -828,6 +864,11 @@ class SizeAxis(BinAxis):
             pa, _pb = self._log_bin_at(value, step[1] - 1)
             if abs(value - pa) < 0.5:
                 return format_size_exact(value)
+            # Offsets are powers of ten, exact in decimal units; in binary
+            # units they'd read "+9.5367431640625 MiB", so they get 4
+            # significant digits there (still all distinct).
+            if BINARY_SIZES:
+                return "+" + format_size_exact(value - pa, sig_digits=4)
             return "+" + format_size_exact(value - pa)
         return format_size_si(value)
 
@@ -835,6 +876,34 @@ class SizeAxis(BinAxis):
         if self._is_log(step):
             return format_size_exact(value)
         return self.format_tick(value, step)
+
+    def format_hover_range(self, start: float, end: float, step: Any) -> str:
+        return f"{self.format_hover_value(start, step)} - {self.format_hover_value(end, step)}"
+
+    def log_subgrid_fractions(self, start: float, end: float, step: Any) -> list:
+        """Log-paper pattern, one layer deep: lines at 2x, 3x, ... 9x the
+        bin's lower bound, measured from its parent bin's start (so
+        [1 GB, 10 GB) gets 2..9 GB, and the nested bin
+        1 GB + [100 MB, 1 GB) gets 1 GB + 200..900 MB), each placed
+        log10(k) / log10(upper/lower) of the way across. A bin starting
+        right at its parent's start ([0, 10), or a parent's first
+        bins) counts from 1 byte; a bin 1 byte wide has none."""
+        if not self._is_log(step) or end - start <= 1.0:
+            return []
+        level = step[1]
+        parent = 0.0 if level == 0 else self._log_bin_at(start, level - 1)[0]
+        lo, hi = start - parent, end - parent
+        if lo < 1.0:
+            lo = 1.0
+        if hi <= lo:
+            return []
+        span = math.log(hi / lo)
+        out = []
+        for k in range(2, 10):
+            if k * lo >= hi - 1e-9:
+                break
+            out.append(math.log(k) / span)
+        return out
 
     def format_bin(self, start: float, end: float) -> str:
         if self.log_mode:

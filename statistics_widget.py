@@ -1168,20 +1168,21 @@ class TimelineWidget(QWidget):
         # every axis/mode except SizeAxis's logarithmic one, where it's
         # log10(value), so decade bins end up equally spaced in pixels
         # instead of growing 10x wider each decade (see binning.py).
-        to_axis = self.axis.to_axis_space
-        p_start, p_end = to_axis(self.view_start), to_axis(self.view_end)
-        if p_end == p_start:
+        # Measured as axis-space *distances* from view_start (see
+        # BinAxis.axis_delta) rather than absolute positions, so deeply
+        # nested log size bins keep full precision.
+        delta = self.axis.axis_delta
+        span = delta(self.view_end, self.view_start)
+        if span == 0:
             return rect.left()
-        frac = (to_axis(v) - p_start) / (p_end - p_start)
+        frac = delta(v, self.view_start) / span
         return rect.left() + frac * rect.width()
 
     def _x_to_value(self, x: float) -> float:
         rect = self._plot_rect()
         frac = (x - rect.left()) / rect.width() if rect.width() else 0.0
-        to_axis = self.axis.to_axis_space
-        p_start, p_end = to_axis(self.view_start), to_axis(self.view_end)
-        pos = p_start + frac * (p_end - p_start)
-        return self.axis.from_axis_space(pos)
+        span = self.axis.axis_delta(self.view_end, self.view_start)
+        return self.axis.from_axis_delta(self.view_start, frac * span)
 
     def _x_to_bin(self, x: float) -> Optional[int]:
         if not self.bin_edges or len(self.bin_edges) < 2:
@@ -1661,7 +1662,7 @@ class TimelineWidget(QWidget):
             # tick format instead of None.
             step = self._current_step if self._nice() else self.axis.choose_step(v0, self.bin_edges[i + 1], 1)
             hover_segment = (
-                f"{self.axis.format_tick(v0, step)} - {self.bin_counts[i]} {self._item_label}(s)",
+                f"{self.axis.format_hover_value(v0, step)} - {self.bin_counts[i]} {self._item_label}(s)",
                 self.hover_label_color,
             )
         if hover_segment is not None:
@@ -1799,8 +1800,10 @@ class TimelineWidget(QWidget):
         # Same step lookup the hover readout uses, so a non-nice (arbitrary)
         # bin width still gets a sensible tick format.
         step = self._current_step if self._nice() else self.axis.choose_step(first, last, 1)
-        first_text = self.axis.format_tick(first, step)
-        last_text = self.axis.format_tick(last, step)
+        # format_hover_value: the full value (same as format_tick except
+        # for nested log size bins, whose ticks are "+offset" labels)
+        first_text = self.axis.format_hover_value(first, step)
+        last_text = self.axis.format_hover_value(last, step)
         return f"Chart: {first_text}" if first_text == last_text else f"Chart: {first_text} - {last_text}"
 
     def _draw_readout_segments(self, painter: QPainter, rect: QRectF, align_right: bool, segments: list):
@@ -1997,6 +2000,9 @@ class TimelineWidget(QWidget):
     def zoom(self, factor: float, pivot_v: Optional[float] = None):
         if self.view_start is None:
             return
+        if self.axis.nonlinear:
+            self._zoom_axis_space(factor, pivot_v)
+            return
         span = self.view_end - self.view_start
         if pivot_v is None:
             pivot_v = self.view_start + span / 2
@@ -2007,6 +2013,38 @@ class TimelineWidget(QWidget):
         self.view_start = pivot_v - frac * new_span
         self.view_end = self.view_start + new_span
         self._clamp_view_to_axis_min()
+        self._recompute_bins()
+        self.viewRangeChanged.emit(self.view_start, self.view_end)
+
+    def _zoom_axis_space(self, factor: float, pivot_v: Optional[float]):
+        """zoom() for a nonlinear axis (SizeAxis's nested log mode):
+        scales the AXIS-SPACE span around the pivot instead of the raw
+        value span, so each wheel step zooms the same visual amount and
+        the pivot stays under the cursor -- scaling raw bytes there
+        would shift the pivot and zoom unevenly. Distances only (see
+        _value_to_x), so it stays exact however deep the view is."""
+        delta = self.axis.axis_delta
+        from_delta = self.axis.from_axis_delta
+        span = delta(self.view_end, self.view_start)
+        if span <= 0:
+            return
+        if pivot_v is None:
+            pivot_v = from_delta(self.view_start, span / 2)
+        frac = delta(pivot_v, self.view_start) / span
+        frac = min(1.0, max(0.0, frac))
+        new_span = span * factor
+        if self.global_end is not None:
+            # zoom-out cap: the whole loaded range plus about one bin
+            max_span = delta(max(self.global_end, 10.0), 0.0) + 1.0
+            new_span = min(new_span, max_span)
+        new_start = from_delta(pivot_v, -frac * new_span)
+        new_end = from_delta(pivot_v, (1.0 - frac) * new_span)
+        if self.axis.min_value is not None and new_start < self.axis.min_value:
+            new_start = self.axis.min_value
+            new_end = from_delta(new_start, new_span)
+        if factor < 1 and new_end - new_start < self.axis.min_span:
+            return  # already at single-byte resolution
+        self.view_start, self.view_end = new_start, new_end
         self._recompute_bins()
         self.viewRangeChanged.emit(self.view_start, self.view_end)
 
@@ -2051,8 +2089,7 @@ class TimelineWidget(QWidget):
         docstring covers."""
         if self.view_start is None:
             return
-        to_axis = self.axis.to_axis_space
-        axis_span = to_axis(self.view_end) - to_axis(self.view_start)
+        axis_span = self.axis.axis_delta(self.view_end, self.view_start)
         self._shift_view(frac_of_span * axis_span)
 
     def _shift_view(self, d_axis: float):
@@ -2105,18 +2142,22 @@ class TimelineWidget(QWidget):
           the first place."""
         if self.view_start is None:
             return
-        to_axis = self.axis.to_axis_space
-        from_axis = self.axis.from_axis_space
-        a0, a1 = to_axis(self.view_start), to_axis(self.view_end)
-        lo = to_axis(self.axis.min_value) if self.axis.min_value is not None else None
-        hi = to_axis(self.global_end) if self.global_end is not None else None
-        new_a0 = a0 + d_axis
-        if lo is not None and new_a0 < lo:
-            d_axis = lo - a0
-        elif hi is not None and new_a0 > hi:
-            d_axis = hi - a0
-        self.view_start = from_axis(a0 + d_axis)
-        self.view_end = from_axis(a1 + d_axis)
+        # Distances (axis_delta) relative to the current view, not
+        # absolute axis positions -- see _value_to_x.
+        delta = self.axis.axis_delta
+        from_delta = self.axis.from_axis_delta
+        lo = delta(self.axis.min_value, self.view_start) if self.axis.min_value is not None else None
+        hi = delta(self.global_end, self.view_start) if self.global_end is not None else None
+        if lo is not None and d_axis < lo:
+            d_axis = lo
+        elif hi is not None and d_axis > hi:
+            d_axis = hi
+        if lo is not None and d_axis == lo:
+            new_start = self.axis.min_value
+        else:
+            new_start = from_delta(self.view_start, d_axis)
+        self.view_end = from_delta(self.view_end, d_axis)
+        self.view_start = new_start
         self._recompute_bins()
         self.viewRangeChanged.emit(self.view_start, self.view_end)
 
@@ -2137,8 +2178,7 @@ class TimelineWidget(QWidget):
         scrollbar-overflow-near-infinity failure modes documented there."""
         if self.view_start is None:
             return
-        to_axis = self.axis.to_axis_space
-        self._shift_view(to_axis(new_start) - to_axis(self.view_start))
+        self._shift_view(self.axis.axis_delta(new_start, self.view_start))
 
     # ------------------------------------------------------------- selection
     def clear_selection(self):
@@ -2243,8 +2283,7 @@ class TimelineWidget(QWidget):
                 # Axis-space delta, not raw -- see _shift_view's docstring
                 # for why that distinction matters once a log size axis
                 # is in play.
-                to_axis = self.axis.to_axis_space
-                axis_span = to_axis(self.view_end) - to_axis(self.view_start)
+                axis_span = self.axis.axis_delta(self.view_end, self.view_start)
                 d_axis = -dx / rect.width() * axis_span
                 self._shift_view(d_axis)
         elif self._selecting:

@@ -596,9 +596,12 @@ class TimelineOpsMixin:
             return
         pane._tl_syncing_scrollbar = True
         g0, g1 = timeline.global_start, timeline.global_end
-        full_span = max(g1 - g0, 1e-6)
-        pos = (view_start - g0) / full_span
-        page = (view_end - view_start) / full_span
+        # Axis-space distances (identical to raw ones on a linear axis),
+        # so the thumb matches what's on screen in log size mode too.
+        delta = timeline.axis.axis_delta
+        full_span = max(delta(g1, g0), 1e-300)
+        pos = delta(view_start, g0) / full_span
+        page = delta(view_end, view_start) / full_span
         sb = pane.tl_scrollbar
         sb.blockSignals(True)
         # All values (e.g. identical timestamps) can make full_span tiny
@@ -615,7 +618,8 @@ class TimelineOpsMixin:
         if getattr(pane, "_tl_syncing_scrollbar", False) or timeline.global_start is None:
             return
         g0, g1 = timeline.global_start, timeline.global_end
-        new_start = g0 + (value / TIMELINE_SCROLLBAR_RANGE) * (g1 - g0)
+        axis = timeline.axis
+        new_start = axis.from_axis_delta(g0, (value / TIMELINE_SCROLLBAR_RANGE) * axis.axis_delta(g1, g0))
         timeline.set_view_start(new_start)
 
     # ---------------------------------------------------- selection sync

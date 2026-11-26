@@ -82,9 +82,10 @@ from binning import BinAxis, SizeAxis, TimeAxis
 MARGIN_LEFT = 55  # fallback width before there's any data to size against - see _y_axis_margin_left
 #: Hard floor for the dynamic left margin (_y_axis_margin_left) - just enough
 #: that a tiny max value (e.g. a single digit) still leaves breathing room
-#: around its label, well below MARGIN_LEFT itself so genuinely small axes
-#: actually get narrower rather than just never getting any wider.
-MARGIN_LEFT_MIN = 24
+#: around its label -- 50 px, so the y-axis never sits squeezed against
+#: the view's left edge with small counts / a small font, while larger
+#: counts still widen it as needed.
+MARGIN_LEFT_MIN = 50
 MARGIN_RIGHT = 20
 MARGIN_TOP = 24
 # Tick labels are drawn at 45 degrees below their tick marks, which eats

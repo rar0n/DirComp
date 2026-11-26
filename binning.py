@@ -921,19 +921,20 @@ class SizeAxis(BinAxis):
         return boundary + step
 
     def format_tick(self, value: float, step: Any) -> str:
+        # Log mode tick labels -- bin starts and "+offset"s alike -- are
+        # rounded to 4 significant digits ("1.074 GB", "+1.049 MB") to
+        # stay readable in base 2 / base e / binary units; the hover and
+        # Chart readouts (format_hover_value) stay exact.
         if self._is_log(step) and step[1] > 0:
             # Below level 0: a tick at the start of its parent bin gets
             # the full value, the rest just their offset from that start
             # ("+10 MB") -- otherwise every label would read 1.0x GB.
             pa, _pb = self._log_bin_at(value, step[1] - 1)
             if abs(value - pa) < 0.5:
-                return format_size_exact(value)
-            # Offsets are (whole-number) powers of the log base -- all
-            # distinct, so 4 significant digits are plenty and keep
-            # base 2 / base e / binary units readable ("+1.049 MB" rather
-            # than "+1.048576 MB"); base 10 in decimal units is exact
-            # anyway ("+10 MB"). Hover/Chart readouts stay exact.
+                return format_size_exact(value, sig_digits=4)
             return "+" + format_size_exact(value - pa, sig_digits=4)
+        if self._is_log(step):
+            return format_size_exact(value, sig_digits=4)
         return format_size_si(value)
 
     def format_hover_value(self, value: float, step: Any) -> str:

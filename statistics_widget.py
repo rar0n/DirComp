@@ -1966,10 +1966,10 @@ class TimelineWidget(QWidget):
         # Same step lookup the hover readout uses, so a non-nice (arbitrary)
         # bin width still gets a sensible tick format.
         step = self._current_step if self._nice() else self.axis.choose_step(first, last, 1)
-        # format_hover_value: the full value (same as format_tick except
-        # for nested log size bins, whose ticks are "+offset" labels)
-        first_text = self.axis.format_hover_value(first, step)
-        last_text = self.axis.format_hover_value(last, step)
+        # format_readout_value: the full value, not a "+offset" tick
+        # label (log size axis: rounded to 4 significant digits)
+        first_text = self.axis.format_readout_value(first, step)
+        last_text = self.axis.format_readout_value(last, step)
         return f"Chart: {first_text}" if first_text == last_text else f"Chart: {first_text} - {last_text}"
 
     def _draw_readout_segments(self, painter: QPainter, rect: QRectF, align_right: bool, segments: list):

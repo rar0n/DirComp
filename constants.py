@@ -26,7 +26,7 @@ TIMELINE_SCROLLBAR_RANGE = 100_000
 # Shown in the window title: YYYY.MM.DD.N -- the date of the change, N
 # counting the versions made on the same day (1, 2, ...). Bump on every batch
 # (every branch/commit batch that changes the program), not just now and then.
-APP_VERSION = "2026.11.26.6"
+APP_VERSION = "2026.11.26.7"
 # The author tag shown in front of the version in the window title.
 APP_AUTHOR = "raron"
 

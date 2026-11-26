@@ -104,6 +104,12 @@ class BinAxis(ABC):
         full exact value there instead of its "+offset" tick labels)."""
         return self.format_tick(value, step)
 
+    def format_readout_value(self, value: float, step: Any) -> str:
+        """A value as shown in the upper-left "Chart: ..." readout.
+        Default: the hover format (SizeAxis's log mode rounds it to 4
+        significant digits, like its tick labels)."""
+        return self.format_hover_value(value, step)
+
     def format_hover_range(self, start: float, end: float, step: Any) -> str:
         """The hovered bin as shown in the hover readout. Default: just
         its start value (as before); SizeAxis shows "start - end"."""
@@ -945,6 +951,11 @@ class SizeAxis(BinAxis):
     def format_hover_range(self, start: float, end: float, step: Any) -> str:
         return f"{self.format_hover_value(start, step)} - {self.format_hover_value(end, step)}"
 
+    def format_readout_value(self, value: float, step: Any) -> str:
+        if self._is_log(step):
+            return format_size_exact(value, sig_digits=4)
+        return self.format_hover_value(value, step)
+
     def log_subgrid_fractions(self, start: float, end: float, step: Any) -> list:
         """Log-paper pattern: lines at LOG_SUBGRID_MULTIPLIERS (base 10:
         2x, 3x, ... 9x; base 2: 1.25x/1.5x/1.75x; base e: 1.5x/2x/2.5x) the
@@ -981,7 +992,7 @@ class SizeAxis(BinAxis):
             if step[1] == 0:
                 return {"10": "1 bin/decade (log10)", "2": "1 bin/doubling (log2)",
                         "e": "1 bin/power of e (ln)"}[self.log_base]
-            return f"log within {format_size_exact(step[2])} - {format_size_exact(step[3])}"
+            return f"log within {format_size_exact(step[2], sig_digits=4)} - {format_size_exact(step[3], sig_digits=4)}"
         return format_size_si(step)
 
     def format_raw_width(self, width: float) -> str:

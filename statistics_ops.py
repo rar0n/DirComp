@@ -40,12 +40,20 @@ from __future__ import annotations
 import os
 import time
 
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QAbstractItemView
 
 from panes import DirectoryPane
 from binning import CategoryAxis
 from name_filter_ops import _compile_term
 from constants import PATH_ROLE, IS_DIR_ROLE, TIMELINE_SCROLLBAR_RANGE, METRIC_DATE_FIELDS
+from custom_widgets import _SelectionMarkerScrollBar
+
+#: Statistics View scrollbar selection markers: buckets over the whole
+#: track, and over the part under the handle (finer, for the magnifier)
+_TL_MARKER_TRACK_BUCKETS = 1024
+_TL_MARKER_HANDLE_BUCKETS = 512
 
 
 def _value_of_for_metric(metric: str):
@@ -608,10 +616,57 @@ class TimelineOpsMixin:
         # while the view is wider: clamp so the ints stay in range.
         page = min(max(page, 0.0), 1.0)
         pos = min(max(pos, 0.0), 1.0)
-        sb.setPageStep(max(1, int(page * TIMELINE_SCROLLBAR_RANGE)))
-        sb.setValue(int(pos * TIMELINE_SCROLLBAR_RANGE))
+        # Range 0..R-page with page step `page`: the whole track (R
+        # units) is then exactly the loaded data range, so a position on
+        # the track is the same fraction of the data -- the handle spans
+        # exactly the visible part, and selection markers (fractions of
+        # the data range) line up with it. (Range 0..R plus a page step
+        # used to squeeze the data into R/(R+page) of the track.)
+        page_units = max(1, int(page * TIMELINE_SCROLLBAR_RANGE))
+        max_value = max(0, TIMELINE_SCROLLBAR_RANGE - page_units)
+        sb.setRange(0, max_value)
+        sb.setPageStep(page_units)
+        sb.setValue(min(max_value, int(pos * TIMELINE_SCROLLBAR_RANGE)))
         sb.blockSignals(False)
         pane._tl_syncing_scrollbar = False
+        self._schedule_statistics_scrollbar_markers(pane)
+
+    def _schedule_statistics_scrollbar_markers(self, pane: DirectoryPane):
+        """Coalesce marker refreshes (a zoom step can fire several
+        triggers in a row) into one, on the next event-loop pass."""
+        if getattr(pane, "_tl_markers_pending", False):
+            return
+        pane._tl_markers_pending = True
+
+        def run(p=pane):
+            p._tl_markers_pending = False
+            self._update_statistics_scrollbar_markers(p)
+
+        QTimer.singleShot(0, run)
+
+    def _update_statistics_scrollbar_markers(self, pane: DirectoryPane):
+        """Selection markers on the Statistics View's scrollbar -- one
+        tick per stretch of the track holding selected files, in the
+        view's own selection color, drawn and magnified under the handle
+        by the same rules (and Settings-tab options) as the File List
+        View's markers (see _SelectionMarkerScrollBar). Fractions come
+        from TimelineWidget.selection_marker_fractions: a coarse pass
+        over the whole track plus a fine one over the part the handle
+        magnifies."""
+        sb = getattr(pane, "tl_scrollbar", None)
+        timeline = getattr(pane, "timeline", None)
+        if not isinstance(sb, _SelectionMarkerScrollBar) or timeline is None:
+            return
+        if timeline.global_start is None or not timeline.selected_paths:
+            sb.set_markers([], 0)
+            return
+        ranges = [(0.0, 1.0, _TL_MARKER_TRACK_BUCKETS)]
+        window = sb.fisheye_window_fraction()
+        if window is not None and window[1] > window[0]:
+            ranges.append((window[0], window[1], _TL_MARKER_HANDLE_BUCKETS))
+        color = QColor(timeline.selection_color)
+        markers = [(f, color) for f in timeline.selection_marker_fractions(ranges)]
+        sb.set_markers(markers, sb.maximum() - sb.minimum() + sb.pageStep())
 
     def _on_statistics_scrollbar_moved(self, pane: DirectoryPane, value: int):
         timeline = pane.timeline

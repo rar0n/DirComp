@@ -900,7 +900,7 @@ class ThemeOpsMixin:
         self._repaint_all_scrollbars()
 
     def _on_scrollbar_handle_style_toggled(self, style_id: int, checked: bool):
-        """Settings tab -> File List View -> Scrollbar Tweaks -> "Scrollbar handle style"
+        """Settings tab -> File List View / Statistics View -> Scrollbar Tweaks -> "Scrollbar handle style"
         radio group (QButtonGroup.idToggled: fires for the button that
         just got checked AND the one that just got unchecked, so only
         the former is acted on). style_id indexes _SCROLLBAR_HANDLE_STYLES.

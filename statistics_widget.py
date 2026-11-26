@@ -222,6 +222,11 @@ class TimelineWidget(QWidget):
     # same "open this folder" contract as DirDropLineEdit/DirDropTreeWidget
     # elsewhere in the host app, just from here too.
     directoryDropped = Signal(str)
+    # emitted whenever the selection scrollbar markers may have changed:
+    # selection, records or palette (see selection_marker_fractions; the
+    # view range -- which also moves the magnified part -- already has
+    # viewRangeChanged)
+    markersChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -571,6 +576,7 @@ class TimelineWidget(QWidget):
         else:
             self._value_of = lambda r: getattr(r, metric).timestamp()
 
+        self._sel_values_cache = None
         self._path_of = path_of if path_of is not None else (lambda r: getattr(r, "path", None))
         self._size_of = size_of if size_of is not None else (lambda r: float(getattr(r, "size", 0) or 0))
         # Each file once, even if the host lists it more than once (the
@@ -605,6 +611,7 @@ class TimelineWidget(QWidget):
             self.global_start = mid - pad
             self.global_end = mid + pad
         self.reset_view()
+        self.markersChanged.emit()
 
     def _unique_size_sum(self, records) -> float:
         """Combined size of `records`, counting every path only once."""
@@ -703,7 +710,57 @@ class TimelineWidget(QWidget):
                 self.view_start, self.view_end = self.axis.relevel(self.view_start, self.view_end)
         if self.view_start is not None:
             self._recompute_bins()
+            self.viewRangeChanged.emit(self.view_start, self.view_end)
         self.update()
+
+    def _selected_values_sorted(self) -> list:
+        """Sorted values of every selected record (cached until the
+        selection or the records change)."""
+        if self._sel_values_cache is None:
+            if not self.selected_paths:
+                self._sel_values_cache = []
+            else:
+                sel = self.selected_paths
+                self._sel_values_cache = sorted(
+                    self._value_of(r) for r in self.records if self._path_of(r) in sel
+                )
+        return self._sel_values_cache
+
+    def selection_marker_fractions(self, ranges) -> list:
+        """Where the selected records are along the whole loaded range,
+        for selection markers on a scrollbar spanning that range (see
+        DirComp's Statistics View scrollbar): sorted fractions 0..1 in
+        the same axis space the scrollbar uses (axis_delta from
+        global_start, so log axes match what's on screen).
+
+        Bucketed rather than one per record -- a big selection would
+        otherwise cost an axis mapping per file on every zoom step:
+        `ranges` is a list of (lo, hi, n): split fractions lo..hi into n
+        equal buckets, and return each bucket's center that holds at
+        least one selected value. Pass a coarse whole-track range plus a
+        fine one where more detail matters (under the handle)."""
+        values = self._selected_values_sorted()
+        if not values or self.global_start is None:
+            return []
+        g0 = self.global_start
+        total = self.axis.axis_delta(self.global_end, g0)
+        if total <= 0:
+            return [0.5]
+        out = set()
+        for lo, hi, n in ranges:
+            if n <= 0 or hi <= lo:
+                continue
+            step = (hi - lo) / n
+            edge_vals = [self.axis.from_axis_delta(g0, (lo + k * step) * total) for k in range(n + 1)]
+            if hi >= 1.0:
+                edge_vals[-1] = float("inf")  # the end value itself counts
+            if lo <= 0.0:
+                edge_vals[0] = float("-inf")
+            for k in range(n):
+                i0 = bisect.bisect_left(values, edge_vals[k])
+                if i0 < len(values) and values[i0] < edge_vals[k + 1]:
+                    out.add(lo + (k + 0.5) * step)
+        return sorted(out)
 
     def set_subdivide_log_grid(self, enabled: bool):
         """Settings tab "Subdivide logarithmic axis grid": a log-paper
@@ -744,6 +801,9 @@ class TimelineWidget(QWidget):
             if self.view_start is not None:
                 self.view_start, self.view_end = self.axis.relevel(self.view_start, self.view_end)
             self._recompute_bins()
+            if self.view_start is not None:
+                # the axis mapping changed: scrollbar position/markers too
+                self.viewRangeChanged.emit(self.view_start, self.view_end)
             self.update()
 
     def set_label_font_size(self, pt: int):
@@ -829,6 +889,7 @@ class TimelineWidget(QWidget):
         if partial_lerp is not None:
             self.partial_lerp = max(0, min(100, int(partial_lerp)))
         self.update()
+        self.markersChanged.emit()  # markers use selection_color
 
     @staticmethod
     def _mix(base: QColor, toward: QColor, frac: float) -> QColor:
@@ -1303,10 +1364,12 @@ class TimelineWidget(QWidget):
         through here means bin highlighting can never go stale relative
         to whichever side changed it last."""
         self.selected_paths = {p for p in paths if p is not None}
+        self._sel_values_cache = None
         self._recompute_selected_counts()
         if emit:
             self.selectionChanged.emit(set(self.selected_paths))
         self.update()
+        self.markersChanged.emit()
 
     def set_selected_total_size(self, value: Optional[float], any_selected: bool = False):
         """Override for the readout's selected-size figure (see

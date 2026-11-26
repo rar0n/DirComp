@@ -676,11 +676,11 @@ import math
 _SCROLLBAR_COLORS = {"groove": "#1A1A1A", "handle": "#E8E8E8"}
 # Opacity the handle is filled at, over whatever's already been painted
 # in the groove beneath it -- low enough that content underneath (the
-# file trees' marker ticks; nothing, currently, on the Statistics view's
-# scrollbar) is still clearly visible-but-dimmed through the handle,
+# file trees' and the Statistics view's selection marker ticks) is still
+# clearly visible-but-dimmed through the handle,
 # high enough that the handle itself still unambiguously reads as "the
 # handle" and not just a faint tint. The live value (a per-theme
-# setting -- Settings tab -> File List View -> "Scrollbar handle
+# setting -- Settings tab -> File List View / Statistics View -> "Scrollbar handle
 # opacity", see ThemeOpsMixin's color sets) is _SCROLLBAR_STYLE below,
 # a dict updated in place like _SCROLLBAR_COLORS; the constants here are
 # the built-in default (77.5% before it became a setting).
@@ -706,7 +706,7 @@ _DEFAULT_SCROLLBAR_TRACK_OPACITY_PCT = 0
 # on a dark track stays visible. 0 = off.
 _DEFAULT_SCROLLBAR_MARKER_LUMA_THRESHOLD = 0
 # How the FLV scrollbar handle shows the selection markers beneath it
-# (Settings tab -> File List View -> Scrollbar Tweaks -> "Scrollbar handle style"). Unlike
+# (Settings tab -> File List View / Statistics View -> Scrollbar Tweaks -> "Scrollbar handle style"). Unlike
 # the two opacities above this is a per-theme widget value (saved inside each
 # theme's set under "widgets"; see settings_ops._per_theme_widgets). The index of a name here is also
 # its radio button's id in that Settings-tab QButtonGroup, and what gets
@@ -1010,10 +1010,51 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
         (see the class docstring)."""
         return _SCROLLBAR_STYLE["handle_style"]
 
-    def __init__(self, parent=None):
-        super().__init__(Qt.Vertical, parent)
+    def __init__(self, parent=None, orientation=Qt.Vertical):
+        super().__init__(orientation, parent)
         self._markers: list[tuple[float, QColor]] = []
         self._total_rows = 0
+
+    # Orientation helpers: everything below measures positions *along*
+    # the track (top->bottom for the File List View's vertical
+    # scrollbar, left->right for the Statistics View's horizontal one)
+    # and draws marker ticks *across* it.
+    def _lo(self, rect) -> int:
+        return rect.top() if self.orientation() == Qt.Vertical else rect.left()
+
+    def _len(self, rect) -> int:
+        return rect.height() if self.orientation() == Qt.Vertical else rect.width()
+
+    def _cross_span(self, groove_rect) -> tuple:
+        if self.orientation() == Qt.Vertical:
+            return groove_rect.left() + 1, groove_rect.right() - 1
+        return groove_rect.top() + 1, groove_rect.bottom() - 1
+
+    def _draw_tick(self, painter, along, c1, c2):
+        if self.orientation() == Qt.Vertical:
+            painter.drawLine(c1, along, c2, along)
+        else:
+            painter.drawLine(along, c1, along, c2)
+
+    def fisheye_window_fraction(self):
+        """(lo, hi): the part of the track (0..1 fractions) the handle's
+        magnifier covers right now -- the handle's own length centered
+        on the middle of the view -- so a host that buckets its markers
+        can give that part finer resolution (see the Statistics View's
+        markers, statistics_ops). None if there's no valid handle."""
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        style = self.style()
+        groove = style.subControlRect(QStyle.CC_ScrollBar, opt, QStyle.SC_ScrollBarGroove, self)
+        handle = style.subControlRect(QStyle.CC_ScrollBar, opt, QStyle.SC_ScrollBarSlider, self)
+        g_len = self._len(groove)
+        page = self.pageStep()
+        span = self.maximum() - self.minimum() + page
+        if g_len <= 0 or span <= 0 or not handle.isValid():
+            return None
+        center = (self.sliderPosition() - self.minimum() + page / 2.0) / span
+        half = self._len(handle) / (2.0 * g_len)
+        return max(0.0, center - half), min(1.0, center + half)
 
     def set_markers(self, markers: "list[tuple[float, QColor]]", total_rows: int = 0):
         """markers: (fraction 0..1 along the visible rows, color) per
@@ -1045,15 +1086,15 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
         span = self.maximum() - self.minimum() + page
         if self._total_rows < 2 or page <= 0 or span <= 0 or not handle_rect.isValid():
             return None
-        natural = groove_rect.height() * page / span
+        natural = self._len(groove_rect) * page / span
         if natural <= 0:
             return None
-        if handle_rect.height() <= natural + 1.0 and self._magnifier_style == "hard_cutoff":
+        if self._len(handle_rect) <= natural + 1.0 and self._magnifier_style == "hard_cutoff":
             return None
         # The fisheye runs even when the handle isn't clamped (mag 1,
         # i.e. a plain linear mapping) so markers under the handle are
         # always drawn the same way -- and get only handle_opacity.
-        mag = max(1.0, handle_rect.height() / natural)
+        mag = max(1.0, self._len(handle_rect) / natural)
         return self.sliderPosition() - self.minimum(), page, span, mag
 
     def _hard_cutoff_row_to_y(self, row, offset, page, unit_per_row, handle_rect):
@@ -1066,8 +1107,8 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
         rel = ((row + 0.5) * unit_per_row - offset) / page
         if rel < 0.0 or rel > 1.0:
             return None
-        h_top = handle_rect.top()
-        h_height = handle_rect.height()
+        h_top = self._lo(handle_rect)
+        h_height = self._len(handle_rect)
         # Keep clear of the handle's 1px bevel edges, so a row at the
         # very top/bottom of the view still shows.
         return min(max(h_top + int(rel * h_height), h_top + 2), h_top + h_height - 2)
@@ -1090,7 +1131,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
         mapping is mirror-symmetric around the handle's center.
 
         Rows outside this window are ordinary track markers."""
-        half = handle_rect.height() * (rows - 1) / (2.0 * groove_rect.height())
+        half = self._len(handle_rect) * (rows - 1) / (2.0 * self._len(groove_rect))
         return center_row - half, center_row + half
 
     def _circle_row_to_y(self, row, center_row, mag, row_lo, row_hi, handle_rect):
@@ -1138,8 +1179,8 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
             circle_out = math.sqrt(max(0.0, 1.0 - (1.0 - t) * (1.0 - t)))
             out_y = 0.5 + 0.5 * circle_out  # t=0 (center) -> 0.5; t=1 (row_hi) -> 1.0
 
-        h_top = handle_rect.top()
-        h_height = handle_rect.height()
+        h_top = self._lo(handle_rect)
+        h_height = self._len(handle_rect)
         return min(max(h_top + int(out_y * h_height), h_top + 2), h_top + h_height - 2)
 
     def _fisheye_row_to_y(self, row, center_row, mag, row_lo, row_hi, handle_rect):
@@ -1197,8 +1238,8 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
             x = min(max(x, 0.0), radius)
             return a * x + b * (radius / math.pi) * math.sin(math.pi * x / radius)
 
-        h_top = handle_rect.top()
-        h_height = handle_rect.height()
+        h_top = self._lo(handle_rect)
+        h_height = self._len(handle_rect)
 
         if row <= center_row:
             radius = center_row - row_lo
@@ -1222,7 +1263,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
         painter = QPainter(self)
         groove_rect, handle_rect = self._paint_groove_and_handle(painter, style, opt)
 
-        if self._markers and groove_rect.isValid() and groove_rect.height() > 0:
+        if self._markers and groove_rect.isValid() and self._len(groove_rect) > 0:
             handle_style = self._magnifier_style
             plain = handle_style == "plain"
             window = None if plain else self._magnifier_window(groove_rect, handle_rect)
@@ -1231,10 +1272,11 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
             handle_weight = (100 - _SCROLLBAR_STYLE["handle_opacity"]) / 100.0
             mpen = QPen()
             mpen.setWidth(2)
-            x1 = groove_rect.left() + 1
-            x2 = groove_rect.right() - 1
-            groove_top = groove_rect.top()
-            groove_height = groove_rect.height()
+            # across-the-track extent of a tick, and the track's own
+            # start/length along it (see the orientation helpers)
+            x1, x2 = self._cross_span(groove_rect)
+            groove_top = self._lo(groove_rect)
+            groove_height = self._len(groove_rect)
 
             fisheye = None  # (row_lo, row_hi, center_row) for fisheye/circle
             if window is not None and handle_style != "hard_cutoff":
@@ -1260,7 +1302,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                 y = groove_top + int(fraction * groove_height)
                 mpen.setColor(_contrasting_marker_color(color, groove_color, track_weight))
                 painter.setPen(mpen)
-                painter.drawLine(x1, y, x2, y)
+                self._draw_tick(painter, y, x1, x2)
             painter.restore()
 
             # Markers under the handle. Painted *before* the handle (same
@@ -1286,7 +1328,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                         y = groove_top + int(fraction * groove_height)
                         mpen.setColor(_contrasting_marker_color(color, groove_color, handle_weight))
                         painter.setPen(mpen)
-                        painter.drawLine(x1, y, x2, y)
+                        self._draw_tick(painter, y, x1, x2)
                 elif handle_style == "hard_cutoff":
                     offset, page, span, _mag = window
                     rows = self._total_rows
@@ -1298,7 +1340,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                             continue
                         mpen.setColor(_contrasting_marker_color(color, groove_color, handle_weight))
                         painter.setPen(mpen)
-                        painter.drawLine(x1, y, x2, y)
+                        self._draw_tick(painter, y, x1, x2)
                 else:
                     _offset, _page, _span, mag = window
                     rows = self._total_rows
@@ -1315,7 +1357,7 @@ class _SelectionMarkerScrollBar(_ThemedScrollBar):
                         y = row_to_y(row, center_row, mag, row_lo, row_hi, handle_rect)
                         mpen.setColor(_contrasting_marker_color(color, groove_color, handle_weight))
                         painter.setPen(mpen)
-                        painter.drawLine(x1, y, x2, y)
+                        self._draw_tick(painter, y, x1, x2)
                 painter.restore()
 
         self._paint_handle(painter, handle_rect)

@@ -185,6 +185,9 @@ class PaneBuilderMixin:
         # relative position or (via lazy population) change the total row
         # count the fractions are computed against.
         tree.setVerticalScrollBar(_SelectionMarkerScrollBar(tree))
+        # Themed horizontal scrollbar too, so the scrollbar settings
+        # (colors, opacities) reach every Main-tab scrollbar.
+        tree.setHorizontalScrollBar(_ThemedScrollBar(Qt.Horizontal, tree))
         tree.itemSelectionChanged.connect(lambda p=pane: self._schedule_selection_markers_update(p))
         tree.itemExpanded.connect(lambda item, p=pane: self._schedule_selection_markers_update(p))
         tree.itemCollapsed.connect(lambda item, p=pane: self._schedule_selection_markers_update(p))
@@ -1229,7 +1232,10 @@ class PaneBuilderMixin:
             if getattr(self, "active_transfer_progress", None) is None else None
         )
 
-        scrollbar = _ThemedScrollBar(Qt.Horizontal)
+        # Same marker scrollbar as the File List View's (horizontal):
+        # selected files show as ticks on the track/handle -- see
+        # TimelineOpsMixin._update_statistics_scrollbar_markers.
+        scrollbar = _SelectionMarkerScrollBar(orientation=Qt.Horizontal)
         scrollbar.setRange(0, TIMELINE_SCROLLBAR_RANGE)
         pane.tl_scrollbar = scrollbar
         tl_layout.addWidget(scrollbar)
@@ -1410,6 +1416,7 @@ class PaneBuilderMixin:
             lambda v0, v1, p=pane: self._on_timeline_view_range_changed(p, v0, v1)
         )
         timeline.viewRangeChanged.connect(lambda v0, v1, p=pane: self._update_statistics_bin_size_label(p))
+        timeline.markersChanged.connect(lambda p=pane: self._schedule_statistics_scrollbar_markers(p))
         scrollbar.valueChanged.connect(lambda v, p=pane: self._on_statistics_scrollbar_moved(p, v))
         # timeline.binInfo isn't connected to anything: TimelineWidget
         # already draws this itself, in the upper-left corner by the

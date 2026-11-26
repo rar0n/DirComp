@@ -985,7 +985,8 @@ class SettingsTabMixin:
         # Background (the lists' own background),
         # Default Selection (the selected-row highlight; a selected row's
         # text color is its Default File/Folder Fg, so there's no Fg
-        # here), Default File, Default Folder and the lists' scrollbars.
+        # here), Default File, Default Folder, ... (The scrollbar colors
+        # moved to "File List View / Statistics View" -> Misc colors.)
         _FLV_COLOR_ROWS = [
             ("Background (Default)",
              None, lambda: self._effective_flv_bg(),
@@ -1022,10 +1023,6 @@ class SettingsTabMixin:
              lambda: TAG_COLORS.get("dupfolder", (None, None))[0] or self._effective_flv_bg(),
              lambda hexc: self._on_comparison_color_changed("dupfolder", True, hexc),
              lambda hexc: self._on_comparison_color_changed("dupfolder", False, hexc)),
-            ("Scrollbar (Handle/Track)",
-             lambda: _SCROLLBAR_COLORS["handle"], lambda: _SCROLLBAR_COLORS["groove"],
-             lambda hexc: self._on_scrollbar_color_changed("handle", hexc),
-             lambda hexc: self._on_scrollbar_color_changed("groove", hexc)),
         ]
         flv_colors_table = QTableWidget(len(_FLV_COLOR_ROWS), 3)
         self._style_table_widget(flv_colors_table, ["Item", "Fg", "Bg"])
@@ -1225,9 +1222,9 @@ class SettingsTabMixin:
              "No magnification: the selection markers under the scrollbar handle stay "
              "at their ordinary position on the track."),
             (1, "Fisheye",
-             "Magnifies the selection markers around the middle of what the File List View "
-             "currently shows, spreading them over the whole handle and easing back to "
-             "normal towards its top and bottom edges."),
+             "Magnifies the selection markers around the middle of what the view "
+             "(File List View or Statistics View) currently shows, spreading them over the "
+             "whole handle and easing back to normal towards its ends."),
             (2, "Quarter circle (test)",
              "Like Fisheye, but with a quarter-circle curve: strongly magnified in the middle "
              "of the view, while markers near the handle's edges bunch together."),
@@ -1871,18 +1868,24 @@ class SettingsTabMixin:
 
         # The former "File List View Colors" Level 2 block is gone: its
         # parts are Level 2 blocks of their own, packed by the flow.
-        for block in (flv_default_misc_block, flv_scrollbar_block, flv_dup_colors_block,
+        for block in (flv_default_misc_block, flv_dup_colors_block,
                       comparison_colors_block, flv_buttons_block, dup_misc_block):
             flv_flow.addWidget(block)
 
         outer.addWidget(self._settings_section("File List View", date_col_group))
 
-        # ---- File List / Statistics Split (both panes) -- the same
-        # ratio the draggable handle between the two views (Main tab)
-        # controls; dragging that handle updates this spin box and vice
-        # versa. See _set_file_list_ratio. ----
-        split_group = QGroupBox("")
-        split_row = QHBoxLayout(split_group)
+        # ---- File List View / Statistics View (both views): what the two
+        # views share. Top line: the File List share -- the same ratio
+        # the draggable handle between the two views (Main tab) controls;
+        # dragging that handle updates this spin box and vice versa (see
+        # _set_file_list_ratio). "Scrollbar Tweaks" (built with the File
+        # List View section above) and "Misc colors" (the scrollbar
+        # colors): every scrollbar on the Main tab -- both views'. ----
+        split_section_group = QGroupBox("")
+        split_section_outer = QVBoxLayout(split_section_group)
+        split_row_widget = QWidget()
+        split_row = QHBoxLayout(split_row_widget)
+        split_row.setContentsMargins(0, 0, 0, 0)
         split_row.addWidget(QLabel("File List share:"))
         self.file_list_ratio_spin = SliderDoubleSpinBox()
         self.file_list_ratio_spin.setRange(0.05, 0.95)
@@ -1901,7 +1904,44 @@ class SettingsTabMixin:
         split_row.addSpacing(12)
         split_row.addWidget(SpinSlider(self.file_list_ratio_spin))
         split_row.addStretch(1)
-        outer.addWidget(self._settings_section("File List / Statistics Split (both panes)", split_group))
+
+        # Misc colors: same Item | Fg | Bg table as File List View ->
+        # Default / Misc colors, where its one row (for now) used to be.
+        _VIEWS_MISC_COLOR_ROWS = [
+            ("Scrollbar (Handle/Track)",
+             lambda: _SCROLLBAR_COLORS["handle"], lambda: _SCROLLBAR_COLORS["groove"],
+             lambda hexc: self._on_scrollbar_color_changed("handle", hexc),
+             lambda hexc: self._on_scrollbar_color_changed("groove", hexc)),
+        ]
+        views_colors_table = QTableWidget(len(_VIEWS_MISC_COLOR_ROWS), 3)
+        self._style_table_widget(views_colors_table, ["Item", "Fg", "Bg"])
+        for i, (label, get_fg, get_bg, on_fg, on_bg) in enumerate(_VIEWS_MISC_COLOR_ROWS):
+            views_colors_table.setItem(i, 0, self._table_item(label))
+            views_colors_table.setCellWidget(i, 1, self._center_in_cell(self._make_color_swatch(get_fg, on_fg)))
+            views_colors_table.setCellWidget(i, 2, self._center_in_cell(self._make_color_swatch(get_bg, on_bg)))
+        views_colors_table.item(0, 0).setToolTip(
+            "Handle (Fg) and track (Bg) colors of every scrollbar on the Main tab: "
+            "the File List Views' and the Statistics Views'."
+        )
+        self._size_table_to_contents(views_colors_table)
+        # A one-row table comes out taller than its content (the scroll
+        # area's own minimum height), leaving an empty strip: pin it.
+        views_colors_table.setFixedHeight(
+            views_colors_table.horizontalHeader().sizeHint().height()
+            + sum(views_colors_table.rowHeight(r) for r in range(views_colors_table.rowCount()))
+            + 2 * views_colors_table.frameWidth()
+        )
+        views_colors_group = QGroupBox("")
+        QVBoxLayout(views_colors_group).addWidget(views_colors_table)
+
+        # The File List share row on its own line (as before), then the
+        # Level 2 blocks.
+        split_section_outer.addWidget(split_row_widget)
+        split_section_outer.addLayout(self._settings_subsection_flow(
+            flv_scrollbar_block,
+            self._l2_block("Misc colors", views_colors_group, "third"),
+        ))
+        outer.addWidget(self._settings_section("File List View / Statistics View (both views)", split_section_group))
 
         # ---- Statistics View (common to both panes) ----
         # The section's frame holds a flow of Level 2 blocks: "General

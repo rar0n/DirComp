@@ -1875,7 +1875,7 @@ class SettingsTabMixin:
         outer.addWidget(self._settings_section("File List View", date_col_group))
 
         # ---- File List View / Statistics View (both views): what the two
-        # views share. Top line: the File List share -- the same ratio
+        # views share. "General": the File List share -- the same ratio
         # the draggable handle between the two views (Main tab) controls;
         # dragging that handle updates this spin box and vice versa (see
         # _set_file_list_ratio). "Scrollbar Tweaks" (built with the File
@@ -1883,9 +1883,8 @@ class SettingsTabMixin:
         # colors): every scrollbar on the Main tab -- both views'. ----
         split_section_group = QGroupBox("")
         split_section_outer = QVBoxLayout(split_section_group)
-        split_row_widget = QWidget()
-        split_row = QHBoxLayout(split_row_widget)
-        split_row.setContentsMargins(0, 0, 0, 0)
+        split_group = QGroupBox("")
+        split_row = QHBoxLayout(split_group)
         split_row.addWidget(QLabel("File List share:"))
         self.file_list_ratio_spin = SliderDoubleSpinBox()
         self.file_list_ratio_spin.setRange(0.05, 0.95)
@@ -1934,10 +1933,11 @@ class SettingsTabMixin:
         views_colors_group = QGroupBox("")
         QVBoxLayout(views_colors_group).addWidget(views_colors_table)
 
-        # The File List share row on its own line (as before), then the
-        # Level 2 blocks.
-        split_section_outer.addWidget(split_row_widget)
+        # Level 2 blocks: General (the File List share) first, then the
+        # scrollbar ones. Half width: a third is too narrow for the
+        # share's label + spin box + slider.
         split_section_outer.addLayout(self._settings_subsection_flow(
+            self._l2_block("General", split_group, "half"),
             flv_scrollbar_block,
             self._l2_block("Misc colors", views_colors_group, "third"),
         ))

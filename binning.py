@@ -516,19 +516,64 @@ def format_size_exact(num_bytes: float, sig_digits: Optional[int] = None) -> str
     return "0 B"
 
 
-def _log_children(a: float, b: float) -> list[float]:
-    """Edges of the nested-log sub-bins of bin [a, b): a, a+1, a+10,
-    a+100, ... (every a + 10**i still short of the bin's width), then b.
-    I.e. the bin's start ("the most significant digits") is held fixed
-    and the logarithmic progression runs over the offset from it, with
-    1 byte as the smallest step. A bin 1 byte wide (or narrower) has no
+# ------------------------------------------------------------ log bases
+#: logarithm bases offered for logarithmic axes (Settings tab "Log
+#: base"), by key. Powers are rounded to whole numbers (see
+#: log_base_powers), since bytes and file counts are whole numbers.
+LOG_BASES = {"2": 2.0, "e": math.e, "10": 10.0}
+DEFAULT_LOG_BASE = "10"
+
+#: highest power generated -- well past any real file size / count
+_LOG_POWER_LIMIT = 1e19
+
+#: Subdivide logarithmic axis grid: sub-grid lines at these multiples of
+#: a cell's start, per base. Base 10: whole multiples 2..9 (log paper,
+#: one level deep). Base 2 has no whole multiple inside [x, 2x) and
+#: base e only 2x, so those go two levels deeper (quarters / halves).
+LOG_SUBGRID_MULTIPLIERS = {
+    "10": (2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0),
+    "2": (1.25, 1.5, 1.75),
+    "e": (1.5, 2.0, 2.5),
+}
+
+
+def normalize_log_base(base) -> str:
+    base = str(base)
+    return base if base in LOG_BASES else DEFAULT_LOG_BASE
+
+
+@lru_cache(maxsize=None)
+def log_base_powers(base: str) -> tuple:
+    """1, b, b^2, ... rounded to whole numbers (strictly increasing, up
+    to past _LOG_POWER_LIMIT): base 10 -> 1, 10, 100, ...; base 2 ->
+    1, 2, 4, 8, ...; base e -> 1, 3, 7, 20, 55, 148, ..."""
+    b = LOG_BASES[normalize_log_base(base)]
+    out = []
+    k = 0
+    while True:
+        p = float(round(b ** k))
+        if not out or p > out[-1]:
+            out.append(p)
+        if p > _LOG_POWER_LIMIT:
+            break
+        k += 1
+    return tuple(out)
+
+
+def _log_children(a: float, b: float, base: str) -> list[float]:
+    """Edges of the nested-log sub-bins of bin [a, b): a, a+1, a+B1,
+    a+B2, ... (every whole power of the base still short of the bin's
+    width), then b -- base 10: a, a+1, a+10, a+100, ... I.e. the bin's
+    start ("the most significant digits") is held fixed and the
+    logarithmic progression runs over the offset from it, with 1 byte
+    as the smallest step. A bin 1 byte wide (or narrower) has no
     children -- it's a leaf, holding exactly one byte value."""
     width = b - a
     edges = [a]
-    p = 1.0
-    while p < width:
+    for p in log_base_powers(base):
+        if p >= width:
+            break
         edges.append(a + p)
-        p *= 10.0
     edges.append(b)
     return edges
 
@@ -538,34 +583,41 @@ def _log_children(a: float, b: float) -> list[float]:
 _LOG_MAX_LEVELS = 1000
 
 
-def _decade_of(value: float) -> int:
-    """Level-0 bin index of `value`: 0 for [0, 10), d for [10**d, 10**(d+1))."""
-    if value < 10.0:
-        return 0
-    d = int(math.floor(math.log10(value)))
-    # log10 rounding can land one off right at a power of ten
-    while d > 0 and 10.0 ** d > value:
-        d -= 1
-    while d < 300 and 10.0 ** (d + 1) <= value:
-        d += 1
-    return min(d, 300)
+@lru_cache(maxsize=None)
+def _level0_edges(base: str) -> tuple:
+    """Level-0 bin edges: 0, then every whole power of the base from b
+    up -- base 10: 0, 10, 100, ... (the first bin swallows everything
+    below b, incl. 0 where log is undefined)."""
+    return (0.0,) + log_base_powers(base)[1:]
 
 
-def _decade_bin(d: int) -> tuple[float, float]:
-    return (0.0, 10.0) if d <= 0 else (10.0 ** d, 10.0 ** (d + 1))
+def _decade_of(value: float, base: str) -> int:
+    """Level-0 bin index of `value` (bin d = [edges[d], edges[d+1]))."""
+    edges = _level0_edges(base)
+    d = bisect.bisect_right(edges, value) - 1
+    return max(0, min(len(edges) - 2, d))
+
+
+def _decade_bin(d: int, base: str) -> tuple[float, float]:
+    edges = _level0_edges(base)
+    d = max(0, min(len(edges) - 2, d))
+    return edges[d], edges[d + 1]
+
+
+def _decade_count(base: str) -> int:
+    return len(_level0_edges(base)) - 1
 
 
 @lru_cache(maxsize=8192)
-def _log_path(value: float):
+def _log_path(value: float, base: str):
     """Nested-log path of `value` (>= 0), level 0 first, down to its
     1-byte leaf: bins[k] = (start, end) of its level-k bin."""
-    d = _decade_of(value)
-    a, b = _decade_bin(d)
+    a, b = _decade_bin(_decade_of(value, base), base)
     bins = [(a, b)]
     for _ in range(_LOG_MAX_LEVELS):
         if b - a <= 1.0:
             break
-        edges = _log_children(a, b)
+        edges = _log_children(a, b, base)
         j = bisect.bisect_right(edges, value) - 1
         j = max(0, min(len(edges) - 2, j))
         a, b = edges[j], edges[j + 1]
@@ -575,74 +627,76 @@ def _log_path(value: float):
 
 # How many bins there are on a nesting level, counted exactly (Python
 # ints). A bin's sub-structure depends only on its width (its children
-# are start + 1, start + 10, ... whatever the start), so counts are
-# memoized per width.
+# are start + 1, start + b, ... whatever the start), so counts are
+# memoized per width (and base).
 @lru_cache(maxsize=None)
-def _child_widths(width: float) -> tuple:
-    edges = _log_children(0.0, width)
+def _child_widths(width: float, base: str) -> tuple:
+    edges = _log_children(0.0, width, base)
     return tuple(edges[i + 1] - edges[i] for i in range(len(edges) - 1))
 
 
 @lru_cache(maxsize=None)
-def _count_bins(width: float, levels: int) -> int:
+def _count_bins(width: float, levels: int, base: str) -> int:
     """Number of bins `levels` levels below a bin `width` bytes wide (a
     1-byte leaf counts as one bin on every deeper level)."""
     if levels <= 0 or width <= 1.0:
         return 1
-    return sum(_count_bins(cw, levels - 1) for cw in _child_widths(width))
+    return sum(_count_bins(cw, levels - 1, base) for cw in _child_widths(width, base))
 
 
-def _decade_width(d: int) -> float:
-    a, b = _decade_bin(d)
+def _decade_width(d: int, base: str) -> float:
+    a, b = _decade_bin(d, base)
     return b - a
 
 
 @lru_cache(maxsize=None)
-def _decade_prefix(d: int, level: int) -> int:
-    """Number of level-`level` bins below decade `d`."""
+def _decade_prefix(d: int, level: int, base: str) -> int:
+    """Number of level-`level` bins below level-0 bin `d`."""
     if d <= 0:
         return 0
-    return _decade_prefix(d - 1, level) + _count_bins(_decade_width(d - 1), level)
+    return _decade_prefix(d - 1, level, base) + _count_bins(_decade_width(d - 1, base), level, base)
 
 
 @lru_cache(maxsize=65536)
-def _level_index(value: float, level: int):
+def _level_index(value: float, level: int, base: str):
     """(index, start, end) of the level-`level` bin holding `value`
     (>= 0), index counted exactly from the first bin [0, ...)."""
-    d = _decade_of(value)
-    idx = _decade_prefix(d, level)
-    a, b = _decade_bin(d)
+    d = _decade_of(value, base)
+    idx = _decade_prefix(d, level, base)
+    a, b = _decade_bin(d, base)
     for k in range(level):
         if b - a <= 1.0:
             break
-        edges = _log_children(a, b)
+        edges = _log_children(a, b, base)
         j = bisect.bisect_right(edges, value) - 1
         j = max(0, min(len(edges) - 2, j))
         below = level - k - 1
         for i in range(j):
-            idx += _count_bins(edges[i + 1] - edges[i], below)
+            idx += _count_bins(edges[i + 1] - edges[i], below, base)
         a, b = edges[j], edges[j + 1]
     return idx, a, b
 
 
-def _level_bin_by_index(index: int, level: int) -> tuple[float, float]:
-    """Inverse of _level_index: the level-`level` bin with that index."""
+def _level_bin_by_index(index: int, level: int, base: str) -> tuple[float, float]:
+    """Inverse of _level_index: the level-`level` bin with that index
+    (clamped to the last bin)."""
     d = 0
-    while d < 300:
-        c = _count_bins(_decade_width(d), level)
+    last = _decade_count(base) - 1
+    while d < last:
+        c = _count_bins(_decade_width(d, base), level, base)
         if index < c:
             break
         index -= c
         d += 1
-    a, b = _decade_bin(d)
+    a, b = _decade_bin(d, base)
     for k in range(level):
         if b - a <= 1.0:
             break
-        edges = _log_children(a, b)
+        edges = _log_children(a, b, base)
         below = level - k - 1
         j = len(edges) - 2
         for i in range(len(edges) - 1):
-            c = _count_bins(edges[i + 1] - edges[i], below)
+            c = _count_bins(edges[i + 1] - edges[i], below, base)
             if index < c:
                 j = i
                 break
@@ -660,9 +714,11 @@ class SizeAxis(BinAxis):
     `set_log_mode` (off by default, matching the original behaviour):
     - Off (linear): the original behaviour above - bin *widths* are
       powers of 10, evenly spaced.
-    - On (logarithmic, nested): level 0 is one bin per order of
-      magnitude - [0, 10), [10, 100), [100, 1000), ... (the first bin
-      swallows everything below 10, incl. 0 where log is undefined).
+    - On (logarithmic, nested): level 0 is one bin per power of the
+      log base (`log_base`, see LOG_BASES; base 10 below) - [0, 10),
+      [10, 100), [100, 1000), ... (the first bin swallows everything
+      below 10, incl. 0 where log is undefined). Base 2 steps by
+      doubling, base e by powers of e rounded to whole bytes.
       Zooming in on a bin splits it again, logarithmically over the
       offset from its start (see _log_children): [1 GB, 10 GB) becomes
       1 GB + [0, 1 B), [1 B, 10 B), [10 B, 100 B), ..., [100 MB, 1 GB),
@@ -694,11 +750,19 @@ class SizeAxis(BinAxis):
         self._max_hint = max_hint
         self._steps = _generate_size_steps(max_hint)
         self.log_mode = False
-        #: current nested-log zoom level (0 = one bin per decade)
+        #: logarithm base key (see LOG_BASES) for log mode's bins
+        self.log_base = DEFAULT_LOG_BASE
+        #: current nested-log zoom level (0 = one bin per power of the base)
         self.level = 0
 
     def set_log_mode(self, enabled: bool):
         self.log_mode = bool(enabled)
+        self.level = 0
+
+    def set_log_base(self, base):
+        """Logarithm base of log mode's bins: "2", "e" or "10" (see
+        LOG_BASES). Back to the coarsest zoom level."""
+        self.log_base = normalize_log_base(base)
         self.level = 0
 
     @property
@@ -729,26 +793,26 @@ class SizeAxis(BinAxis):
     def _log_bin_at(self, value: float, level: int) -> tuple[float, float]:
         """The bin of nesting `level` holding `value` (a leaf stops the
         descent early -- it's its own bin at every deeper level)."""
-        path = _log_path(max(0.0, float(value)))
+        path = _log_path(max(0.0, float(value)), self.log_base)
         return path[min(level, len(path) - 1)]
 
     def _delta_at(self, value: float, ref: float, level: int) -> float:
-        iv, av, bv = _level_index(max(0.0, float(value)), level)
-        ir, ar, br = _level_index(max(0.0, float(ref)), level)
+        iv, av, bv = _level_index(max(0.0, float(value)), level, self.log_base)
+        ir, ar, br = _level_index(max(0.0, float(ref)), level, self.log_base)
         fv = min(1.0, max(0.0, (max(0.0, value) - av) / (bv - av)))
         fr = min(1.0, max(0.0, (max(0.0, ref) - ar) / (br - ar)))
         return float(iv - ir) + (fv - fr)
 
     def _from_delta_at(self, ref: float, delta: float, level: int) -> float:
         ref = max(0.0, float(ref))
-        ir, a, b = _level_index(ref, level)
+        ir, a, b = _level_index(ref, level, self.log_base)
         t = (ref - a) / (b - a) + delta
         k = math.floor(t)
         frac = t - k
         target = ir + int(k)
         if target < 0:
             return 0.0
-        a, b = _level_bin_by_index(target, level)
+        a, b = _level_bin_by_index(target, level, self.log_base)
         return a + min(1.0, max(0.0, frac)) * (b - a)
 
     def axis_delta(self, value: float, ref: float) -> float:
@@ -767,7 +831,7 @@ class SizeAxis(BinAxis):
         self.level = 0
 
     def _can_descend(self, value: float) -> bool:
-        return len(_log_path(max(0.0, float(value)))) - 1 > self.level
+        return len(_log_path(max(0.0, float(value)), self.log_base)) - 1 > self.level
 
     def relevel(self, view_start: float, view_end: float, pivot: Optional[float] = None):
         """Pick the zoom level for the view [view_start, view_end] after
@@ -864,12 +928,12 @@ class SizeAxis(BinAxis):
             pa, _pb = self._log_bin_at(value, step[1] - 1)
             if abs(value - pa) < 0.5:
                 return format_size_exact(value)
-            # Offsets are powers of ten, exact in decimal units; in binary
-            # units they'd read "+9.5367431640625 MiB", so they get 4
-            # significant digits there (still all distinct).
-            if BINARY_SIZES:
-                return "+" + format_size_exact(value - pa, sig_digits=4)
-            return "+" + format_size_exact(value - pa)
+            # Offsets are (whole-number) powers of the log base -- all
+            # distinct, so 4 significant digits are plenty and keep
+            # base 2 / base e / binary units readable ("+1.049 MB" rather
+            # than "+1.048576 MB"); base 10 in decimal units is exact
+            # anyway ("+10 MB"). Hover/Chart readouts stay exact.
+            return "+" + format_size_exact(value - pa, sig_digits=4)
         return format_size_si(value)
 
     def format_hover_value(self, value: float, step: Any) -> str:
@@ -881,7 +945,8 @@ class SizeAxis(BinAxis):
         return f"{self.format_hover_value(start, step)} - {self.format_hover_value(end, step)}"
 
     def log_subgrid_fractions(self, start: float, end: float, step: Any) -> list:
-        """Log-paper pattern, one layer deep: lines at 2x, 3x, ... 9x the
+        """Log-paper pattern: lines at LOG_SUBGRID_MULTIPLIERS (base 10:
+        2x, 3x, ... 9x; base 2: 1.25x/1.5x/1.75x; base e: 1.5x/2x/2.5x) the
         bin's lower bound, measured from its parent bin's start (so
         [1 GB, 10 GB) gets 2..9 GB, and the nested bin
         1 GB + [100 MB, 1 GB) gets 1 GB + 200..900 MB), each placed
@@ -899,10 +964,10 @@ class SizeAxis(BinAxis):
             return []
         span = math.log(hi / lo)
         out = []
-        for k in range(2, 10):
-            if k * lo >= hi - 1e-9:
+        for m in LOG_SUBGRID_MULTIPLIERS[self.log_base]:
+            if m * lo >= hi - 1e-9:
                 break
-            out.append(math.log(k) / span)
+            out.append(math.log(m) / span)
         return out
 
     def format_bin(self, start: float, end: float) -> str:
@@ -913,7 +978,8 @@ class SizeAxis(BinAxis):
     def format_step(self, step: Any) -> str:
         if self._is_log(step):
             if step[1] == 0:
-                return "1 bin/decade (log)"
+                return {"10": "1 bin/decade (log10)", "2": "1 bin/doubling (log2)",
+                        "e": "1 bin/power of e (ln)"}[self.log_base]
             return f"log within {format_size_exact(step[2])} - {format_size_exact(step[3])}"
         return format_size_si(step)
 

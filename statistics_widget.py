@@ -448,6 +448,9 @@ class TimelineWidget(QWidget):
         #: TimeAxis and is simply held onto (unapplied) if the metric
         #: gets switched away from size and back.
         self.log_size_axis: bool = False
+        #: logarithm base ("2", "e" or "10") of every logarithmic axis:
+        #: the log size axis's bins and the log count axis's ticks
+        self.log_base: str = binning.DEFAULT_LOG_BASE
         #: draw a log-paper sub-grid in logarithmic axes' grid cells
         #: (see set_subdivide_log_grid)
         self.subdivide_log_grid: bool = False
@@ -555,6 +558,7 @@ class TimelineWidget(QWidget):
             self.axis = axis
         elif metric == "size":
             self.axis = SizeAxis()
+            self.axis.set_log_base(self.log_base)
             self.axis.set_log_mode(self.log_size_axis)
         else:
             self.axis = TimeAxis()
@@ -683,6 +687,22 @@ class TimelineWidget(QWidget):
                 use_week_number=self.strip_use_week_number,
             )
         return self.axis.format_tick(value, step)
+
+    def set_log_base(self, base):
+        """Settings tab "Log base" ("2", "e" or "10"): base of the log
+        size axis's bins (back to the coarsest level, view kept) and of
+        the log count axis's ticks."""
+        base = binning.normalize_log_base(base)
+        if base == self.log_base:
+            return
+        self.log_base = base
+        if isinstance(self.axis, SizeAxis):
+            self.axis.set_log_base(base)
+            if self.view_start is not None:
+                self.view_start, self.view_end = self.axis.relevel(self.view_start, self.view_end)
+        if self.view_start is not None:
+            self._recompute_bins()
+        self.update()
 
     def set_subdivide_log_grid(self, enabled: bool):
         """Settings tab "Subdivide logarithmic axis grid": a log-paper
@@ -1384,15 +1404,18 @@ class TimelineWidget(QWidget):
         if max_count <= 0:
             return [0.0]
         if self.log_scale:
-            top_decade = max(0, math.ceil(math.log10(max_count)))
-            decades = list(range(0, top_decade + 1))
-            if len(decades) > Y_AXIS_MAX_TICKS - 1:
-                keep_every = max(1, math.ceil(len(decades) / (Y_AXIS_MAX_TICKS - 1)))
-                decades = decades[::keep_every]
-                if decades[-1] != top_decade:
-                    decades.append(top_decade)
+            # Powers of the Log base (whole numbers -- base e: 1, 3, 7,
+            # 20, ... -- see binning.log_base_powers), thinned out evenly
+            # when there are too many.
+            powers = [p for p in binning.log_base_powers(self.log_base) if p <= max_count]
+            if len(powers) > Y_AXIS_MAX_TICKS - 1:
+                keep_every = max(1, math.ceil(len(powers) / (Y_AXIS_MAX_TICKS - 1)))
+                kept = powers[::keep_every]
+                if kept[-1] != powers[-1]:
+                    kept.append(powers[-1])
+                powers = kept
             ticks = {0.0, float(max_count)}
-            ticks.update(float(10 ** d) for d in decades if 0 < 10 ** d <= max_count)
+            ticks.update(powers)
             return sorted(ticks)
         raw_step = max_count / (Y_AXIS_MAX_TICKS - 1)
         magnitude = 10 ** math.floor(math.log10(raw_step))
@@ -1422,15 +1445,19 @@ class TimelineWidget(QWidget):
             major_ys.append(y)
             painter.drawLine(rect.left(), y, rect.right(), y)
         if self.subdivide_log_grid and self.log_scale and max_count > 1:
-            # "Subdivide logarithmic axis grid": 1..9 x 10^d between the
-            # decade gridlines (k = 1 too, for decades the major ticks
-            # skipped when thinned out), same pen; a line too close to
-            # another one is left out.
+            # "Subdivide logarithmic axis grid": the Log base's sub-grid
+            # multiples (binning.LOG_SUBGRID_MULTIPLIERS, e.g. 2..9 for
+            # base 10) of each power, between the power gridlines -- and
+            # the powers themselves the major ticks skipped when thinned
+            # out. Same pen; a line too close to another one is left out.
             majors = set(major)
+            mults = (1.0,) + binning.LOG_SUBGRID_MULTIPLIERS[self.log_base]
             last_y = None
-            for d in range(0, math.ceil(math.log10(max_count)) + 1):
-                for k in range(1, 10):
-                    v = float(k * 10 ** d)
+            for p in binning.log_base_powers(self.log_base):
+                if p >= max_count:
+                    break
+                for k in mults:
+                    v = k * p
                     if v >= max_count:
                         break
                     if v in majors:

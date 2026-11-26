@@ -2069,11 +2069,31 @@ class SettingsTabMixin:
         stats_options_outer.addLayout(stats_week_row)
 
         stats_subgrid_row = QHBoxLayout()
+        stats_subgrid_row.addWidget(QLabel("Log base:"), 0, Qt.AlignVCenter)
+        self.log_base_combo = QComboBox()
+        for key, label in (("2", "Base 2"), ("e", "Base e"), ("10", "Base 10")):
+            self.log_base_combo.addItem(label, key)
+        self.log_base_combo.setCurrentIndex(max(0, self.log_base_combo.findData(self._log_base)))
+        self.log_base_combo.setToolTip(
+            "Base of every logarithmic axis in both panes' Statistics views:\n"
+            "- Log size axis: one bin per power of the base (base 10: 10 B, 100 B, \n"
+            "  1 kB, ...; base 2: 2 B, 4 B, 8 B, ...; base e: 3 B, 7 B, 20 B, ...), \n"
+            "  and the sub-bins you get when zooming in step by the same powers.\n"
+            "- Log scale (count axis): gridlines at the powers of the base.\n"
+            "Powers of e are rounded to whole bytes/counts (1, 3, 7, 20, 55, ...)."
+        )
+        self.log_base_combo.currentIndexChanged.connect(self._on_log_base_changed)
+        stats_subgrid_row.addWidget(self.log_base_combo, 0, Qt.AlignVCenter)
+        stats_subgrid_row.addSpacing(16)
         self.subdivide_log_grid_cb = QCheckBox("Subdivide logarithmic axis grid")
         self.subdivide_log_grid_cb.setToolTip(
             "Adds a logarithmic sub-grid inside each grid cell of a logarithmic \n"
-            "axis, one layer deep, like log paper (lines at 2, 3, ... 9 times the \n"
-            "cell's start), in the grid color:\n"
+            "axis, like log paper, in the grid color -- lines at these multiples \n"
+            "of the cell's start, by Log base:\n"
+            "  Base 10: 2, 3, ... 9 (one level deep)\n"
+            "  Base 2: 1.25, 1.5, 1.75 (two levels deep)\n"
+            "  Base e: 1.5, 2, 2.5 (two levels deep)\n"
+            "Where:\n"
             "- the size axis with Log size axis on: inside each bin,\n"
             "- the vertical (count) axis with Log scale on: between its decades.\n"
             "Lines that would crowd each other are left out."
@@ -2128,6 +2148,7 @@ class SettingsTabMixin:
             pane.timeline.set_strip_abbreviate_names(self.common_strip_abbreviate_cb.isChecked())
             pane.timeline.set_strip_use_week_number(self.common_strip_week_number_cb.isChecked())
             pane.timeline.set_subdivide_log_grid(self._subdivide_log_grid)
+            pane.timeline.set_log_base(self._log_base)
             pane.tl_strip_units_cb = self.common_strip_units_cb
             pane.tl_strip_names_cb = self.common_strip_names_cb
             pane.tl_strip_abbreviate_cb = self.common_strip_abbreviate_cb
@@ -2874,6 +2895,11 @@ class SettingsTabMixin:
         self.common_tick_angle_spin.setEnabled(not checked)
         for pane in (self.left, self.right):
             pane.timeline.set_auto_tick_angle(checked)
+
+    def _on_log_base_changed(self, _index):
+        self._log_base = self.log_base_combo.currentData() or "10"
+        for pane in (self.left, self.right):
+            pane.timeline.set_log_base(self._log_base)
 
     def _on_subdivide_log_grid_changed(self, checked):
         self._subdivide_log_grid = bool(checked)

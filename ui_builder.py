@@ -321,6 +321,10 @@ class UiBuilderMixin(SettingsTabMixin, ThemeOpsMixin, PaneBuilderMixin, Responsi
             # Settings tab -> Statistics View -> General options:
             # "Subdivide logarithmic axis grid"
             self._subdivide_log_grid = False
+        if not hasattr(self, "_log_base"):
+            # Settings tab -> Statistics View -> General options:
+            # "Log base" of every logarithmic axis ("2", "e" or "10")
+            self._log_base = "10"
         if not hasattr(self, "_file_list_ratio"):
             # Fraction of each pane's vertical space the File List view
             # gets, the rest going to the Statistics view below it --

@@ -46,10 +46,25 @@ class BinAxis(ABC):
     #: range the records' values actually cover.
     fixed_range: Optional[tuple] = None
 
+    #: True to anchor each x-axis label at its bin's start (the tick
+    #: the value belongs to) instead of centering it under the bin --
+    #: SizeAxis, whose bins are labelled by their lower boundary.
+    label_at_bin_start: bool = False
+
     #: True when axis space (to_axis_space) isn't a plain linear copy
     #: of value space -- the widget then zooms in axis space, so a wheel
     #: step zooms the same visual amount wherever the view sits.
     nonlinear: bool = False
+
+    def reset_level(self):
+        """Back to the coarsest zoom level (only SizeAxis's nested log
+        mode has levels; default no-op)."""
+
+    def relevel(self, view_start: float, view_end: float, pivot: Optional[float] = None):
+        """Adjust the zoom level for a new view after a zoom and return
+        the (possibly adjusted) view -- see SizeAxis.relevel. Default:
+        no levels, view unchanged."""
+        return view_start, view_end
 
     def view_padding(self, span: float) -> float:
         """Empty room added either side of the data when the view is
@@ -507,68 +522,97 @@ def _decade_bin(d: int) -> tuple[float, float]:
 @lru_cache(maxsize=8192)
 def _log_path(value: float):
     """Nested-log path of `value` (>= 0), level 0 first, down to its
-    1-byte leaf: (bins, s, e) where bins[k] = (start, end, index, axis
-    width) of its level-k bin (index = decade for level 0, else the
-    child index within the parent), and s[k]/e[k] are the axis
-    distances from `value` to that bin's start/end. s/e are summed up
-    from the leaf, so they keep full precision however deep it is."""
+    1-byte leaf: bins[k] = (start, end) of its level-k bin."""
     d = _decade_of(value)
     a, b = _decade_bin(d)
-    w = 1.0
-    bins = [(a, b, d, w)]
+    bins = [(a, b)]
     for _ in range(_LOG_MAX_LEVELS):
         if b - a <= 1.0:
             break
         edges = _log_children(a, b)
-        n = len(edges) - 1
         j = bisect.bisect_right(edges, value) - 1
-        j = max(0, min(n - 1, j))
+        j = max(0, min(len(edges) - 2, j))
         a, b = edges[j], edges[j + 1]
-        w /= n
-        bins.append((a, b, j, w))
-    a, b, _j, w = bins[-1]
-    frac = min(1.0, max(0.0, (value - a) / (b - a)))
-    s_leaf = frac * w
-    e_leaf = min(1.0, max(0.0, (b - value) / (b - a))) * w
-    s = [0.0] * len(bins)
-    e = [0.0] * len(bins)
-    s[-1], e[-1] = s_leaf, e_leaf
-    for k in range(len(bins) - 2, -1, -1):
-        j, cw = bins[k + 1][2], bins[k + 1][3]
-        n = len(_log_children(bins[k][0], bins[k][1])) - 1
-        s[k] = j * cw + s[k + 1]
-        e[k] = (n - 1 - j) * cw + e[k + 1]
-    return tuple(bins), tuple(s), tuple(e)
+        bins.append((a, b))
+    return tuple(bins)
 
 
-def _descend_from_start(a: float, b: float, w: float, off: float) -> float:
-    """Value at axis distance `off` from the start of bin [a, b) (axis
-    width `w`)."""
-    for _ in range(_LOG_MAX_LEVELS):
+# How many bins there are on a nesting level, counted exactly (Python
+# ints). A bin's sub-structure depends only on its width (its children
+# are start + 1, start + 10, ... whatever the start), so counts are
+# memoized per width.
+@lru_cache(maxsize=None)
+def _child_widths(width: float) -> tuple:
+    edges = _log_children(0.0, width)
+    return tuple(edges[i + 1] - edges[i] for i in range(len(edges) - 1))
+
+
+@lru_cache(maxsize=None)
+def _count_bins(width: float, levels: int) -> int:
+    """Number of bins `levels` levels below a bin `width` bytes wide (a
+    1-byte leaf counts as one bin on every deeper level)."""
+    if levels <= 0 or width <= 1.0:
+        return 1
+    return sum(_count_bins(cw, levels - 1) for cw in _child_widths(width))
+
+
+def _decade_width(d: int) -> float:
+    a, b = _decade_bin(d)
+    return b - a
+
+
+@lru_cache(maxsize=None)
+def _decade_prefix(d: int, level: int) -> int:
+    """Number of level-`level` bins below decade `d`."""
+    if d <= 0:
+        return 0
+    return _decade_prefix(d - 1, level) + _count_bins(_decade_width(d - 1), level)
+
+
+@lru_cache(maxsize=65536)
+def _level_index(value: float, level: int):
+    """(index, start, end) of the level-`level` bin holding `value`
+    (>= 0), index counted exactly from the first bin [0, ...)."""
+    d = _decade_of(value)
+    idx = _decade_prefix(d, level)
+    a, b = _decade_bin(d)
+    for k in range(level):
         if b - a <= 1.0:
             break
         edges = _log_children(a, b)
-        n = len(edges) - 1
-        cw = w / n
-        j = max(0, min(n - 1, int(off // cw)))
-        off -= j * cw
-        a, b, w = edges[j], edges[j + 1], cw
-    return a + min(1.0, max(0.0, off / w)) * (b - a)
+        j = bisect.bisect_right(edges, value) - 1
+        j = max(0, min(len(edges) - 2, j))
+        below = level - k - 1
+        for i in range(j):
+            idx += _count_bins(edges[i + 1] - edges[i], below)
+        a, b = edges[j], edges[j + 1]
+    return idx, a, b
 
 
-def _descend_from_end(a: float, b: float, w: float, off: float) -> float:
-    """Value at axis distance `off` back from the end of bin [a, b)."""
-    for _ in range(_LOG_MAX_LEVELS):
+def _level_bin_by_index(index: int, level: int) -> tuple[float, float]:
+    """Inverse of _level_index: the level-`level` bin with that index."""
+    d = 0
+    while d < 300:
+        c = _count_bins(_decade_width(d), level)
+        if index < c:
+            break
+        index -= c
+        d += 1
+    a, b = _decade_bin(d)
+    for k in range(level):
         if b - a <= 1.0:
             break
         edges = _log_children(a, b)
-        n = len(edges) - 1
-        cw = w / n
-        back = max(0, min(n - 1, int(off // cw)))
-        off -= back * cw
-        j = n - 1 - back
-        a, b, w = edges[j], edges[j + 1], cw
-    return b - min(1.0, max(0.0, off / w)) * (b - a)
+        below = level - k - 1
+        j = len(edges) - 2
+        for i in range(len(edges) - 1):
+            c = _count_bins(edges[i + 1] - edges[i], below)
+            if index < c:
+                j = i
+                break
+            index -= c
+        a, b = edges[j], edges[j + 1]
+    return a, b
 
 
 class SizeAxis(BinAxis):
@@ -588,11 +632,10 @@ class SizeAxis(BinAxis):
       1 GB + [0, 1 B), [1 B, 10 B), [10 B, 100 B), ..., [100 MB, 1 GB),
       then [2 GB, 10 GB). Each of those splits the same way when zoomed
       in on, and so on down to 1-byte leaf bins.
-      Every bin of a level gets the same on-screen width: axis space
-      (to_axis_space) gives each level-0 bin width 1.0, and each child
-      an equal 1/n share of its parent's width, all the way down. Which
-      level is shown is picked from the view (choose_step): the level
-      below whatever bin fills at least half the view.
+      Every bin of the current zoom level gets the same on-screen width
+      (one axis unit each, see the nested log helpers), wherever it is,
+      so panning never changes bin widths. The level changes only on
+      zoom (relevel): one deeper once fewer than 2 bins are in view.
 
     The log step token is ("log", level, parent_start, parent_end):
     level 0 = decade bins (parent None); parent is the bin under the
@@ -601,12 +644,13 @@ class SizeAxis(BinAxis):
 
     _LOG_TOKEN = "log"
 
-    #: a bin taking up at least this share of the view's (axis-space)
-    #: width is split into its children (see choose_step)
-    _LOG_SPLIT_SHARE = 0.5
+    #: zoom in until the view shows fewer than this many bins of the
+    #: current level and it splits into the next level (see relevel)
+    _LOG_SPLIT_SPAN = 2.0
 
     min_span = 1.0  # 1 byte
     equal_span_pad = 1024.0
+    label_at_bin_start = True
     min_value = 0.0  # file sizes can't go negative - clamp view/bins at 0
 
     def __init__(self, max_hint: float = 1_000_000_000_000.0):
@@ -614,9 +658,12 @@ class SizeAxis(BinAxis):
         self._max_hint = max_hint
         self._steps = _generate_size_steps(max_hint)
         self.log_mode = False
+        #: current nested-log zoom level (0 = one bin per decade)
+        self.level = 0
 
     def set_log_mode(self, enabled: bool):
         self.log_mode = bool(enabled)
+        self.level = 0
 
     @property
     def nonlinear(self) -> bool:
@@ -629,15 +676,16 @@ class SizeAxis(BinAxis):
         return self._steps
 
     # -- nested log helpers ------------------------------------------------
-    # Precision note: nesting can run 40+ levels deep (e.g. the
-    # [2 GB, 10 GB) tail of [1 GB, 10 GB) only peels one leading-digit
-    # step per level), so a deep bin's axis width can be far below what
-    # an absolute float position (~1e-15 at position 10) resolves. The
-    # widget therefore never works with absolute positions in this mode:
-    # it asks for axis *distances* (axis_delta / from_axis_delta), which
-    # are built from the two values' common ancestor bin and their own
-    # distance to that bin's edges -- sums of positive terms that keep
-    # full relative precision however deep the view is.
+    # On-screen mapping: at the current zoom level L (self.level), every
+    # level-L bin is exactly 1.0 axis unit wide, wherever it is -- so
+    # panning/scrolling never changes bin widths, and a bin's children
+    # don't depend on how many siblings it has. Positions are the bin's
+    # exact (Python int) index on that level plus a linear fraction
+    # inside the bin. Nesting can run 100+ levels deep, so indexes can
+    # get astronomically large; the widget therefore only ever asks for
+    # *distances* (axis_delta / from_axis_delta), whose integer part is
+    # exact and whose fractional part keeps full float precision.
+    # The level only changes on zoom (see relevel), never on pan.
     @classmethod
     def _is_log(cls, step: Any) -> bool:
         return isinstance(step, tuple) and len(step) > 0 and step[0] == cls._LOG_TOKEN
@@ -645,102 +693,116 @@ class SizeAxis(BinAxis):
     def _log_bin_at(self, value: float, level: int) -> tuple[float, float]:
         """The bin of nesting `level` holding `value` (a leaf stops the
         descent early -- it's its own bin at every deeper level)."""
-        path = _log_path(max(0.0, float(value)))[0]
-        a, b, _j, _w = path[min(level, len(path) - 1)]
-        return a, b
+        path = _log_path(max(0.0, float(value)))
+        return path[min(level, len(path) - 1)]
+
+    def _delta_at(self, value: float, ref: float, level: int) -> float:
+        iv, av, bv = _level_index(max(0.0, float(value)), level)
+        ir, ar, br = _level_index(max(0.0, float(ref)), level)
+        fv = min(1.0, max(0.0, (max(0.0, value) - av) / (bv - av)))
+        fr = min(1.0, max(0.0, (max(0.0, ref) - ar) / (br - ar)))
+        return float(iv - ir) + (fv - fr)
+
+    def _from_delta_at(self, ref: float, delta: float, level: int) -> float:
+        ref = max(0.0, float(ref))
+        ir, a, b = _level_index(ref, level)
+        t = (ref - a) / (b - a) + delta
+        k = math.floor(t)
+        frac = t - k
+        target = ir + int(k)
+        if target < 0:
+            return 0.0
+        a, b = _level_bin_by_index(target, level)
+        return a + min(1.0, max(0.0, frac)) * (b - a)
 
     def axis_delta(self, value: float, ref: float) -> float:
         if not self.log_mode:
             return value - ref
-        pv, sv, ev = _log_path(max(0.0, float(value)))
-        pr, sr, er = _log_path(max(0.0, float(ref)))
-        k = 0
-        n_common = min(len(pv), len(pr))
-        while k < n_common and pv[k][2] == pr[k][2]:
-            k += 1
-        if k >= n_common:
-            # same leaf bin
-            a, b, _j, w = pv[-1]
-            return (max(0.0, value) - max(0.0, ref)) / (b - a) * w
-        w = pv[k][3]
-        jv, jr = pv[k][2], pr[k][2]
-        if jv > jr:
-            return er[k] + (jv - jr - 1) * w + sv[k]
-        return -(ev[k] + (jr - jv - 1) * w + sr[k])
+        return self._delta_at(value, ref, self.level)
 
     def from_axis_delta(self, ref: float, delta: float) -> float:
         if not self.log_mode:
             return ref + delta
-        ref = max(0.0, float(ref))
         if delta == 0:
-            return ref
-        path, s, e = _log_path(ref)
-        last = len(path) - 1
-        if delta > 0:
-            for k in range(last, -1, -1):
-                if delta < e[k]:
-                    break
-            else:
-                # past the end of ref's decade
-                off = delta - e[0]
-                steps = math.floor(off)
-                dd = min(path[0][2] + 1 + steps, 300)
-                a, b = _decade_bin(dd)
-                return _descend_from_start(a, b, 1.0, off - steps)
-            if k == last:
-                a, b, _j, w = path[k]
-                return ref + delta / w * (b - a)
-            ca, cb, cj, cw = path[k + 1]
-            off = delta - e[k + 1]
-            steps = math.floor(off / cw)
-            edges = _log_children(path[k][0], path[k][1])
-            j = cj + 1 + steps
-            if j > len(edges) - 2:
-                return path[k][1]  # landed on (or rounded past) bin k's end
-            return _descend_from_start(edges[j], edges[j + 1], cw, off - steps * cw)
-        dist = -delta
-        for k in range(last, -1, -1):
-            if dist <= s[k]:
-                break
-        else:
-            off = dist - s[0]
-            steps = math.floor(off)
-            dd = path[0][2] - 1 - steps
-            if dd < 0:
-                return 0.0
-            a, b = _decade_bin(dd)
-            return _descend_from_end(a, b, 1.0, off - steps)
-        if k == last:
-            a, b, _j, w = path[k]
-            return ref - dist / w * (b - a)
-        ca, cb, cj, cw = path[k + 1]
-        off = dist - s[k + 1]
-        steps = math.floor(off / cw)
-        edges = _log_children(path[k][0], path[k][1])
-        j = cj - 1 - steps
-        if j < 0:
-            return path[k][0]  # landed on (or rounded past) bin k's start
-        return _descend_from_end(edges[j], edges[j + 1], cw, off - steps * cw)
+            return max(0.0, float(ref))
+        return self._from_delta_at(ref, delta, self.level)
+
+    def reset_level(self):
+        self.level = 0
+
+    def _can_descend(self, value: float) -> bool:
+        return len(_log_path(max(0.0, float(value)))) - 1 > self.level
+
+    def relevel(self, view_start: float, view_end: float, pivot: Optional[float] = None):
+        """Pick the zoom level for the view [view_start, view_end] after
+        a zoom (never called on pan, so panning keeps both level and bin
+        width): one level deeper while the view shows fewer than 2 bins
+        of the current level, one level up while it shows 2 or more
+        bins of the level above. Returns the (possibly adjusted) view:
+        changing level changes the mapping, so with a `pivot` the view
+        is re-fitted to keep the pivot value at the same on-screen
+        fraction (wheel zoom under the cursor); without one the raw
+        range is kept as is (zoom to a bin/selection)."""
+        if not self.log_mode:
+            return view_start, view_end
+        span0 = self.axis_delta(view_end, view_start)
+        frac = None
+        if pivot is not None and span0 > 0:
+            frac = min(1.0, max(0.0, self.axis_delta(pivot, view_start) / span0))
+        start_level = self.level
+        for _ in range(_LOG_MAX_LEVELS):
+            span = self.axis_delta(view_end, view_start)
+            center = self.from_axis_delta(view_start, span / 2)
+            if span < self._LOG_SPLIT_SPAN and self._can_descend(center):
+                self.level += 1
+                continue
+            if self.level > 0 and self._delta_at(view_end, view_start, self.level - 1) >= self._LOG_SPLIT_SPAN:
+                self.level -= 1
+                continue
+            break
+        if self.level != start_level and frac is not None:
+            span = self.axis_delta(view_end, view_start)
+
+            def fit(s):
+                v0 = self.from_axis_delta(pivot, -frac * s)
+                v1 = self.from_axis_delta(pivot, (1.0 - frac) * s)
+                if v0 < 0.0:
+                    v0 = 0.0
+                    v1 = self.from_axis_delta(0.0, s)
+                return v0, v1
+
+            def too_wide(v0, v1):
+                # re-fitted view showing >= 2 bins of the level above
+                # would step straight back up on the next zoom (flip-flop)
+                return (self.level > 0 and self.level > start_level
+                        and self._delta_at(v1, v0, self.level - 1) >= self._LOG_SPLIT_SPAN)
+
+            cand = fit(span)
+            if too_wide(*cand):
+                lo, hi = 0.0, span  # largest span (around the pivot) that fits
+                for _ in range(48):
+                    mid = (lo + hi) / 2
+                    if too_wide(*fit(mid)):
+                        hi = mid
+                    else:
+                        lo = mid
+                cand = fit(lo) if lo > 0 else (view_start, view_end)
+            view_start, view_end = cand
+        return view_start, view_end
 
     # -- BinAxis interface ---------------------------------------------------
     def choose_step(self, view_start: float, view_end: float, target_bins: int) -> Any:
         target_bins = max(1, target_bins)
         if self.log_mode:
-            # Not driven by target_bins: go one level deeper for as long
-            # as the bin under the view's center fills at least
-            # _LOG_SPLIT_SHARE of the view.
+            # Not driven by target_bins. The level itself is set by relevel() on zoom; this only
+            # reports it (plus the parent bin under the view's center,
+            # for the "Bin:" readout).
+            if self.level == 0:
+                return (self._LOG_TOKEN, 0, None, None)
             span = self.axis_delta(view_end, view_start)
-            if span <= 0:
-                return (self._LOG_TOKEN, 0, None, None)
             center = self.from_axis_delta(view_start, span / 2)
-            path = _log_path(max(0.0, center))[0]
-            level = 0
-            while level + 1 < len(path) and path[level][3] >= self._LOG_SPLIT_SHARE * span:
-                level += 1
-            if level == 0:
-                return (self._LOG_TOKEN, 0, None, None)
-            pa, pb, _j, _w = path[level - 1]
-            return (self._LOG_TOKEN, level, pa, pb)
+            pa, pb = self._log_bin_at(center, self.level - 1)
+            return (self._LOG_TOKEN, self.level, pa, pb)
         view_span = view_end - view_start
         ideal = max(view_span, self.min_span) / target_bins
         for step in self._steps_for(max(ideal, view_span)):
@@ -791,9 +853,7 @@ class SizeAxis(BinAxis):
 
     def to_axis_space(self, value: float) -> float:
         if self.log_mode:
-            # Level-0 (decade) bin d spans [d, d+1); inside it each child
-            # bin gets an equal 1/n share of its parent's span, all the
-            # way down, so every bin of one level is the same pixel width.
+            # Index of the value's bin on the current level (+ fraction).
             # Coarse (absolute float) -- the widget uses axis_delta for
             # anything that has to stay exact at deep zoom.
             return self.axis_delta(value, 0.0)

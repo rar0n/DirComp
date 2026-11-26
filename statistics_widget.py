@@ -695,6 +695,8 @@ class TimelineWidget(QWidget):
         self.log_size_axis = bool(enabled)
         if isinstance(self.axis, SizeAxis):
             self.axis.set_log_mode(self.log_size_axis)
+            if self.view_start is not None:
+                self.view_start, self.view_end = self.axis.relevel(self.view_start, self.view_end)
             self._recompute_bins()
             self.update()
 
@@ -868,6 +870,8 @@ class TimelineWidget(QWidget):
         self.view_start = self.global_start - pad
         self.view_end = self.global_end + pad
         self._clamp_view_to_axis_min()
+        self.axis.reset_level()
+        self.view_start, self.view_end = self.axis.relevel(self.view_start, self.view_end)
         # Deliberately does NOT touch selection_range or selected_paths -
         # resetting the zoom is a view-only operation. Any existing range
         # overlay or file selection survives and is simply recolored
@@ -1055,8 +1059,9 @@ class TimelineWidget(QWidget):
             is the "horizontal if it fits" rule; or
           - d*sin(a) >= h: a >= asin(h / d), i.e. the labels stack like
             lines of text once tilted far enough.
-        Labels are centered under their bins, so d is the pixel distance
-        between neighbouring bins' centers (see _x_label_bins).
+        Labels are centered under their bins (or start at them, for the
+        size metric), so d is the pixel distance between neighbouring
+        labels' anchors (see _x_label_bins).
         The angle for the whole axis is the steepest one any adjacent
         pair needs (in log mode the pixel gaps are uneven, so the
         tightest pair decides). If even 90 degrees can't fit a pair
@@ -1847,7 +1852,14 @@ class TimelineWidget(QWidget):
         gets none, and neither does pure padding (see _recompute_bins,
         which pads bin_edges a bit past the view). Centers are taken in
         pixel space (via _value_to_x), so log-scale bins are centered as
-        they look, not as their values average."""
+        they look, not as their values average.
+
+        For an axis with label_at_bin_start (the size metric) the label
+        anchor is the bin's start instead of its center: center_x is
+        then the start x, and a bin is labelled while its start is
+        inside the plot (incl. the right edge, so the view's last
+        boundary gets its value too)."""
+        at_start = self.axis.label_at_bin_start
         n_edges = len(self.bin_edges)
         if self.view_start is None or n_edges < 2:
             return []
@@ -1855,11 +1867,15 @@ class TimelineWidget(QWidget):
         out = []
         for i in range(n_edges - 1):
             lo, hi = self.bin_edges[i], self.bin_edges[i + 1]
-            if hi <= self.view_start or lo >= self.view_end:
+            if at_start:
+                if lo < self.view_start or lo > self.view_end:
+                    continue
+            elif hi <= self.view_start or lo >= self.view_end:
                 continue
             x0, x1 = self._value_to_x(lo), self._value_to_x(hi)
-            cx = (x0 + x1) / 2
-            if cx < rect.left() or cx > rect.right():
+            cx = x0 if at_start else (x0 + x1) / 2
+            tol = 0.5 if at_start else 0.0  # float slop at the plot's edges
+            if cx < rect.left() - tol or cx > rect.right() + tol:
                 continue
             out.append((i, cx, x0, x1))
         return out
@@ -1869,7 +1885,9 @@ class TimelineWidget(QWidget):
         origin_x, text_width, bin_index, bin_center_x) for the surviving
         bins, ascending.
 
-        Each bin is labelled with its own start value. The label is
+        Each bin is labelled with its own start value. For an axis with
+        label_at_bin_start (the size metric) the label's origin is
+        simply the bin's start tick. Otherwise the label is
         centered under the bin -- centered as the *rotated* text
         actually looks: a label at angle a (down-right from its origin)
         of text width w and height h covers w*cos(a) + h*sin(a) pixels
@@ -1902,11 +1920,15 @@ class TimelineWidget(QWidget):
         min_x = X_LABEL_EDGE_INSET
         max_x = self.width() - X_LABEL_EDGE_INSET
 
+        at_start = self.axis.label_at_bin_start
         kept = []
         for i, cx, x0, x1 in bins:
             label = self._format_x_tick(self.bin_edges[i], tick_step)
             w = fm.horizontalAdvance(label)
-            if w * cos_a + h * sin_a < x1 - x0:
+            if at_start:
+                # the text starts right at the bin's start tick
+                ox = x0
+            elif w * cos_a + h * sin_a < x1 - x0:
                 ox = cx - (w / 2) * cos_a
             else:
                 ox = x0 + X_LABEL_EDGE_INSET + half_h_sin
@@ -2044,7 +2066,8 @@ class TimelineWidget(QWidget):
             new_end = from_delta(new_start, new_span)
         if factor < 1 and new_end - new_start < self.axis.min_span:
             return  # already at single-byte resolution
-        self.view_start, self.view_end = new_start, new_end
+        # May step the zoom level up/down (re-fitting around the pivot)
+        self.view_start, self.view_end = self.axis.relevel(new_start, new_end, pivot_v)
         self._recompute_bins()
         self.viewRangeChanged.emit(self.view_start, self.view_end)
 
@@ -2225,7 +2248,8 @@ class TimelineWidget(QWidget):
         zoom and click-to-zoom on an already-selected bin."""
         if v1 - v0 < self.axis.min_span:
             v1 = v0 + self.axis.min_span
-        self.view_start, self.view_end = v0, v1
+        # zoom level for the new range (raw range kept as is)
+        self.view_start, self.view_end = self.axis.relevel(v0, v1)
         self._recompute_bins()
         self.viewRangeChanged.emit(self.view_start, self.view_end)
 
